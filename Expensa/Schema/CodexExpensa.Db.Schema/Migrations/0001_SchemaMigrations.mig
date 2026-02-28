@@ -1,0 +1,5 @@
+﻿CREATE TABLE IF NOT EXISTS SchemaMigrations (
+  MigrationId TEXT NOT NULL PRIMARY KEY,
+  AppliedUtc  TEXT NOT NULL,
+  Checksum    TEXT NULL
+);

@@ -1,0 +1,26 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>net8.0</TargetFramework>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+	</PropertyGroup>
+
+	<!-- Make sure SQL-ish files never get treated as buildable inputs -->
+	<ItemGroup>
+		<Compile Remove="**\*.sql" />
+		<Content Remove="**\*.sql" />
+		<None Remove="**\*.sql" />
+
+		<Compile Remove="**\*.mig" />
+		<Content Remove="**\*.mig" />
+		<None Remove="**\*.mig" />
+	</ItemGroup>
+
+	<!-- Embed ONLY migration resources -->
+	<ItemGroup>
+		<EmbeddedResource Include="**\*.mig" />
+	</ItemGroup>
+
+</Project>

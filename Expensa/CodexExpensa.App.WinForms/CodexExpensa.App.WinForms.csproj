@@ -1,0 +1,18 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<OutputType>WinExe</OutputType>
+		<TargetFramework>net8.0-windows</TargetFramework>
+		<UseWindowsForms>true</UseWindowsForms>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<AssemblyTitle>CodexExpensa</AssemblyTitle>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\CodexExpensa.Core\CodexExpensa.Core.csproj" />
+		<ProjectReference Include="..\CodexExpensa.Data.Sqlite\CodexExpensa.Data.Sqlite.csproj" />
+		<ProjectReference Include="..\CodexExpensa.Security.Windows\CodexExpensa.Security.Windows.csproj" />
+	</ItemGroup>
+
+</Project>

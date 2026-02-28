@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path="Directory.Build.props" />
+  </Folder>
+  <Project Path="CodexExpensa.App.WinForms/CodexExpensa.App.WinForms.csproj" />
+  <Project Path="CodexExpensa.Core/CodexExpensa.Core.csproj" />
+  <Project Path="CodexExpensa.Data.Sqlite/CodexExpensa.Data.Sqlite.csproj" />
+  <Project Path="CodexExpensa.Security.Windows/CodexExpensa.Security.Windows.csproj" />
+  <Project Path="Schema/CodexExpensa.Db.Schema/CodexExpensa.Db.Schema.csproj" />
+</Solution>

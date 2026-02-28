@@ -1,0 +1,25 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>net8.0</TargetFramework>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.0" />
+	</ItemGroup>
+
+	<!-- Safety net: if any .sql lands here, never compile it -->
+	<ItemGroup>
+		<Compile Remove="**\*.sql" />
+		<None Remove="**\*.sql" />
+		<Content Remove="**\*.sql" />
+		<EmbeddedResource Remove="**\*.sql" />
+	</ItemGroup>
+	<ItemGroup>
+	  <ProjectReference Include="..\CodexExpensa.Core\CodexExpensa.Core.csproj" />
+	  <ProjectReference Include="..\Schema\CodexExpensa.Db.Schema\CodexExpensa.Db.Schema.csproj" />
+	</ItemGroup>
+
+</Project>
