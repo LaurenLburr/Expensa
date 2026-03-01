@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/Solution Items/">
+    <File Path="ChatGpt/Expensa_1.md" />
     <File Path="Directory.Build.props" />
   </Folder>
   <Project Path="CodexExpensa.App.WinForms/CodexExpensa.App.WinForms.csproj" />
