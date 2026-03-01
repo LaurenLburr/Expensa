@@ -1,3 +1,5 @@
+Expensa 1
+
 # Codex → Expensa --- Conversation Catch-Up
 
 ## Solution / Repo State

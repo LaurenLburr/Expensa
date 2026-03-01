@@ -1,0 +1,45 @@
+﻿-- 0004_BankAndAccount
+
+PRAGMA foreign_keys = OFF;
+
+DROP TABLE IF EXISTS Accounts;
+
+PRAGMA foreign_keys = ON;
+
+-- =========================
+-- Bank
+-- =========================
+
+CREATE TABLE IF NOT EXISTS Bank (
+    BankId        TEXT    NOT NULL PRIMARY KEY,
+    BankName      TEXT    NOT NULL,
+    RoutingNumber TEXT    NOT NULL,
+    Url           TEXT    NULL
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS UX_Bank_BankName_Routing
+ON Bank (BankName, RoutingNumber);
+
+-- =========================
+-- Account
+-- =========================
+
+CREATE TABLE IF NOT EXISTS Account (
+    AccountId       TEXT    NOT NULL PRIMARY KEY,
+    BankId          TEXT    NOT NULL,
+
+    AccountNickname TEXT    NOT NULL,
+    SortIndex       INTEGER NOT NULL DEFAULT 0,
+    AccountNumber   TEXT    NOT NULL,
+
+    AccountType     TEXT    NOT NULL,
+    IsActive        INTEGER NOT NULL DEFAULT 1,
+
+    FOREIGN KEY (BankId) REFERENCES Bank (BankId)
+);
+
+CREATE INDEX IF NOT EXISTS IX_Account_SortIndex_Nickname
+ON Account (SortIndex, AccountNickname);
+
+CREATE INDEX IF NOT EXISTS IX_Account_BankId
+ON Account (BankId);

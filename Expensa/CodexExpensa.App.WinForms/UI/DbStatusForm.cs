@@ -1,13 +1,16 @@
-﻿using System.Diagnostics;
-using CodexExpensa.Data.Sqlite.Db;
-using CodexExpensa.Data.Sqlite.Db.Schema;
+﻿using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.Windows.Forms;
+using CodexExpensa.Core.Abstractions;
 
 namespace CodexExpensa.App.WinForms.UI;
 
-public sealed partial   class DbStatusForm : Form
+public sealed partial class DbStatusForm : Form
 {
-    private readonly SqliteDatabase _db;
-    private readonly MigrationRunner _migrationRunner;
+    private readonly IDatabaseSession _dbSession;
+    private readonly IMigrationStatusProvider _migrationStatus;
     private readonly string _dbPath;
 
     private readonly TextBox _txtDbPath;
@@ -15,10 +18,13 @@ public sealed partial   class DbStatusForm : Form
     private readonly Button _btnRefresh;
     private readonly ListView _list;
 
-    public DbStatusForm(SqliteDatabase db, MigrationRunner migrationRunner, string dbPath)
+    public DbStatusForm(
+        IDatabaseSession dbSession,
+        IMigrationStatusProvider migrationStatus,
+        string dbPath)
     {
-        _db = db ?? throw new ArgumentNullException(nameof(db));
-        _migrationRunner = migrationRunner ?? throw new ArgumentNullException(nameof(migrationRunner));
+        _dbSession = dbSession ?? throw new ArgumentNullException(nameof(dbSession));
+        _migrationStatus = migrationStatus ?? throw new ArgumentNullException(nameof(migrationStatus));
         _dbPath = string.IsNullOrWhiteSpace(dbPath)
             ? throw new ArgumentException("dbPath is required.", nameof(dbPath))
             : dbPath;
@@ -85,7 +91,7 @@ public sealed partial   class DbStatusForm : Form
             GridLines = true
         };
 
-        _list.Columns.Add("MigrationId", 420);
+        _list.Columns.Add("MigrationId", 520);
         _list.Columns.Add("Status", 160);
 
         Controls.Add(_list);
@@ -99,7 +105,23 @@ public sealed partial   class DbStatusForm : Form
         _list.BeginUpdate();
         _list.Items.Clear();
 
-        var rows = _migrationRunner.GetStatus(_db);
+        IReadOnlyList<MigrationStatusRow> rows;
+
+        try
+        {
+            rows = _migrationStatus.GetStatus(_dbSession);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                this,
+                ex.ToString(),
+                "Failed to load migration status",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
+            _list.EndUpdate();
+            return;
+        }
 
         foreach (var row in rows)
         {
@@ -119,6 +141,7 @@ public sealed partial   class DbStatusForm : Form
             if (string.IsNullOrWhiteSpace(folder) || !Directory.Exists(folder))
             {
                 MessageBox.Show(
+                    this,
                     "DB folder not found.",
                     "Codex Expensa",
                     MessageBoxButtons.OK,
@@ -136,6 +159,7 @@ public sealed partial   class DbStatusForm : Form
         catch (Exception ex)
         {
             MessageBox.Show(
+                this,
                 $"Could not open folder:\n\n{ex.Message}",
                 "Codex Expensa",
                 MessageBoxButtons.OK,

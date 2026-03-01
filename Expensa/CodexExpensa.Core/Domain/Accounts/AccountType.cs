@@ -1,0 +1,8 @@
+﻿namespace CodexExpensa.Core.Domain.Accounts;
+
+public enum AccountType
+{
+    Checking = 0,
+    Savings = 1,
+    CreditCard = 2
+}

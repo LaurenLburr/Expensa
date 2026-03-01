@@ -1,4 +1,12 @@
-﻿using CodexExpensa.App.WinForms.UI;
+﻿using System;
+using System.IO;
+using System.Windows.Forms;
+using CodexExpensa.App.WinForms.UI;
+using CodexExpensa.Core.Abstractions;
+using CodexExpensa.Core.Domain.Accounts;
+using CodexExpensa.Core.Domain.Banks;
+using CodexExpensa.Data.Sqlite.Accounts;
+using CodexExpensa.Data.Sqlite.Banks;
 using CodexExpensa.Data.Sqlite.Db;
 using CodexExpensa.Data.Sqlite.Db.Schema;
 
@@ -10,13 +18,25 @@ public sealed class AppBootstrapper
     {
         var dbPath = GetDatabasePath();
 
-        // Your current MigrationRunner expects SqliteDatabase, so we keep it concrete here.
+        // Concrete DB session (also implements IDatabaseSession / IDatabaseSession-like abstraction)
         var db = SqliteDatabase.OpenMemorySeededFromFile(dbPath);
 
+        // Apply migrations at startup
         var migrationRunner = new MigrationRunner();
         migrationRunner.ApplyPendingMigrations(db);
 
-        var mainForm = new MainForm(db, migrationRunner, dbPath);
+        // Status provider for the DB Status UI (requires runner)
+        IMigrationStatusProvider migrationStatusProvider = new SqliteMigrationStatusProvider(migrationRunner);
+
+        // Repositories
+        IAccountRepository accounts = new SqliteAccountRepository(db);
+        IBankRepository banks = new SqliteBankRepository(db);
+
+        var mainForm = new MainForm(
+            dbSession: db,
+            accounts: accounts,
+            banks: banks,
+            createDbStatusForm: () => new DbStatusForm(db, migrationStatusProvider, dbPath));
 
         mainForm.FormClosing += (_, _) =>
         {

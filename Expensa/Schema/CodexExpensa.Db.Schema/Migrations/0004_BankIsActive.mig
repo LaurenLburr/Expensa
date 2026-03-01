@@ -1,0 +1,5 @@
+﻿-- 0004_BankIsActive
+-- Adds IsActive to Bank. Existing rows default to active.
+
+ALTER TABLE Bank
+ADD COLUMN IsActive INTEGER NOT NULL DEFAULT 1;
