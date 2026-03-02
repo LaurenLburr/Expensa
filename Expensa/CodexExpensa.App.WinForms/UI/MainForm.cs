@@ -7,6 +7,7 @@ using CodexExpensa.Core.Domain.Accounts;
 using CodexExpensa.Core.Domain.Banks;
 using CodexExpensa.App.WinForms.UI.Accounts;
 using CodexExpensa.App.WinForms.UI.Banks;
+using CodexExpensa.App.WinForms.Infrastructure;
 
 namespace CodexExpensa.App.WinForms.UI;
 
@@ -22,15 +23,17 @@ public partial class MainForm : Form
 
     private Form? _activeChildForm;
 
-    private readonly ContextMenuStrip _ctxAccountsRoot;
     private readonly ContextMenuStrip _ctxBanksRoot;
-    private readonly ContextMenuStrip _ctxAccountNode;
+    private readonly ContextMenuStrip _ctxAccountsRoot;
     private readonly ContextMenuStrip _ctxBankNode;
+    private readonly ContextMenuStrip _ctxAccountNode;
+    private readonly ICredentialStore _creds = new WindowsCredentialStore();
+
 
     private enum NavTag
     {
-        AccountsRoot,
-        BanksRoot
+        BanksRoot,
+        AccountsRoot
     }
 
     public MainForm(
@@ -46,20 +49,23 @@ public partial class MainForm : Form
 
         InitializeComponent();
 
-        _ctxAccountsRoot = BuildAccountsRootMenu();
         _ctxBanksRoot = BuildBanksRootMenu();
-        _ctxAccountNode = BuildAccountNodeMenu();
+        _ctxAccountsRoot = BuildAccountsRootMenu();
         _ctxBankNode = BuildBankNodeMenu();
+        _ctxAccountNode = BuildAccountNodeMenu();
 
         Load += MainForm_Load;
+
         treeNav.AfterSelect += TreeNav_AfterSelect;
         treeNav.NodeMouseClick += TreeNav_NodeMouseClick;
 
+        // Menu wiring (names must exist in designer)
         menuFileSave.Click += MenuFileSave_Click;
         menuFileExit.Click += (_, _) => Close();
         menuViewRefresh.Click += MenuViewRefresh_Click;
         menuToolsDbStatus.Click += MenuToolsDbStatus_Click;
         menuHelpAbout.Click += MenuHelpAbout_Click;
+
 
         UpdateDbStatus();
         SetStatus("Ready");
@@ -123,8 +129,8 @@ public partial class MainForm : Form
     {
         MessageBox.Show(
             this,
-            "Expensa\n\nDocked subforms edition.\n(Still not doing your taxes. Calm down.)",
-            "About Expensa",
+            "Codex Expensa\n\nDocked subforms edition.\n(Still not doing your taxes. Calm down.)",
+            "About Codex Expensa",
             MessageBoxButtons.OK,
             MessageBoxIcon.Information);
     }
@@ -152,7 +158,7 @@ public partial class MainForm : Form
             banksRoot.Expand();
             treeNav.Nodes.Add(banksRoot);
 
-            // Accounts root -> grouped by BankName
+            // Accounts root: Accounts | Bank | Nickname - last4
             var accountsRoot = new TreeNode("Accounts") { Tag = NavTag.AccountsRoot };
 
             foreach (var bankGroup in _accountCache
@@ -161,7 +167,7 @@ public partial class MainForm : Form
                          .ThenBy(a => a.AccountNickname)
                          .GroupBy(a => a.BankName))
             {
-                var bankNode = new TreeNode(bankGroup.Key); // bank grouping node (no Tag)
+                var bankNode = new TreeNode(bankGroup.Key);
 
                 foreach (var acct in bankGroup)
                 {
@@ -203,15 +209,14 @@ public partial class MainForm : Form
         if (e.Node is null)
             return;
 
-        // Right click: select node and show menu
-        if (e.Button == MouseButtons.Right)
-        {
-            treeNav.SelectedNode = e.Node;
+        if (e.Button != MouseButtons.Right)
+            return;
 
-            var menu = GetContextMenuForNode(e.Node);
-            if (menu is not null)
-                menu.Show(treeNav, e.Location);
-        }
+        treeNav.SelectedNode = e.Node;
+
+        var menu = GetContextMenuForNode(e.Node);
+        if (menu is not null)
+            menu.Show(treeNav, e.Location);
     }
 
     private ContextMenuStrip? GetContextMenuForNode(TreeNode node)
@@ -226,11 +231,11 @@ public partial class MainForm : Form
             };
         }
 
-        // Bank leaf nodes under Banks root have Tag = bankId
+        // Bank node: parent is BanksRoot
         if (node.Tag is string && node.Parent?.Tag is NavTag parentTag && parentTag == NavTag.BanksRoot)
             return _ctxBankNode;
 
-        // Account leaf nodes have Tag = accountId (under Accounts->BankGroup)
+        // Account node: (AccountsRoot) -> (BankGroup) -> (Account leaf)
         if (node.Tag is string && node.Parent is not null && node.Parent.Parent?.Tag is NavTag p2 && p2 == NavTag.AccountsRoot)
             return _ctxAccountNode;
 
@@ -242,26 +247,27 @@ public partial class MainForm : Form
         if (e.Node is null)
             return;
 
-        // Root selections show "list" views (optional; here we keep it simple)
+        // Root nodes
         if (e.Node.Tag is NavTag tag)
         {
-            if (tag == NavTag.BanksRoot)
+            switch (tag)
             {
-                ShowBanksList();
-                SetStatus("Banks");
-                return;
-            }
+                case NavTag.BanksRoot:
+                    ShowBanksLanding();
+                    SetStatus("Banks");
+                    return;
 
-            if (tag == NavTag.AccountsRoot)
-            {
-                ShowAccountsList(null);
-                SetStatus("Accounts");
-                return;
+                case NavTag.AccountsRoot:
+                    ShowAccountsList();
+                    SetStatus("Accounts");
+                    return;
             }
         }
 
         // Bank leaf
-        if (e.Node.Tag is string bankId && e.Node.Parent?.Tag is NavTag parentTag && parentTag == NavTag.BanksRoot)
+        if (e.Node.Tag is string bankId &&
+            e.Node.Parent?.Tag is NavTag parentTag &&
+            parentTag == NavTag.BanksRoot)
         {
             ShowBankDetails(bankId);
             SetStatus($"Bank: {e.Node.Text}");
@@ -269,21 +275,18 @@ public partial class MainForm : Form
         }
 
         // Account leaf
-        if (e.Node.Tag is string accountId && e.Node.Parent?.Parent?.Tag is NavTag rootTag && rootTag == NavTag.AccountsRoot)
+        if (e.Node.Tag is string accountId &&
+            e.Node.Parent?.Parent?.Tag is NavTag rootTag &&
+            rootTag == NavTag.AccountsRoot)
         {
             ShowAccountDetails(accountId);
             SetStatus($"Account: {e.Node.Text}");
         }
     }
 
-    private void ShowBanksList()
+    private void ShowBanksLanding()
     {
-        // Simple placeholder list: reuse BankDetails for first bank or show empty panel
-        var form = new Form
-        {
-            Text = "Banks",
-            FormBorderStyle = FormBorderStyle.None
-        };
+        var form = new Form { Text = "Banks", FormBorderStyle = FormBorderStyle.None };
 
         var label = new Label
         {
@@ -296,23 +299,42 @@ public partial class MainForm : Form
         ShowChildForm(form);
     }
 
-    private void ShowAccountsList(string? selectedAccountId)
+    private void ShowAccountsList()
     {
-        if (_activeChildForm is AccountsListForm existing)
-        {
-            existing.SetAccounts(_accountCache);
-            if (!string.IsNullOrWhiteSpace(selectedAccountId))
-                existing.SelectAccount(selectedAccountId);
-            return;
-        }
-
-        var form = new AccountsListForm(_accounts, OnDataChanged);
+        var form = new AccountsListForm(OpenAccountDetailsFromList);
         form.SetAccounts(_accountCache);
-
-        if (!string.IsNullOrWhiteSpace(selectedAccountId))
-            form.SelectAccount(selectedAccountId);
-
         ShowChildForm(form);
+    }
+
+    private void OpenAccountDetailsFromList(string accountId)
+    {
+        TrySelectAccountNode(accountId);
+        ShowAccountDetails(accountId);
+        SetStatus("Account (from list)");
+    }
+
+    private void TrySelectAccountNode(string accountId)
+    {
+        if (string.IsNullOrWhiteSpace(accountId))
+            return;
+
+        foreach (TreeNode root in treeNav.Nodes)
+        {
+            if (root.Tag is not NavTag tag || tag != NavTag.AccountsRoot)
+                continue;
+
+            foreach (TreeNode bankGroup in root.Nodes)
+            {
+                foreach (TreeNode acct in bankGroup.Nodes)
+                {
+                    if (acct.Tag is string id && id == accountId)
+                    {
+                        treeNav.SelectedNode = acct;
+                        return;
+                    }
+                }
+            }
+        }
     }
 
     private void ShowBankDetails(string bankId)
@@ -320,7 +342,7 @@ public partial class MainForm : Form
         var bank = _banks.GetById(bankId);
         if (bank is null)
         {
-            MessageBox.Show(this, "Bank not found.", "Expensa", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            MessageBox.Show(this, "Bank not found.", "Codex Expensa", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
 
@@ -334,11 +356,12 @@ public partial class MainForm : Form
         var acct = _accounts.GetById(accountId);
         if (acct is null)
         {
-            MessageBox.Show(this, "Account not found.", "Expensa", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            MessageBox.Show(this, "Account not found.", "Codex Expensa", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
 
-        var form = new AccountDetailsForm(_accounts, OnDataChanged);
+        // ✅ FIX: pass credential store into AccountDetailsForm
+        var form = new AccountDetailsForm(_accounts, _bankCache, _creds, OnDataChanged);
         form.LoadAccount(acct);
         ShowChildForm(form);
     }
@@ -347,10 +370,16 @@ public partial class MainForm : Form
     {
         RefreshCaches();
         BuildNavigationTree();
+
+        // Optional: keep the current view stable if you're on Accounts root
+        if (treeNav.SelectedNode?.Tag is NavTag tag && tag == NavTag.AccountsRoot)
+            ShowAccountsList();
     }
 
     private void ShowChildForm(Form child)
     {
+        if (child is null) throw new ArgumentNullException(nameof(child));
+
         if (_activeChildForm is not null)
         {
             try { _activeChildForm.Close(); } catch { }
@@ -442,7 +471,7 @@ public partial class MainForm : Form
 
     private void AddCheckingAccount()
     {
-        using var dlg = new AddCheckingAccountForm();
+        using var dlg = new AddCheckingAccountForm(_bankCache);
         if (dlg.ShowDialog(this) != DialogResult.OK)
             return;
 
@@ -451,6 +480,19 @@ public partial class MainForm : Form
             nextSort = Math.Max(nextSort, a.SortIndex);
         nextSort += 1;
 
+        if (string.IsNullOrWhiteSpace(dlg.BankId))
+        {
+            MessageBox.Show(this, "No bank selected.", "Codex Expensa", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        var bank = _bankCache.FirstOrDefault(b => b.BankId == dlg.BankId);
+        if (bank is null)
+        {
+            MessageBox.Show(this, "Selected bank not found.", "Codex Expensa", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
         var acct = new Account
         {
             AccountId = Guid.NewGuid().ToString("N"),
@@ -458,10 +500,10 @@ public partial class MainForm : Form
             SortIndex = nextSort,
             AccountNumber = dlg.AccountNumber,
 
-            BankId = string.Empty,
-            BankName = dlg.BankName,
-            RoutingNumber = dlg.RoutingNumber,
-            Url = dlg.Url,
+            BankId = bank.BankId,
+            BankName = bank.BankName,
+            RoutingNumber = bank.RoutingNumber,
+            Url = bank.Url,
 
             AccountType = AccountType.Checking,
             IsActive = dlg.IsActive

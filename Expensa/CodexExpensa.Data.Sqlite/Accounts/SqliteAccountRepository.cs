@@ -111,25 +111,19 @@ public sealed class SqliteAccountRepository : IAccountRepository
                 );
                 """;
 
-            var parameters = new[]
-            {
-                new SqliteParameter("@AccountId", account.AccountId),
-                new SqliteParameter("@BankId", bankId),
-                new SqliteParameter("@AccountNickname", account.AccountNickname),
-                new SqliteParameter("@SortIndex", account.SortIndex),
-                new SqliteParameter("@AccountNumber", account.AccountNumber),
-                new SqliteParameter("@AccountType", account.AccountType.ToString()),
-                new SqliteParameter("@IsActive", account.IsActive ? 1 : 0),
-            };
-
-            try
-            {
-                _db.ExecuteNonQuery(insertAccount, parameters, tx);
-            }
-            catch (SqliteException ex) when (ex.SqliteErrorCode == 19)
-            {
-                throw new InvalidOperationException($"Could not add account '{account.AccountNickname}'. A constraint was violated.", ex);
-            }
+            _db.ExecuteNonQuery(
+                insertAccount,
+                new[]
+                {
+                    new SqliteParameter("@AccountId", account.AccountId),
+                    new SqliteParameter("@BankId", bankId),
+                    new SqliteParameter("@AccountNickname", account.AccountNickname),
+                    new SqliteParameter("@SortIndex", account.SortIndex),
+                    new SqliteParameter("@AccountNumber", account.AccountNumber),
+                    new SqliteParameter("@AccountType", account.AccountType.ToString()),
+                    new SqliteParameter("@IsActive", account.IsActive ? 1 : 0),
+                },
+                tx);
         });
     }
 
@@ -180,22 +174,31 @@ public sealed class SqliteAccountRepository : IAccountRepository
         if (string.IsNullOrWhiteSpace(accountId))
             throw new ArgumentException("accountId is required.", nameof(accountId));
 
-        const string delete =
+        const string sql =
             """
             DELETE FROM Account
             WHERE AccountId = @AccountId;
             """;
 
-        _db.ExecuteNonQuery(delete, new[] { new SqliteParameter("@AccountId", accountId) });
+        _db.ExecuteNonQuery(sql, new[] { new SqliteParameter("@AccountId", accountId) });
     }
 
     private static void ValidateForWrite(Account account)
     {
-        if (string.IsNullOrWhiteSpace(account.AccountId)) throw new ArgumentException("AccountId is required.", nameof(account));
-        if (string.IsNullOrWhiteSpace(account.AccountNickname)) throw new ArgumentException("AccountNickname is required.", nameof(account));
-        if (string.IsNullOrWhiteSpace(account.BankName)) throw new ArgumentException("BankName is required.", nameof(account));
-        if (string.IsNullOrWhiteSpace(account.RoutingNumber)) throw new ArgumentException("RoutingNumber is required.", nameof(account));
-        if (string.IsNullOrWhiteSpace(account.AccountNumber)) throw new ArgumentException("AccountNumber is required.", nameof(account));
+        if (string.IsNullOrWhiteSpace(account.AccountId))
+            throw new ArgumentException("AccountId is required.", nameof(account));
+
+        if (string.IsNullOrWhiteSpace(account.AccountNickname))
+            throw new ArgumentException("AccountNickname is required.", nameof(account));
+
+        if (string.IsNullOrWhiteSpace(account.BankName))
+            throw new ArgumentException("BankName is required.", nameof(account));
+
+        if (string.IsNullOrWhiteSpace(account.RoutingNumber))
+            throw new ArgumentException("RoutingNumber is required.", nameof(account));
+
+        if (string.IsNullOrWhiteSpace(account.AccountNumber))
+            throw new ArgumentException("AccountNumber is required.", nameof(account));
     }
 
     private string GetOrCreateBankId(string bankName, string routingNumber, string? url, SqliteTransaction tx)
@@ -226,9 +229,10 @@ public sealed class SqliteAccountRepository : IAccountRepository
 
         if (existing.Count > 0)
         {
+            // Optional: fill in URL if it was missing in DB
             if (!string.IsNullOrWhiteSpace(url) && string.IsNullOrWhiteSpace(existing[0].Url))
             {
-                const string updateBankUrl =
+                const string updateUrl =
                     """
                     UPDATE Bank
                     SET Url = @Url
@@ -236,7 +240,7 @@ public sealed class SqliteAccountRepository : IAccountRepository
                     """;
 
                 _db.ExecuteNonQuery(
-                    updateBankUrl,
+                    updateUrl,
                     new[]
                     {
                         new SqliteParameter("@Url", url),
@@ -268,44 +272,18 @@ public sealed class SqliteAccountRepository : IAccountRepository
             );
             """;
 
-        try
-        {
-            _db.ExecuteNonQuery(
-                insert,
-                new[]
-                {
-                    new SqliteParameter("@BankId", newId),
-                    new SqliteParameter("@BankName", bankName),
-                    new SqliteParameter("@RoutingNumber", routingNumber),
-                    new SqliteParameter("@Url", (object?)url ?? DBNull.Value),
-                },
-                tx);
+        _db.ExecuteNonQuery(
+            insert,
+            new[]
+            {
+                new SqliteParameter("@BankId", newId),
+                new SqliteParameter("@BankName", bankName),
+                new SqliteParameter("@RoutingNumber", routingNumber),
+                new SqliteParameter("@Url", (object?)url ?? DBNull.Value),
+            },
+            tx);
 
-            return newId;
-        }
-        catch (SqliteException ex) when (ex.SqliteErrorCode == 19)
-        {
-            var retry = _db.Query(
-                """
-                SELECT BankId
-                FROM Bank
-                WHERE BankName = @BankName
-                  AND RoutingNumber = @RoutingNumber
-                LIMIT 1;
-                """,
-                r => r.GetString(0),
-                new[]
-                {
-                    new SqliteParameter("@BankName", bankName),
-                    new SqliteParameter("@RoutingNumber", routingNumber),
-                },
-                tx);
-
-            if (retry.Count > 0)
-                return retry[0];
-
-            throw;
-        }
+        return newId;
     }
 
     private static Account MapAccount(SqliteDataReader r)

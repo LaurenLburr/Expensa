@@ -38,217 +38,176 @@
 
         private void InitializeComponent()
         {
-            this.components = new System.ComponentModel.Container();
-
-            this.menuMain = new System.Windows.Forms.MenuStrip();
-            this.menuFile = new System.Windows.Forms.ToolStripMenuItem();
-            this.menuFileSave = new System.Windows.Forms.ToolStripMenuItem();
-            this.menuFileExit = new System.Windows.Forms.ToolStripMenuItem();
-
-            this.menuView = new System.Windows.Forms.ToolStripMenuItem();
-            this.menuViewRefresh = new System.Windows.Forms.ToolStripMenuItem();
-
-            this.menuTools = new System.Windows.Forms.ToolStripMenuItem();
-            this.menuToolsDbStatus = new System.Windows.Forms.ToolStripMenuItem();
-
-            this.menuHelp = new System.Windows.Forms.ToolStripMenuItem();
-            this.menuHelpAbout = new System.Windows.Forms.ToolStripMenuItem();
-
-            this.statusMain = new System.Windows.Forms.StatusStrip();
-            this.statusText = new System.Windows.Forms.ToolStripStatusLabel();
-            this.statusDbMode = new System.Windows.Forms.ToolStripStatusLabel();
-
-            this.splitMain = new System.Windows.Forms.SplitContainer();
-            this.treeNav = new System.Windows.Forms.TreeView();
-            this.panelHost = new System.Windows.Forms.Panel();
-
-            this.menuMain.SuspendLayout();
-            this.statusMain.SuspendLayout();
-
-            ((System.ComponentModel.ISupportInitialize)(this.splitMain)).BeginInit();
-            this.splitMain.Panel1.SuspendLayout();
-            this.splitMain.Panel2.SuspendLayout();
-            this.splitMain.SuspendLayout();
-
-            this.SuspendLayout();
-
+            menuMain = new MenuStrip();
+            menuFile = new ToolStripMenuItem();
+            menuFileSave = new ToolStripMenuItem();
+            menuFileExit = new ToolStripMenuItem();
+            menuView = new ToolStripMenuItem();
+            menuViewRefresh = new ToolStripMenuItem();
+            menuTools = new ToolStripMenuItem();
+            menuToolsDbStatus = new ToolStripMenuItem();
+            menuHelp = new ToolStripMenuItem();
+            menuHelpAbout = new ToolStripMenuItem();
+            statusMain = new StatusStrip();
+            statusText = new ToolStripStatusLabel();
+            statusDbMode = new ToolStripStatusLabel();
+            splitMain = new SplitContainer();
+            treeNav = new TreeView();
+            panelHost = new Panel();
+            menuMain.SuspendLayout();
+            statusMain.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)splitMain).BeginInit();
+            splitMain.Panel1.SuspendLayout();
+            splitMain.Panel2.SuspendLayout();
+            splitMain.SuspendLayout();
+            SuspendLayout();
             // 
             // menuMain
             // 
-            this.menuMain.ImageScalingSize = new System.Drawing.Size(20, 20);
-            this.menuMain.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
-                this.menuFile,
-                this.menuView,
-                this.menuTools,
-                this.menuHelp
-            });
-            this.menuMain.Location = new System.Drawing.Point(0, 0);
-            this.menuMain.Name = "menuMain";
-            this.menuMain.Size = new System.Drawing.Size(1100, 28);
-            this.menuMain.TabIndex = 0;
-
+            menuMain.ImageScalingSize = new Size(20, 20);
+            menuMain.Items.AddRange(new ToolStripItem[] { menuFile, menuView, menuTools, menuHelp });
+            menuMain.Location = new Point(0, 0);
+            menuMain.Name = "menuMain";
+            menuMain.Size = new Size(1100, 24);
+            menuMain.TabIndex = 0;
             // 
             // menuFile
             // 
-            this.menuFile.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
-                this.menuFileSave,
-                new System.Windows.Forms.ToolStripSeparator(),
-                this.menuFileExit
-            });
-            this.menuFile.Name = "menuFile";
-            this.menuFile.Size = new System.Drawing.Size(46, 24);
-            this.menuFile.Text = "&File";
-
+            menuFile.DropDownItems.AddRange(new ToolStripItem[] { menuFileSave, menuFileExit });
+            menuFile.Name = "menuFile";
+            menuFile.Size = new Size(37, 20);
+            menuFile.Text = "&File";
             // 
             // menuFileSave
             // 
-            this.menuFileSave.Name = "menuFileSave";
-            this.menuFileSave.Size = new System.Drawing.Size(224, 26);
-            this.menuFileSave.Text = "&Save";
-
+            menuFileSave.Name = "menuFileSave";
+            menuFileSave.Size = new Size(180, 22);
+            menuFileSave.Text = "&Save";
+           
             // 
             // menuFileExit
             // 
-            this.menuFileExit.Name = "menuFileExit";
-            this.menuFileExit.Size = new System.Drawing.Size(224, 26);
-            this.menuFileExit.Text = "E&xit";
-
+            menuFileExit.Name = "menuFileExit";
+            menuFileExit.Size = new Size(180, 22);
+            menuFileExit.Text = "E&xit";
             // 
             // menuView
             // 
-            this.menuView.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
-                this.menuViewRefresh
-            });
-            this.menuView.Name = "menuView";
-            this.menuView.Size = new System.Drawing.Size(55, 24);
-            this.menuView.Text = "&View";
-
+            menuView.DropDownItems.AddRange(new ToolStripItem[] { menuViewRefresh });
+            menuView.Name = "menuView";
+            menuView.Size = new Size(44, 20);
+            menuView.Text = "&View";
             // 
             // menuViewRefresh
             // 
-            this.menuViewRefresh.Name = "menuViewRefresh";
-            this.menuViewRefresh.Size = new System.Drawing.Size(224, 26);
-            this.menuViewRefresh.Text = "&Refresh";
-
+            menuViewRefresh.Name = "menuViewRefresh";
+            menuViewRefresh.Size = new Size(113, 22);
+            menuViewRefresh.Text = "&Refresh";
             // 
             // menuTools
             // 
-            this.menuTools.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
-                this.menuToolsDbStatus
-            });
-            this.menuTools.Name = "menuTools";
-            this.menuTools.Size = new System.Drawing.Size(58, 24);
-            this.menuTools.Text = "&Tools";
-
+            menuTools.DropDownItems.AddRange(new ToolStripItem[] { menuToolsDbStatus });
+            menuTools.Name = "menuTools";
+            menuTools.Size = new Size(46, 20);
+            menuTools.Text = "&Tools";
             // 
             // menuToolsDbStatus
             // 
-            this.menuToolsDbStatus.Name = "menuToolsDbStatus";
-            this.menuToolsDbStatus.Size = new System.Drawing.Size(224, 26);
-            this.menuToolsDbStatus.Text = "DB &Status...";
-
+            menuToolsDbStatus.Name = "menuToolsDbStatus";
+            menuToolsDbStatus.Size = new Size(133, 22);
+            menuToolsDbStatus.Text = "DB &Status...";
             // 
             // menuHelp
             // 
-            this.menuHelp.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
-                this.menuHelpAbout
-            });
-            this.menuHelp.Name = "menuHelp";
-            this.menuHelp.Size = new System.Drawing.Size(55, 24);
-            this.menuHelp.Text = "&Help";
-
+            menuHelp.DropDownItems.AddRange(new ToolStripItem[] { menuHelpAbout });
+            menuHelp.Name = "menuHelp";
+            menuHelp.Size = new Size(44, 20);
+            menuHelp.Text = "&Help";
             // 
             // menuHelpAbout
             // 
-            this.menuHelpAbout.Name = "menuHelpAbout";
-            this.menuHelpAbout.Size = new System.Drawing.Size(224, 26);
-            this.menuHelpAbout.Text = "&About";
-
+            menuHelpAbout.Name = "menuHelpAbout";
+            menuHelpAbout.Size = new Size(107, 22);
+            menuHelpAbout.Text = "&About";
             // 
             // statusMain
             // 
-            this.statusMain.ImageScalingSize = new System.Drawing.Size(20, 20);
-            this.statusMain.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
-                this.statusText,
-                this.statusDbMode
-            });
-            this.statusMain.Location = new System.Drawing.Point(0, 628);
-            this.statusMain.Name = "statusMain";
-            this.statusMain.Size = new System.Drawing.Size(1100, 22);
-            this.statusMain.TabIndex = 2;
-
+            statusMain.ImageScalingSize = new Size(20, 20);
+            statusMain.Items.AddRange(new ToolStripItem[] { statusText, statusDbMode });
+            statusMain.Location = new Point(0, 628);
+            statusMain.Name = "statusMain";
+            statusMain.Size = new Size(1100, 22);
+            statusMain.TabIndex = 2;
             // 
             // statusText
             // 
-            this.statusText.Name = "statusText";
-            this.statusText.Size = new System.Drawing.Size(1020, 16);
-            this.statusText.Spring = true;
-            this.statusText.Text = "Ready";
-
+            statusText.Name = "statusText";
+            statusText.Size = new Size(1042, 17);
+            statusText.Spring = true;
+            statusText.Text = "Ready";
             // 
             // statusDbMode
             // 
-            this.statusDbMode.Name = "statusDbMode";
-            this.statusDbMode.Size = new System.Drawing.Size(65, 16);
-            this.statusDbMode.Text = "DB: ???";
-
+            statusDbMode.Name = "statusDbMode";
+            statusDbMode.Size = new Size(43, 17);
+            statusDbMode.Text = "DB: ???";
             // 
             // splitMain
             // 
-            this.splitMain.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.splitMain.FixedPanel = System.Windows.Forms.FixedPanel.Panel1;
-            this.splitMain.Location = new System.Drawing.Point(0, 28);
-            this.splitMain.Name = "splitMain";
-            this.splitMain.Panel1.Controls.Add(this.treeNav);
-            this.splitMain.Panel2.Controls.Add(this.panelHost);
-            this.splitMain.Size = new System.Drawing.Size(1100, 600);
-            this.splitMain.SplitterDistance = 280;
-            this.splitMain.TabIndex = 1;
-
+            splitMain.Dock = DockStyle.Fill;
+            splitMain.FixedPanel = FixedPanel.Panel1;
+            splitMain.Location = new Point(0, 24);
+            splitMain.Name = "splitMain";
+            // 
+            // splitMain.Panel1
+            // 
+            splitMain.Panel1.Controls.Add(treeNav);
+            // 
+            // splitMain.Panel2
+            // 
+            splitMain.Panel2.Controls.Add(panelHost);
+            splitMain.Size = new Size(1100, 604);
+            splitMain.SplitterDistance = 280;
+            splitMain.TabIndex = 1;
             // 
             // treeNav
             // 
-            this.treeNav.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.treeNav.HideSelection = false;
-            this.treeNav.Location = new System.Drawing.Point(0, 0);
-            this.treeNav.Name = "treeNav";
-            this.treeNav.Size = new System.Drawing.Size(280, 600);
-            this.treeNav.TabIndex = 0;
-
+            treeNav.Dock = DockStyle.Fill;
+            treeNav.HideSelection = false;
+            treeNav.Location = new Point(0, 0);
+            treeNav.Name = "treeNav";
+            treeNav.Size = new Size(280, 604);
+            treeNav.TabIndex = 0;
             // 
             // panelHost
             // 
-            this.panelHost.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.panelHost.Location = new System.Drawing.Point(0, 0);
-            this.panelHost.Name = "panelHost";
-            this.panelHost.Size = new System.Drawing.Size(816, 600);
-            this.panelHost.TabIndex = 0;
-
+            panelHost.Dock = DockStyle.Fill;
+            panelHost.Location = new Point(0, 0);
+            panelHost.Name = "panelHost";
+            panelHost.Size = new Size(816, 604);
+            panelHost.TabIndex = 0;
             // 
             // MainForm
             // 
-            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(1100, 650);
-            this.Controls.Add(this.splitMain);
-            this.Controls.Add(this.statusMain);
-            this.Controls.Add(this.menuMain);
-            this.MainMenuStrip = this.menuMain;
-            this.Name = "MainForm";
-            this.Text = "Expensa";
-
-            this.menuMain.ResumeLayout(false);
-            this.menuMain.PerformLayout();
-
-            this.statusMain.ResumeLayout(false);
-            this.statusMain.PerformLayout();
-
-            this.splitMain.Panel1.ResumeLayout(false);
-            this.splitMain.Panel2.ResumeLayout(false);
-            ((System.ComponentModel.ISupportInitialize)(this.splitMain)).EndInit();
-            this.splitMain.ResumeLayout(false);
-
-            this.ResumeLayout(false);
-            this.PerformLayout();
+            AutoScaleDimensions = new SizeF(7F, 15F);
+            AutoScaleMode = AutoScaleMode.Font;
+            ClientSize = new Size(1100, 650);
+            Controls.Add(splitMain);
+            Controls.Add(statusMain);
+            Controls.Add(menuMain);
+            MainMenuStrip = menuMain;
+            Name = "MainForm";
+            Text = "Expensa";
+            menuMain.ResumeLayout(false);
+            menuMain.PerformLayout();
+            statusMain.ResumeLayout(false);
+            statusMain.PerformLayout();
+            splitMain.Panel1.ResumeLayout(false);
+            splitMain.Panel2.ResumeLayout(false);
+            ((System.ComponentModel.ISupportInitialize)splitMain).EndInit();
+            splitMain.ResumeLayout(false);
+            ResumeLayout(false);
+            PerformLayout();
         }
 
         #endregion

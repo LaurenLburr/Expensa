@@ -1,4 +1,6 @@
-﻿namespace CodexExpensa.Core.Domain.Accounts;
+﻿using System.Collections.Generic;
+
+namespace CodexExpensa.Core.Domain.Accounts;
 
 public interface IAccountRepository
 {
