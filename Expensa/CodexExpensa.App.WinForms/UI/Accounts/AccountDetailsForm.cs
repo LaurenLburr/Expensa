@@ -6,6 +6,8 @@ using System.Windows.Forms;
 using CodexExpensa.Core.Abstractions;
 using CodexExpensa.Core.Domain.Accounts;
 using CodexExpensa.Core.Domain.Banks;
+using CodexExpensa.Core.Domain.Payees;
+using CodexExpensa.Core.Domain.Transactions;
 using CodexExpensa.App.WinForms.UI.Banks;
 
 namespace CodexExpensa.App.WinForms.UI.Accounts;
@@ -18,13 +20,20 @@ public sealed class AccountDetailsForm : Form
 
     private readonly IReadOnlyList<Bank> _banks;
 
+    private readonly ITransactionRepository _txns;
+    private readonly IPayeeRepository _payees;
+
     private Account? _account;
 
+    private readonly TabControl _tabs;
+    private readonly TabPage _tabDetails;
+    private readonly TabPage _tabTransactions;
+
+    // Details controls
     private readonly TextBox _txtNickname;
     private readonly NumericUpDown _numSort;
     private readonly TextBox _txtAccountNumber;
     private readonly CheckBox _chkActive;
-
     private readonly TextBox _txtAccountType;
 
     private readonly LinkLabel _lnkBankLabel;
@@ -39,40 +48,89 @@ public sealed class AccountDetailsForm : Form
 
     private readonly Button _btnSave;
 
-    public AccountDetailsForm(IAccountRepository repo, IReadOnlyList<Bank> banks, ICredentialStore creds, Action onSaved)
+    private readonly AccountTransactionsPanel _transactionsPanel;
+
+    public AccountDetailsForm(
+        IAccountRepository repo,
+        IReadOnlyList<Bank> banks,
+        ICredentialStore creds,
+        ITransactionRepository txns,
+        IPayeeRepository payees,
+        Action onSaved)
     {
         _repo = repo ?? throw new ArgumentNullException(nameof(repo));
         _banks = banks ?? throw new ArgumentNullException(nameof(banks));
         _creds = creds ?? throw new ArgumentNullException(nameof(creds));
+        _txns = txns ?? throw new ArgumentNullException(nameof(txns));
+        _payees = payees ?? throw new ArgumentNullException(nameof(payees));
         _onSaved = onSaved ?? throw new ArgumentNullException(nameof(onSaved));
 
         Text = "Account";
         FormBorderStyle = FormBorderStyle.None;
 
-        var panel = new Panel { Dock = DockStyle.Fill, Padding = new Padding(12) };
-        Controls.Add(panel);
+        var root = new Panel { Dock = DockStyle.Fill, Padding = new Padding(12) };
+        Controls.Add(root);
 
         var lblTitle = new Label { Text = "Account Details", AutoSize = true, Left = 12, Top = 12 };
+        root.Controls.Add(lblTitle);
 
-        var lblNick = new Label { Text = "Nickname:", AutoSize = true, Left = 12, Top = 50 };
-        _txtNickname = new TextBox { Left = 140, Top = 46, Width = 700, Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
+        _tabs = new TabControl
+        {
+            Left = 12,
+            Top = 40,
+            Width = 900,
+            Height = 520,
+            Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right
+        };
+        root.Controls.Add(_tabs);
 
-        var lblSort = new Label { Text = "Sort Index:", AutoSize = true, Left = 12, Top = 86 };
-        _numSort = new NumericUpDown { Left = 140, Top = 82, Width = 140, Minimum = 0, Maximum = 1000000 };
+        _tabDetails = new TabPage("Details");
+        _tabTransactions = new TabPage("Transactions");
 
-        var lblAcctNo = new Label { Text = "Account #:", AutoSize = true, Left = 12, Top = 122 };
-        _txtAccountNumber = new TextBox { Left = 140, Top = 118, Width = 240 };
+        _tabs.TabPages.Add(_tabDetails);
+        _tabs.TabPages.Add(_tabTransactions);
 
-        var lblType = new Label { Text = "Type:", AutoSize = true, Left = 400, Top = 122 };
-        _txtAccountType = new TextBox { Left = 450, Top = 118, Width = 180, ReadOnly = true };
+        _btnSave = new Button
+        {
+            Text = "Save",
+            Width = 100,
+            Height = 30,
+            Anchor = AnchorStyles.Bottom | AnchorStyles.Left
+        };
+        _btnSave.Click += (_, _) => Save();
+        root.Controls.Add(_btnSave);
 
-        _chkActive = new CheckBox { Text = "Active", Left = 140, Top = 154, Width = 120 };
+        root.Resize += (_, _) =>
+        {
+            _btnSave.Left = 12;
+            _btnSave.Top = root.Height - _btnSave.Height - 12;
+            _tabs.Height = _btnSave.Top - _tabs.Top - 10;
+            _tabs.Width = root.Width - 24;
+        };
+
+        // -------- Details Tab --------
+        var details = new Panel { Dock = DockStyle.Fill };
+        _tabDetails.Controls.Add(details);
+
+        var lblNick = new Label { Text = "Nickname:", AutoSize = true, Left = 12, Top = 16 };
+        _txtNickname = new TextBox { Left = 140, Top = 12, Width = 700, Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
+
+        var lblSort = new Label { Text = "Sort Index:", AutoSize = true, Left = 12, Top = 52 };
+        _numSort = new NumericUpDown { Left = 140, Top = 48, Width = 140, Minimum = 0, Maximum = 1000000 };
+
+        var lblAcctNo = new Label { Text = "Account #:", AutoSize = true, Left = 12, Top = 88 };
+        _txtAccountNumber = new TextBox { Left = 140, Top = 84, Width = 240 };
+
+        var lblType = new Label { Text = "Type:", AutoSize = true, Left = 400, Top = 88 };
+        _txtAccountType = new TextBox { Left = 450, Top = 84, Width = 180, ReadOnly = true };
+
+        _chkActive = new CheckBox { Text = "Active", Left = 140, Top = 120, Width = 120 };
 
         var groupBank = new GroupBox
         {
             Text = "Bank (linked record)",
             Left = 12,
-            Top = 190,
+            Top = 155,
             Width = 860,
             Height = 230,
             Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
@@ -141,21 +199,27 @@ public sealed class AccountDetailsForm : Form
             Parent = groupBank
         };
 
-        _btnSave = new Button { Text = "Save", Width = 100, Height = 30, Left = 140, Top = 435 };
-        _btnSave.Click += (_, _) => Save();
+        details.Controls.Add(lblNick);
+        details.Controls.Add(_txtNickname);
+        details.Controls.Add(lblSort);
+        details.Controls.Add(_numSort);
+        details.Controls.Add(lblAcctNo);
+        details.Controls.Add(_txtAccountNumber);
+        details.Controls.Add(lblType);
+        details.Controls.Add(_txtAccountType);
+        details.Controls.Add(_chkActive);
+        details.Controls.Add(groupBank);
 
-        panel.Controls.Add(lblTitle);
-        panel.Controls.Add(lblNick);
-        panel.Controls.Add(_txtNickname);
-        panel.Controls.Add(lblSort);
-        panel.Controls.Add(_numSort);
-        panel.Controls.Add(lblAcctNo);
-        panel.Controls.Add(_txtAccountNumber);
-        panel.Controls.Add(lblType);
-        panel.Controls.Add(_txtAccountType);
-        panel.Controls.Add(_chkActive);
-        panel.Controls.Add(groupBank);
-        panel.Controls.Add(_btnSave);
+        _tabDetails.Resize += (_, _) =>
+        {
+            groupBank.Width = _tabDetails.ClientSize.Width - 24;
+            _txtNickname.Width = _tabDetails.ClientSize.Width - _txtNickname.Left - 24;
+            _cmbBank.Width = groupBank.ClientSize.Width - _cmbBank.Left - 24;
+        };
+
+        // -------- Transactions Tab --------
+        _transactionsPanel = new AccountTransactionsPanel(_txns, _payees, _repo);
+        _tabTransactions.Controls.Add(_transactionsPanel);
 
         LoadBanksIntoCombo();
         SetUrl(null);
@@ -176,6 +240,19 @@ public sealed class AccountDetailsForm : Form
 
         SelectBankByAccount(account);
         UpdateCredentialLinkText();
+
+        _transactionsPanel.LoadForAccount(
+            accountId: account.AccountId,
+            accountDisplayName: $"{account.AccountNickname} - {Last4(account.AccountNumber)}");
+    }
+
+    private static string Last4(string accountNumber)
+    {
+        if (string.IsNullOrWhiteSpace(accountNumber))
+            return "????";
+
+        var cleaned = accountNumber.Replace(" ", "").Replace("-", "");
+        return cleaned.Length <= 4 ? cleaned : cleaned.Substring(cleaned.Length - 4);
     }
 
     private void LoadBanksIntoCombo()
@@ -323,14 +400,14 @@ public sealed class AccountDetailsForm : Form
         if (string.IsNullOrWhiteSpace(bankId))
             throw new InvalidOperationException("No bank is selected.");
 
-        return $"CodexExpensa.Bank.{bankId}";
+        return CredentialKeys.Bank(bankId);
     }
 
     private void UpdateCredentialLinkText()
     {
         try
         {
-            if (_cmbBank.SelectedItem is not BankItem bankItem)
+            if (_cmbBank.SelectedItem is not BankItem)
             {
                 _lnkUsername.Text = "Username (n/a)";
                 _lnkPw.Text = "PW (n/a)";
@@ -361,34 +438,24 @@ public sealed class AccountDetailsForm : Form
         if (_cmbBank.SelectedItem is not BankItem bankItem)
             return;
 
-        var key = GetCredentialKeyForSelectedBank();
-
-        _creds.TryGet(key, out var existingUser, out _);
-
-        using var dlg = new BankCredentialsForm(
-            bankDisplayName: $"{bankItem.Bank.BankName} ({bankItem.Bank.RoutingNumber})",
-            existingUsername: existingUser);
-
-        if (dlg.ShowDialog(this) != DialogResult.OK)
-            return;
-
+        string key;
         try
         {
-            if (dlg.ClearRequested)
-            {
-                _creds.Delete(key);
-            }
-            else
-            {
-                _creds.Save(key, dlg.Username, dlg.Password);
-            }
-
-            UpdateCredentialLinkText();
+            key = GetCredentialKeyForSelectedBank();
         }
         catch (Exception ex)
         {
-            MessageBox.Show(this, ex.ToString(), "Credential Save failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            MessageBox.Show(this, ex.Message, "Credentials", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
         }
+
+        using var dlg = new BankCredentialsForm(
+            _creds,
+            bankDisplayName: $"{bankItem.Bank.BankName} ({bankItem.Bank.RoutingNumber})",
+            credentialKey: key);
+
+        dlg.ShowDialog(this);
+        UpdateCredentialLinkText();
     }
 
     private void Save()
@@ -424,16 +491,13 @@ public sealed class AccountDetailsForm : Form
         var updated = new Account
         {
             AccountId = _account.AccountId,
-
             AccountNickname = nickname,
             SortIndex = (int)_numSort.Value,
-            AccountNumber = acctNo,
-
             BankId = bank.BankId,
+            AccountNumber = acctNo,
             BankName = bank.BankName,
             RoutingNumber = bank.RoutingNumber,
             Url = bank.Url,
-
             AccountType = _account.AccountType,
             IsActive = _chkActive.Checked
         };

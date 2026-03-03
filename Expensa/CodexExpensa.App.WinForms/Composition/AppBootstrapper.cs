@@ -5,71 +5,78 @@ using CodexExpensa.App.WinForms.UI;
 using CodexExpensa.Core.Abstractions;
 using CodexExpensa.Core.Domain.Accounts;
 using CodexExpensa.Core.Domain.Banks;
+using CodexExpensa.Core.Domain.Payees;
+using CodexExpensa.Core.Domain.Transactions;
 using CodexExpensa.Data.Sqlite.Accounts;
 using CodexExpensa.Data.Sqlite.Banks;
 using CodexExpensa.Data.Sqlite.Db;
 using CodexExpensa.Data.Sqlite.Db.Schema;
+using CodexExpensa.Data.Sqlite.Payees;
+using CodexExpensa.Data.Sqlite.Transactions;
 
 namespace CodexExpensa.App.WinForms.Composition;
 
-public sealed class AppBootstrapper
+public static class AppBootstrapper
 {
-    public MainForm Initialize()
+    public static MainForm Initialize()
     {
         var dbPath = GetDatabasePath();
 
-        // Concrete DB session (also implements IDatabaseSession / IDatabaseSession-like abstraction)
+        // In-memory DB seeded from file (Save flushes to disk)
         var db = SqliteDatabase.OpenMemorySeededFromFile(dbPath);
 
-        // Apply migrations at startup
+        // ✅ MUST RUN MIGRATIONS BEFORE ANY REPO QUERIES
         var migrationRunner = new MigrationRunner();
-        migrationRunner.ApplyPendingMigrations(db);
+        MigrationRunResult migResult;
 
-        // Status provider for the DB Status UI (requires runner)
+        try
+        {
+            migResult = migrationRunner.ApplyPendingMigrations(db);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                $"Database migration failed:\n\n{ex}",
+                "Codex Expensa",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
+
+            throw; // keep failing fast; DB is not safe to use
+        }
+
+        // Optional: if you want visibility during dev
+        if (migResult.AppliedCount > 0)
+        {
+            // Avoid noisy popups later if you don't want them.
+            // MessageBox.Show($"Applied {migResult.AppliedCount} migration(s).", "Codex Expensa");
+        }
+
         IMigrationStatusProvider migrationStatusProvider = new SqliteMigrationStatusProvider(migrationRunner);
 
-        // Repositories
+        // Repositories (now safe: tables exist)
         IAccountRepository accounts = new SqliteAccountRepository(db);
         IBankRepository banks = new SqliteBankRepository(db);
+        ITransactionRepository transactions = new SqliteTransactionRepository(db);
+        IPayeeRepository payees = new SqlitePayeeRepository(db);
 
-        var mainForm = new MainForm(
+        return new MainForm(
             dbSession: db,
             accounts: accounts,
             banks: banks,
-            createDbStatusForm: () => new DbStatusForm(db, migrationStatusProvider, dbPath));
-
-        mainForm.FormClosing += (_, _) =>
-        {
-            try
-            {
-                db.Save();
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(
-                    $"Database save failed:\n\n{ex}",
-                    "Codex Expensa",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error);
-            }
-            finally
-            {
-                db.Dispose();
-            }
-        };
-
-        return mainForm;
+            transactions: transactions,
+            payees: payees,
+            createDbStatusForm: () => new DbStatusForm(db, migrationStatusProvider, dbPath)
+        );
     }
 
     private static string GetDatabasePath()
     {
-        var baseFolder = Path.Combine(
+        var folder = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "CodexExpensa",
-            "db");
+            "CodexExpensa","db");
 
-        Directory.CreateDirectory(baseFolder);
+        Directory.CreateDirectory(folder);
 
-        return Path.Combine(baseFolder, "codexexpensa.db");
+        return Path.Combine(folder, "codexexpensa.db");
     }
 }

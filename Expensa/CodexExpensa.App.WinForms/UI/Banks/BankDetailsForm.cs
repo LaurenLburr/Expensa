@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Windows.Forms;
+using CodexExpensa.Core.Abstractions;
 using CodexExpensa.Core.Domain.Banks;
 
 namespace CodexExpensa.App.WinForms.UI.Banks;
@@ -7,6 +8,7 @@ namespace CodexExpensa.App.WinForms.UI.Banks;
 public sealed class BankDetailsForm : Form
 {
     private readonly IBankRepository _repo;
+    private readonly ICredentialStore _credentialStore;
     private readonly Action _onSaved;
 
     private Bank? _bank;
@@ -15,11 +17,14 @@ public sealed class BankDetailsForm : Form
     private readonly TextBox _txtRouting;
     private readonly TextBox _txtUrl;
     private readonly CheckBox _chkActive;
-    private readonly Button _btnSave;
 
-    public BankDetailsForm(IBankRepository repo, Action onSaved)
+    private readonly Button _btnSave;
+    private readonly Button _btnCredentials;
+
+    public BankDetailsForm(IBankRepository repo, ICredentialStore credentialStore, Action onSaved)
     {
         _repo = repo ?? throw new ArgumentNullException(nameof(repo));
+        _credentialStore = credentialStore ?? throw new ArgumentNullException(nameof(credentialStore));
         _onSaved = onSaved ?? throw new ArgumentNullException(nameof(onSaved));
 
         Text = "Bank";
@@ -41,8 +46,12 @@ public sealed class BankDetailsForm : Form
 
         _chkActive = new CheckBox { Text = "Active", Left = 140, Top = 154, Width = 120 };
 
-        _btnSave = new Button { Text = "Save", Width = 100, Height = 30, Left = 140, Top = 190 };
+        _btnSave = new Button { Text = "Save", Width = 100, Height = 30, Anchor = AnchorStyles.Bottom | AnchorStyles.Left };
         _btnSave.Click += (_, _) => Save();
+
+        _btnCredentials = new Button { Text = "Credentials...", Width = 120, Height = 30, Anchor = AnchorStyles.Bottom | AnchorStyles.Left };
+        _btnCredentials.Click += (_, _) => OpenCredentials();
+        _btnCredentials.Enabled = false;
 
         panel.Controls.Add(lblTitle);
         panel.Controls.Add(lblName);
@@ -53,6 +62,18 @@ public sealed class BankDetailsForm : Form
         panel.Controls.Add(_txtUrl);
         panel.Controls.Add(_chkActive);
         panel.Controls.Add(_btnSave);
+        panel.Controls.Add(_btnCredentials);
+
+        // Lower Save/Credentials buttons: keep them glued to the bottom.
+        panel.Resize += (_, _) =>
+        {
+            var bottom = panel.Height - 12 - _btnSave.Height;
+            _btnSave.Left = 140;
+            _btnSave.Top = bottom;
+
+            _btnCredentials.Left = _btnSave.Right + 10;
+            _btnCredentials.Top = bottom;
+        };
     }
 
     public void LoadBank(Bank bank)
@@ -63,6 +84,26 @@ public sealed class BankDetailsForm : Form
         _txtRouting.Text = bank.RoutingNumber;
         _txtUrl.Text = bank.Url ?? string.Empty;
         _chkActive.Checked = bank.IsActive;
+
+        _btnCredentials.Enabled = true;
+    }
+
+    private void OpenCredentials()
+    {
+        if (_bank is null)
+            return;
+
+        var key = CredentialKeys.Bank(_bank.BankId);
+
+        using var dlg = new BankCredentialsForm(
+            _credentialStore,
+            bankDisplayName: $"{_bank.BankName} ({_bank.RoutingNumber})",
+            credentialKey: key)
+        {
+            StartPosition = FormStartPosition.CenterParent
+        };
+
+        dlg.ShowDialog(this);
     }
 
     private void Save()

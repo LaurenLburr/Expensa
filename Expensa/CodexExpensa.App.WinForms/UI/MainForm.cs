@@ -1,13 +1,16 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Windows.Forms;
+﻿using CodexExpensa.App.WinForms.Infrastructure;
+using CodexExpensa.App.WinForms.UI.Accounts;
+using CodexExpensa.App.WinForms.UI.Banks;
 using CodexExpensa.Core.Abstractions;
 using CodexExpensa.Core.Domain.Accounts;
 using CodexExpensa.Core.Domain.Banks;
-using CodexExpensa.App.WinForms.UI.Accounts;
-using CodexExpensa.App.WinForms.UI.Banks;
-using CodexExpensa.App.WinForms.Infrastructure;
+using CodexExpensa.Core.Domain.Payees;
+using CodexExpensa.Core.Domain.Transactions;
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
+using System.Windows.Forms;
 
 namespace CodexExpensa.App.WinForms.UI;
 
@@ -27,8 +30,11 @@ public partial class MainForm : Form
     private readonly ContextMenuStrip _ctxAccountsRoot;
     private readonly ContextMenuStrip _ctxBankNode;
     private readonly ContextMenuStrip _ctxAccountNode;
+
     private readonly ICredentialStore _creds = new WindowsCredentialStore();
 
+    private readonly ITransactionRepository _transactions;
+    private readonly IPayeeRepository _payees;
 
     private enum NavTag
     {
@@ -37,15 +43,20 @@ public partial class MainForm : Form
     }
 
     public MainForm(
-        IDatabaseSession dbSession,
-        IAccountRepository accounts,
-        IBankRepository banks,
-        Func<Form> createDbStatusForm)
+    IDatabaseSession dbSession,
+    IAccountRepository accounts,
+    IBankRepository banks,
+    ITransactionRepository transactions,
+    IPayeeRepository payees,
+    Func<Form> createDbStatusForm)
     {
         _dbSession = dbSession ?? throw new ArgumentNullException(nameof(dbSession));
         _accounts = accounts ?? throw new ArgumentNullException(nameof(accounts));
         _banks = banks ?? throw new ArgumentNullException(nameof(banks));
         _createDbStatusForm = createDbStatusForm ?? throw new ArgumentNullException(nameof(createDbStatusForm));
+
+        _transactions = transactions ?? throw new ArgumentNullException(nameof(transactions));
+        _payees = payees ?? throw new ArgumentNullException(nameof(payees));
 
         InitializeComponent();
 
@@ -65,7 +76,6 @@ public partial class MainForm : Form
         menuViewRefresh.Click += MenuViewRefresh_Click;
         menuToolsDbStatus.Click += MenuToolsDbStatus_Click;
         menuHelpAbout.Click += MenuHelpAbout_Click;
-
 
         UpdateDbStatus();
         SetStatus("Ready");
@@ -158,18 +168,39 @@ public partial class MainForm : Form
             banksRoot.Expand();
             treeNav.Nodes.Add(banksRoot);
 
-            // Accounts root: Accounts | Bank | Nickname - last4
+            // Accounts root: Accounts -> Bank (tag=bankId) -> Account leaf (tag=accountId)
             var accountsRoot = new TreeNode("Accounts") { Tag = NavTag.AccountsRoot };
 
-            foreach (var bankGroup in _accountCache
-                         .OrderBy(a => a.BankName)
-                         .ThenBy(a => a.SortIndex)
-                         .ThenBy(a => a.AccountNickname)
-                         .GroupBy(a => a.BankName))
+            // Build bankId -> accounts list (resolving bankId when missing)
+            var bankAccounts = new Dictionary<string, List<Account>>(StringComparer.Ordinal);
+            foreach (var acct in _accountCache)
             {
-                var bankNode = new TreeNode(bankGroup.Key);
+                var bankId = ResolveBankId(acct);
+                if (string.IsNullOrWhiteSpace(bankId))
+                    continue;
 
-                foreach (var acct in bankGroup)
+                if (!bankAccounts.TryGetValue(bankId, out var list))
+                {
+                    list = new List<Account>();
+                    bankAccounts[bankId] = list;
+                }
+
+                list.Add(acct);
+            }
+
+            foreach (var kvp in bankAccounts
+                         .OrderBy(k => GetBankDisplayName(k.Key), StringComparer.OrdinalIgnoreCase))
+            {
+                var bankId = kvp.Key;
+                var accountsForBank = kvp.Value;
+
+                var bankDisplay = GetBankDisplayName(bankId);
+                var bankNode = new TreeNode(bankDisplay) { Tag = bankId };
+
+                foreach (var acct in accountsForBank
+                             .OrderBy(a => a.SortIndex)
+                             .ThenBy(a => a.AccountNickname)
+                             .ThenBy(a => a.AccountNumber))
                 {
                     var last4 = Last4(acct.AccountNumber);
                     var label = $"{acct.AccountNickname} - {last4}";
@@ -187,6 +218,31 @@ public partial class MainForm : Form
         {
             treeNav.EndUpdate();
         }
+    }
+
+    private string GetBankDisplayName(string bankId)
+    {
+        var bank = _bankCache.FirstOrDefault(b => b.BankId == bankId);
+        if (bank is null)
+            return bankId;
+
+        return $"{bank.BankName} ({bank.RoutingNumber})";
+    }
+
+    private string? ResolveBankId(Account acct)
+    {
+        if (!string.IsNullOrWhiteSpace(acct.BankId))
+            return acct.BankId;
+
+        // Fallback: match by BankName + RoutingNumber if older rows didn’t store BankId
+        if (string.IsNullOrWhiteSpace(acct.BankName) || string.IsNullOrWhiteSpace(acct.RoutingNumber))
+            return null;
+
+        var match = _bankCache.FirstOrDefault(b =>
+            string.Equals(b.BankName, acct.BankName, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(b.RoutingNumber, acct.RoutingNumber, StringComparison.OrdinalIgnoreCase));
+
+        return match?.BankId;
     }
 
     private static string Last4(string accountNumber)
@@ -231,11 +287,15 @@ public partial class MainForm : Form
             };
         }
 
-        // Bank node: parent is BanksRoot
+        // Bank node under Banks root
         if (node.Tag is string && node.Parent?.Tag is NavTag parentTag && parentTag == NavTag.BanksRoot)
             return _ctxBankNode;
 
-        // Account node: (AccountsRoot) -> (BankGroup) -> (Account leaf)
+        // Bank node under Accounts root (this is what you asked for)
+        if (node.Tag is string && node.Parent?.Tag is NavTag parentTag2 && parentTag2 == NavTag.AccountsRoot)
+            return _ctxBankNode;
+
+        // Account leaf under Accounts root: AccountsRoot -> BankNode -> AccountLeaf
         if (node.Tag is string && node.Parent is not null && node.Parent.Parent?.Tag is NavTag p2 && p2 == NavTag.AccountsRoot)
             return _ctxAccountNode;
 
@@ -264,7 +324,7 @@ public partial class MainForm : Form
             }
         }
 
-        // Bank leaf
+        // Bank leaf under Banks root
         if (e.Node.Tag is string bankId &&
             e.Node.Parent?.Tag is NavTag parentTag &&
             parentTag == NavTag.BanksRoot)
@@ -274,7 +334,17 @@ public partial class MainForm : Form
             return;
         }
 
-        // Account leaf
+        // Bank node under Accounts root (behave the same as real bank nodes)
+        if (e.Node.Tag is string bankId2 &&
+            e.Node.Parent?.Tag is NavTag parentTag2 &&
+            parentTag2 == NavTag.AccountsRoot)
+        {
+            ShowBankDetails(bankId2);
+            SetStatus($"Bank: {e.Node.Text}");
+            return;
+        }
+
+        // Account leaf under Accounts root
         if (e.Node.Tag is string accountId &&
             e.Node.Parent?.Parent?.Tag is NavTag rootTag &&
             rootTag == NavTag.AccountsRoot)
@@ -292,7 +362,7 @@ public partial class MainForm : Form
         {
             Dock = DockStyle.Fill,
             TextAlign = System.Drawing.ContentAlignment.MiddleCenter,
-            Text = "Select a bank to view/edit details.\n(Right-click Banks to add a new one.)"
+            Text = "Select a bank to view/edit details.\n(Right-click Banks to add a new one.)\n(Right-click a bank to add an account.)"
         };
 
         form.Controls.Add(label);
@@ -346,7 +416,7 @@ public partial class MainForm : Form
             return;
         }
 
-        var form = new BankDetailsForm(_banks, OnDataChanged);
+        var form = new BankDetailsForm(_banks, _creds, OnDataChanged);
         form.LoadBank(bank);
         ShowChildForm(form);
     }
@@ -360,10 +430,13 @@ public partial class MainForm : Form
             return;
         }
 
-        // ✅ FIX: pass credential store into AccountDetailsForm
-        var form = new AccountDetailsForm(_accounts, _bankCache, _creds, OnDataChanged);
-        form.LoadAccount(acct);
-        ShowChildForm(form);
+        var form = new AccountDetailsForm(
+    _accounts,
+    _bankCache,
+    _creds,
+    _transactions,
+    _payees,
+    OnDataChanged);
     }
 
     private void OnDataChanged()
@@ -412,18 +485,19 @@ public partial class MainForm : Form
 
     private ContextMenuStrip BuildAccountsRootMenu()
     {
-        var menu = new ContextMenuStrip();
-
-        var add = new ToolStripMenuItem("Add Checking Account");
-        add.Click += (_, _) => AddCheckingAccount();
-        menu.Items.Add(add);
-
-        return menu;
+        // Empty for now. “Add account” lives on Bank nodes.
+        return new ContextMenuStrip();
     }
 
     private ContextMenuStrip BuildBankNodeMenu()
     {
         var menu = new ContextMenuStrip();
+
+        var addAcct = new ToolStripMenuItem("Add Checking Account");
+        addAcct.Click += (_, _) => AddCheckingAccount(preselectedBankId: GetSelectedBankIdFromTree());
+        menu.Items.Add(addAcct);
+
+        menu.Items.Add(new ToolStripSeparator());
 
         var del = new ToolStripMenuItem("Delete Bank");
         del.Click += (_, _) => DeleteSelectedBank();
@@ -441,6 +515,12 @@ public partial class MainForm : Form
         menu.Items.Add(del);
 
         return menu;
+    }
+
+    private string? GetSelectedBankIdFromTree()
+    {
+        var node = treeNav.SelectedNode;
+        return node?.Tag as string;
     }
 
     private void AddBank()
@@ -461,6 +541,16 @@ public partial class MainForm : Form
         try
         {
             _banks.Add(bank);
+
+            var username = dlg.Username;
+            var password = dlg.Password;
+
+            if (!string.IsNullOrWhiteSpace(username) || !string.IsNullOrEmpty(password))
+            {
+                var key = CredentialKeys.Bank(bank.BankId);
+                _creds.Save(key, username, password);
+            }
+
             OnDataChanged();
         }
         catch (Exception ex)
@@ -469,9 +559,9 @@ public partial class MainForm : Form
         }
     }
 
-    private void AddCheckingAccount()
+    private void AddCheckingAccount(string? preselectedBankId)
     {
-        using var dlg = new AddCheckingAccountForm(_bankCache);
+        using var dlg = new AddCheckingAccountForm(_bankCache, preselectedBankId);
         if (dlg.ShowDialog(this) != DialogResult.OK)
             return;
 
@@ -538,6 +628,9 @@ public partial class MainForm : Form
 
         try
         {
+            var key = CredentialKeys.Bank(bankId);
+            try { _creds.Delete(key); } catch { }
+
             _banks.Delete(bankId);
             OnDataChanged();
         }

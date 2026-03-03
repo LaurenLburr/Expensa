@@ -9,13 +9,25 @@ public sealed class AddBankForm : Form
     private readonly TextBox _txtRouting;
     private readonly TextBox _txtUrl;
     private readonly CheckBox _chkActive;
+
+    // Optional credentials captured at Bank creation time
+    private readonly TextBox _txtUsername;
+    private readonly TextBox _txtPassword;
+
     private readonly Button _btnOk;
     private readonly Button _btnCancel;
 
     public string BankName => _txtBankName.Text.Trim();
+
     public string RoutingNumber => _txtRouting.Text.Trim();
+
     public string? Url => string.IsNullOrWhiteSpace(_txtUrl.Text) ? null : _txtUrl.Text.Trim();
+
     public bool IsActive => _chkActive.Checked;
+
+    public string Username => _txtUsername.Text.Trim();
+
+    public string Password => _txtPassword.Text; // keep spaces if user typed them
 
     public AddBankForm()
     {
@@ -27,11 +39,12 @@ public sealed class AddBankForm : Form
         ShowInTaskbar = false;
 
         Width = 700;
-        Height = 300;
+        Height = 380;
 
         var panel = new Panel { Dock = DockStyle.Fill, Padding = new Padding(12) };
         Controls.Add(panel);
 
+        // --- Bank fields ---
         var lblBank = new Label { Text = "Bank Name:", AutoSize = true, Left = 12, Top = 16 };
         _txtBankName = new TextBox { Left = 140, Top = 12, Width = 520, Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
 
@@ -44,6 +57,35 @@ public sealed class AddBankForm : Form
 
         _chkActive = new CheckBox { Text = "Active", Left = 140, Top = 120, Width = 120, Checked = true };
 
+        // --- Credentials group (optional) ---
+        var groupCreds = new GroupBox
+        {
+            Text = "Login (optional — stored with this bank)",
+            Left = 12,
+            Top = 154,
+            Width = 648,
+            Height = 120,
+            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+        };
+
+        var lblUser = new Label { Text = "Username:", AutoSize = true, Left = 12, Top = 30, Parent = groupCreds };
+        _txtUsername = new TextBox { Left = 110, Top = 26, Width = 520, Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right, Parent = groupCreds };
+
+        var lblPw = new Label { Text = "Password:", AutoSize = true, Left = 12, Top = 66, Parent = groupCreds };
+        _txtPassword = new TextBox
+        {
+            Left = 110,
+            Top = 62,
+            Width = 520,
+            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+            UseSystemPasswordChar = true,
+            Parent = groupCreds
+        };
+
+        var chkShow = new CheckBox { Text = "Show", Left = 110, Top = 90, AutoSize = true, Parent = groupCreds };
+        chkShow.CheckedChanged += (_, _) => _txtPassword.UseSystemPasswordChar = !chkShow.Checked;
+
+        // --- Buttons ---
         _btnOk = new Button { Text = "OK", Width = 90, Height = 30, Anchor = AnchorStyles.Bottom | AnchorStyles.Right };
         _btnCancel = new Button { Text = "Cancel", Width = 90, Height = 30, Anchor = AnchorStyles.Bottom | AnchorStyles.Right };
 
@@ -57,10 +99,12 @@ public sealed class AddBankForm : Form
         panel.Controls.Add(lblUrl);
         panel.Controls.Add(_txtUrl);
         panel.Controls.Add(_chkActive);
+        panel.Controls.Add(groupCreds);
 
         panel.Controls.Add(_btnOk);
         panel.Controls.Add(_btnCancel);
 
+        // Lower the buttons (and keep them there)
         panel.Resize += (_, _) =>
         {
             _btnCancel.Left = panel.Width - _btnCancel.Width - 12;
@@ -100,6 +144,16 @@ public sealed class AddBankForm : Form
                 _txtUrl.Focus();
                 return;
             }
+        }
+
+        // Credential rule: if either field is used, require username.
+        var user = Username;
+        var pw = Password;
+        if (!string.IsNullOrWhiteSpace(pw) && string.IsNullOrWhiteSpace(user))
+        {
+            MessageBox.Show(this, "If you enter a password, you must enter a username.", Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            _txtUsername.Focus();
+            return;
         }
 
         DialogResult = DialogResult.OK;

@@ -1,3 +1,5 @@
+using System;
+using System.Windows.Forms;
 using CodexExpensa.App.WinForms.Composition;
 
 namespace CodexExpensa.App.WinForms;
@@ -11,9 +13,7 @@ internal static class Program
 
         try
         {
-            var bootstrapper = new AppBootstrapper();
-            var mainForm = bootstrapper.Initialize();
-
+            var mainForm = AppBootstrapper.Initialize();
             Application.Run(mainForm);
         }
         catch (Exception ex)

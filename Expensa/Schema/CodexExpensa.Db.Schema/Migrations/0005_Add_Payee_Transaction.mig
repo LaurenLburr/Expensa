@@ -1,0 +1,30 @@
+﻿-- Payees
+CREATE TABLE IF NOT EXISTS Payee
+(
+    PayeeId TEXT PRIMARY KEY,
+    PayeeName TEXT NOT NULL
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS IX_Payee_PayeeName
+ON Payee (PayeeName);
+
+-- Transactions
+CREATE TABLE IF NOT EXISTS Txn
+(
+    TransactionId INTEGER PRIMARY KEY AUTOINCREMENT,
+    AccountId TEXT NOT NULL,
+    PayeeId TEXT NULL,
+
+    Status INTEGER NOT NULL, -- 0=Projected,1=Outstanding,2=Cleared
+    Amount REAL NOT NULL,
+    StartDate TEXT NOT NULL, -- ISO yyyy-MM-dd
+
+    Confirm TEXT NULL,
+    Note TEXT NULL,
+
+    FOREIGN KEY (AccountId) REFERENCES Account (AccountId) ON DELETE CASCADE,
+    FOREIGN KEY (PayeeId) REFERENCES Payee (PayeeId) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS IX_Txn_AccountId_StartDate
+ON Txn (AccountId, StartDate);
