@@ -81,14 +81,13 @@
             // menuFileSave
             // 
             menuFileSave.Name = "menuFileSave";
-            menuFileSave.Size = new Size(180, 22);
+            menuFileSave.Size = new Size(98, 22);
             menuFileSave.Text = "&Save";
-           
             // 
             // menuFileExit
             // 
             menuFileExit.Name = "menuFileExit";
-            menuFileExit.Size = new Size(180, 22);
+            menuFileExit.Size = new Size(98, 22);
             menuFileExit.Text = "E&xit";
             // 
             // menuView
@@ -127,8 +126,9 @@
             // menuHelpAbout
             // 
             menuHelpAbout.Name = "menuHelpAbout";
-            menuHelpAbout.Size = new Size(107, 22);
+            menuHelpAbout.Size = new Size(180, 22);
             menuHelpAbout.Text = "&About";
+            menuHelpAbout.Click += menuHelpAbout_Click_1;
             // 
             // statusMain
             // 

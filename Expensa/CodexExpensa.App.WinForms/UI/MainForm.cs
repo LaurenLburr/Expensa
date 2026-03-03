@@ -1,6 +1,7 @@
 ﻿using CodexExpensa.App.WinForms.Infrastructure;
 using CodexExpensa.App.WinForms.UI.Accounts;
 using CodexExpensa.App.WinForms.UI.Banks;
+using CodexExpensa.App.WinForms.UI.Budgets;
 using CodexExpensa.Core.Abstractions;
 using CodexExpensa.Core.Domain.Accounts;
 using CodexExpensa.Core.Domain.Banks;
@@ -8,7 +9,7 @@ using CodexExpensa.Core.Domain.Payees;
 using CodexExpensa.Core.Domain.Transactions;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Windows.Forms;
 
@@ -28,6 +29,7 @@ public partial class MainForm : Form
 
     private readonly ContextMenuStrip _ctxBanksRoot;
     private readonly ContextMenuStrip _ctxAccountsRoot;
+    private readonly ContextMenuStrip _ctxBudgetsRoot;
     private readonly ContextMenuStrip _ctxBankNode;
     private readonly ContextMenuStrip _ctxAccountNode;
 
@@ -39,16 +41,56 @@ public partial class MainForm : Form
     private enum NavTag
     {
         BanksRoot,
-        AccountsRoot
+        AccountsRoot,
+        BudgetsRoot
+    }
+
+    // Budget node ids (string tags)
+    private static class BudgetNav
+    {
+        public const string Template = "Budget.Template";
+
+        public static string Year(int year) => $"Budget.Year.{year}";
+        public static string Month(int year, int month) => $"Budget.Month.{year:D4}.{month:D2}";
+
+        public static bool TryParseMonth(string id, out int year, out int month)
+        {
+            year = 0;
+            month = 0;
+
+            // Budget.Month.2026.12
+            if (string.IsNullOrWhiteSpace(id))
+                return false;
+
+            var parts = id.Split('.');
+            if (parts.Length != 4)
+                return false;
+
+            if (!string.Equals(parts[0], "Budget", StringComparison.OrdinalIgnoreCase))
+                return false;
+            if (!string.Equals(parts[1], "Month", StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            if (!int.TryParse(parts[2], out year))
+                return false;
+
+            if (!int.TryParse(parts[3], out month))
+                return false;
+
+            if (month < 1 || month > 12)
+                return false;
+
+            return true;
+        }
     }
 
     public MainForm(
-    IDatabaseSession dbSession,
-    IAccountRepository accounts,
-    IBankRepository banks,
-    ITransactionRepository transactions,
-    IPayeeRepository payees,
-    Func<Form> createDbStatusForm)
+        IDatabaseSession dbSession,
+        IAccountRepository accounts,
+        IBankRepository banks,
+        ITransactionRepository transactions,
+        IPayeeRepository payees,
+        Func<Form> createDbStatusForm)
     {
         _dbSession = dbSession ?? throw new ArgumentNullException(nameof(dbSession));
         _accounts = accounts ?? throw new ArgumentNullException(nameof(accounts));
@@ -62,6 +104,7 @@ public partial class MainForm : Form
 
         _ctxBanksRoot = BuildBanksRootMenu();
         _ctxAccountsRoot = BuildAccountsRootMenu();
+        _ctxBudgetsRoot = BuildBudgetsRootMenu();
         _ctxBankNode = BuildBankNodeMenu();
         _ctxAccountNode = BuildAccountNodeMenu();
 
@@ -75,6 +118,8 @@ public partial class MainForm : Form
         menuFileExit.Click += (_, _) => Close();
         menuViewRefresh.Click += MenuViewRefresh_Click;
         menuToolsDbStatus.Click += MenuToolsDbStatus_Click;
+
+        // Keep both handlers safe: some designers wire one or the other.
         menuHelpAbout.Click += MenuHelpAbout_Click;
 
         UpdateDbStatus();
@@ -137,12 +182,36 @@ public partial class MainForm : Form
 
     private void MenuHelpAbout_Click(object? sender, EventArgs e)
     {
+        var dbPath = GetDatabasePathForDisplay();
+
         MessageBox.Show(
             this,
-            "Codex Expensa\n\nDocked subforms edition.\n(Still not doing your taxes. Calm down.)",
+            "Codex Expensa\n\n" +
+            "Database Location:\n" +
+            $"{dbPath}\n\n" +
+            "Migrations, startup, and database configuration are stable.\n" +
+            "Do not modify bootstrap or migration logic.\n\n" +
+            "(Still not doing your taxes. Calm down.)",
             "About Codex Expensa",
             MessageBoxButtons.OK,
             MessageBoxIcon.Information);
+    }
+
+    // If your designer still points to this, keep it and forward to the real handler.
+    private void menuHelpAbout_Click_1(object sender, EventArgs e)
+        => MenuHelpAbout_Click(sender, e);
+
+    private static string GetDatabasePathForDisplay()
+    {
+        // Per your preference:
+        // var folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        //     "CodexExpensa","db");
+        var folder = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "CodexExpensa",
+            "db");
+
+        return Path.Combine(folder, "codexexpensa.db");
     }
 
     private void RefreshCaches()
@@ -213,6 +282,40 @@ public partial class MainForm : Form
 
             accountsRoot.Expand();
             treeNav.Nodes.Add(accountsRoot);
+
+            // Budgets root
+            var budgetsRoot = new TreeNode("Budgets") { Tag = NavTag.BudgetsRoot };
+
+            // Template node immediately under Budgets
+            budgetsRoot.Nodes.Add(new TreeNode("Template") { Tag = BudgetNav.Template });
+
+            // Years and months
+            // For now (no budget repo yet), we generate a predictable scaffold.
+            // Years descending.
+            var currentYear = DateTime.Today.Year;
+            var years = Enumerable.Range(currentYear - 4, 5).Reverse().ToList(); // currentYear..currentYear-4
+
+            foreach (var year in years)
+            {
+                var yearNode = new TreeNode(year.ToString()) { Tag = BudgetNav.Year(year) };
+
+                var months = Enumerable.Range(1, 12).ToList();
+                if (year == currentYear)
+                    months.Reverse(); // current year descending
+                // older years: ascending (Jan..Dec)
+
+                foreach (var m in months)
+                {
+                    var monthName = new DateTime(year, m, 1).ToString("MMM");
+                    yearNode.Nodes.Add(new TreeNode(monthName) { Tag = BudgetNav.Month(year, m) });
+                }
+
+                yearNode.Expand();
+                budgetsRoot.Nodes.Add(yearNode);
+            }
+
+            budgetsRoot.Expand();
+            treeNav.Nodes.Add(budgetsRoot);
         }
         finally
         {
@@ -283,6 +386,7 @@ public partial class MainForm : Form
             {
                 NavTag.BanksRoot => _ctxBanksRoot,
                 NavTag.AccountsRoot => _ctxAccountsRoot,
+                NavTag.BudgetsRoot => _ctxBudgetsRoot,
                 _ => null
             };
         }
@@ -291,7 +395,7 @@ public partial class MainForm : Form
         if (node.Tag is string && node.Parent?.Tag is NavTag parentTag && parentTag == NavTag.BanksRoot)
             return _ctxBankNode;
 
-        // Bank node under Accounts root (this is what you asked for)
+        // Bank node under Accounts root (works like real bank nodes)
         if (node.Tag is string && node.Parent?.Tag is NavTag parentTag2 && parentTag2 == NavTag.AccountsRoot)
             return _ctxBankNode;
 
@@ -299,6 +403,7 @@ public partial class MainForm : Form
         if (node.Tag is string && node.Parent is not null && node.Parent.Parent?.Tag is NavTag p2 && p2 == NavTag.AccountsRoot)
             return _ctxAccountNode;
 
+        // Budgets subtree: no context menus yet (keep it simple)
         return null;
     }
 
@@ -321,6 +426,29 @@ public partial class MainForm : Form
                     ShowAccountsList();
                     SetStatus("Accounts");
                     return;
+
+                case NavTag.BudgetsRoot:
+                    ShowBudgetsLanding();
+                    SetStatus("Budgets");
+                    return;
+            }
+        }
+
+        // Budgets: template/month nodes are string tags
+        if (e.Node.Tag is string budgetTag)
+        {
+            if (string.Equals(budgetTag, BudgetNav.Template, StringComparison.OrdinalIgnoreCase))
+            {
+                ShowBudgetTemplate();
+                SetStatus("Budgets: Template");
+                return;
+            }
+
+            if (BudgetNav.TryParseMonth(budgetTag, out var year, out var month))
+            {
+                ShowBudgetMonth(year, month);
+                SetStatus($"Budgets: {year}-{month:D2}");
+                return;
             }
         }
 
@@ -373,6 +501,24 @@ public partial class MainForm : Form
     {
         var form = new AccountsListForm(OpenAccountDetailsFromList);
         form.SetAccounts(_accountCache);
+        ShowChildForm(form);
+    }
+
+    private void ShowBudgetsLanding()
+    {
+        var form = new BudgetsLandingForm();
+        ShowChildForm(form);
+    }
+
+    private void ShowBudgetTemplate()
+    {
+        var form = new BudgetTemplateForm();
+        ShowChildForm(form);
+    }
+
+    private void ShowBudgetMonth(int year, int month)
+    {
+        var form = new BudgetMonthForm(year, month);
         ShowChildForm(form);
     }
 
@@ -431,12 +577,15 @@ public partial class MainForm : Form
         }
 
         var form = new AccountDetailsForm(
-    _accounts,
-    _bankCache,
-    _creds,
-    _transactions,
-    _payees,
-    OnDataChanged);
+            _accounts,
+            _bankCache,
+            _creds,
+            _transactions,
+            _payees,
+            OnDataChanged);
+
+        form.LoadAccount(acct);
+        ShowChildForm(form); // <-- this was missing; without it, nothing shows.
     }
 
     private void OnDataChanged()
@@ -486,6 +635,12 @@ public partial class MainForm : Form
     private ContextMenuStrip BuildAccountsRootMenu()
     {
         // Empty for now. “Add account” lives on Bank nodes.
+        return new ContextMenuStrip();
+    }
+
+    private ContextMenuStrip BuildBudgetsRootMenu()
+    {
+        // No actions yet (we’ll add once budget repo + screens exist)
         return new ContextMenuStrip();
     }
 
@@ -542,6 +697,8 @@ public partial class MainForm : Form
         {
             _banks.Add(bank);
 
+            // Note: only do this if your AddBankForm actually has Username/Password.
+            // If not, remove these lines.
             var username = dlg.Username;
             var password = dlg.Password;
 
