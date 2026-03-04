@@ -1,0 +1,29 @@
+﻿-- Budget Template Rows
+CREATE TABLE IF NOT EXISTS BudgetTemplateRow (
+    TemplateRowId TEXT NOT NULL PRIMARY KEY,
+    Name          TEXT NOT NULL,
+    SortIndex     INTEGER NOT NULL DEFAULT 0,
+    DefaultAmount REAL NOT NULL,
+    IsActive      INTEGER NOT NULL DEFAULT 1
+);
+
+-- Budget Month Header
+CREATE TABLE IF NOT EXISTS BudgetMonth (
+    BudgetMonthId TEXT NOT NULL PRIMARY KEY,
+    Year          INTEGER NOT NULL,
+    Month         INTEGER NOT NULL,
+    CreatedUtc    TEXT NOT NULL
+);
+
+-- Budget Month Rows
+CREATE TABLE IF NOT EXISTS BudgetMonthRow (
+    BudgetMonthRowId TEXT NOT NULL PRIMARY KEY,
+    BudgetMonthId    TEXT NOT NULL,
+    TemplateRowId    TEXT NULL,
+
+    Name             TEXT NOT NULL,
+    SortIndex        INTEGER NOT NULL DEFAULT 0,
+    PlannedAmount    REAL NOT NULL,
+
+    FOREIGN KEY (BudgetMonthId) REFERENCES BudgetMonth (BudgetMonthId)
+);
