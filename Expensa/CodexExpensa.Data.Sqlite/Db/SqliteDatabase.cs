@@ -72,7 +72,7 @@ public sealed class SqliteDatabase : IDatabaseSession, IDisposable
         memConn.Open();
 
         // Copy disk -> memory
-        fileDb._connection.BackupDatabase(memConn);
+         fileDb._connection.BackupDatabase(memConn);
 
         return new SqliteDatabase(memConn, persistedFilePath: dbPath);
     }

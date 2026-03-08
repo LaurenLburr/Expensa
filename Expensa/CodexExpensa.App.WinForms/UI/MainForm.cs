@@ -6,6 +6,7 @@ using CodexExpensa.App.WinForms.Infrastructure;
 using CodexExpensa.App.WinForms.UI.Accounts;
 using CodexExpensa.App.WinForms.UI.Banks;
 using CodexExpensa.App.WinForms.UI.Budgets;
+using CodexExpensa.App.WinForms.UI.Payees;
 using CodexExpensa.Core.Abstractions;
 using CodexExpensa.Core.Domain.Accounts;
 using CodexExpensa.Core.Domain.Banks;
@@ -27,19 +28,24 @@ public partial class MainForm : Form
 
     private IReadOnlyList<Account> _accountCache = Array.Empty<Account>();
     private IReadOnlyList<Bank> _bankCache = Array.Empty<Bank>();
+    private IReadOnlyList<Payee> _payeeCache = Array.Empty<Payee>();
 
     private Form? _activeChildForm;
 
     private readonly ContextMenuStrip _ctxBanksRoot;
     private readonly ContextMenuStrip _ctxAccountsRoot;
     private readonly ContextMenuStrip _ctxBudgetsRoot;
+    private readonly ContextMenuStrip _ctxPayeesRoot;
+
     private readonly ContextMenuStrip _ctxBankNode;
     private readonly ContextMenuStrip _ctxAccountNode;
+    private readonly ContextMenuStrip _ctxPayeeNode;
 
     private enum NavTag
     {
         BanksRoot,
         AccountsRoot,
+        PayeesRoot,
         BudgetsRoot
     }
 
@@ -131,9 +137,12 @@ public partial class MainForm : Form
 
         _ctxBanksRoot = BuildBanksRootMenu();
         _ctxAccountsRoot = BuildAccountsRootMenu();
+        _ctxPayeesRoot = BuildPayeesRootMenu();
         _ctxBudgetsRoot = BuildBudgetsRootMenu();
+
         _ctxBankNode = BuildBankNodeMenu();
         _ctxAccountNode = BuildAccountNodeMenu();
+        _ctxPayeeNode = BuildPayeeNodeMenu();
 
         Load += MainForm_Load;
 
@@ -224,6 +233,7 @@ public partial class MainForm : Form
     {
         _bankCache = _banks.GetAll();
         _accountCache = _accounts.GetAll();
+        _payeeCache = _payees.GetAll();
     }
 
     private void BuildNavigationTree()
@@ -240,7 +250,7 @@ public partial class MainForm : Form
                 var label = $"{b.BankName} ({b.RoutingNumber})";
                 banksRoot.Nodes.Add(new TreeNode(label) { Tag = b.BankId });
             }
-            banksRoot.Expand();
+            //banksRoot.Expand();
             treeNav.Nodes.Add(banksRoot);
 
             // Accounts root: Accounts -> Bank (tag=bankId) -> Account leaf (tag=accountId)
@@ -280,12 +290,24 @@ public partial class MainForm : Form
                     bankNode.Nodes.Add(new TreeNode(label) { Tag = acct.AccountId });
                 }
 
-                bankNode.Expand();
+                //bankNode.Expand();
                 accountsRoot.Nodes.Add(bankNode);
             }
 
-            accountsRoot.Expand();
+            //accountsRoot.Expand();
             treeNav.Nodes.Add(accountsRoot);
+
+            // Payees root
+            var payeesRoot = new TreeNode("Payees") { Tag = NavTag.PayeesRoot };
+            foreach (var p in _payeeCache
+                         .OrderByDescending(p => p.IncludeInBudgetTemplate)
+                         .ThenBy(p => p.PayeeName))
+            {
+                var label = p.IncludeInBudgetTemplate ? $"{p.PayeeName}  ✓" : p.PayeeName;
+                payeesRoot.Nodes.Add(new TreeNode(label) { Tag = p.PayeeId });
+            }
+            //payeesRoot.Expand();
+            treeNav.Nodes.Add(payeesRoot);
 
             // Budgets root
             var budgetsRoot = new TreeNode("Budgets") { Tag = NavTag.BudgetsRoot };
@@ -293,7 +315,7 @@ public partial class MainForm : Form
             // Template node immediately under Budgets
             budgetsRoot.Nodes.Add(new TreeNode("Template") { Tag = BudgetNav.Template });
 
-            // Current node immediately under Template
+            // Current node immediately under Budgets
             var today = DateTime.Today;
             budgetsRoot.Nodes.Add(new TreeNode($"Current ({today:MMM/yyyy})")
             {
@@ -332,11 +354,11 @@ public partial class MainForm : Form
                     yearNode.Nodes.Add(new TreeNode(monthName) { Tag = BudgetNav.Month(year, m) });
                 }
 
-                yearNode.Expand();
+                //yearNode.Expand();
                 budgetsRoot.Nodes.Add(yearNode);
             }
 
-            budgetsRoot.Expand();
+            //budgetsRoot.Expand();
             treeNav.Nodes.Add(budgetsRoot);
         }
         finally
@@ -390,6 +412,11 @@ public partial class MainForm : Form
                     ShowAccountsList();
                     return;
 
+                case NavTag.PayeesRoot:
+                    SetStatus("Payees");
+                    ShowPayeesLanding();
+                    return;
+
                 case NavTag.BudgetsRoot:
                     SetStatus("Budgets");
                     ShowBudgetsLanding();
@@ -420,6 +447,16 @@ public partial class MainForm : Form
                 SetStatus($"Budgets: {year}-{month:D2}");
                 return;
             }
+        }
+
+        // Payee leaf under Payees root
+        if (e.Node.Tag is string payeeId &&
+            e.Node.Parent?.Tag is NavTag pRoot &&
+            pRoot == NavTag.PayeesRoot)
+        {
+            ShowPayeeDetails(payeeId);
+            SetStatus($"Payee: {e.Node.Text}");
+            return;
         }
 
         // Bank leaf under Banks root
@@ -474,10 +511,25 @@ public partial class MainForm : Form
                     _ctxAccountsRoot.Show(treeNav, e.Location);
                     return;
 
+                case NavTag.PayeesRoot:
+                    _ctxPayeesRoot.Show(treeNav, e.Location);
+                    return;
+
                 case NavTag.BudgetsRoot:
                     _ctxBudgetsRoot.Show(treeNav, e.Location);
                     return;
             }
+        }
+
+        // Payee node under Payees root
+        // Payee node under Payees root (ignore Search node)
+        if (e.Node.Tag is string payeeId &&
+            payeeId != "Payee.Search" &&
+            e.Node.Parent?.Tag is NavTag pr &&
+            pr == NavTag.PayeesRoot)
+        {
+            _ctxPayeeNode.Show(treeNav, e.Location);
+            return;
         }
 
         // Bank node under Banks root
@@ -579,6 +631,34 @@ public partial class MainForm : Form
         return menu;
     }
 
+    private ContextMenuStrip BuildPayeesRootMenu()
+    {
+        var menu = new ContextMenuStrip();
+
+        var add = new ToolStripMenuItem("Add Payee...");
+        add.Click += (_, _) =>
+        {
+            // Minimal add dialog (InputBox style) without building a separate form yet.
+            var name = PromptForText(this, "Add Payee", "Payee name:");
+            if (string.IsNullOrWhiteSpace(name))
+                return;
+
+            var payee = new Payee
+            {
+                PayeeId = Guid.NewGuid().ToString("N"),
+                PayeeName = name.Trim(),
+                IncludeInBudgetTemplate = false
+            };
+
+            _payees.Add(payee);
+            RefreshCaches();
+            BuildNavigationTree();
+        };
+
+        menu.Items.Add(add);
+        return menu;
+    }
+
     private ContextMenuStrip BuildBudgetsRootMenu()
     {
         var menu = new ContextMenuStrip();
@@ -663,6 +743,37 @@ public partial class MainForm : Form
         return menu;
     }
 
+    private ContextMenuStrip BuildPayeeNodeMenu()
+    {
+        var menu = new ContextMenuStrip();
+
+        var del = new ToolStripMenuItem("Delete Payee");
+        del.Click += (_, _) =>
+        {
+            var payeeId = treeNav.SelectedNode?.Tag as string;
+            if (string.IsNullOrWhiteSpace(payeeId))
+                return;
+
+            var confirm = MessageBox.Show(
+                this,
+                "Delete this payee?",
+                "Confirm",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Warning);
+
+            if (confirm != DialogResult.Yes)
+                return;
+
+            _payees.Delete(payeeId);
+            RefreshCaches();
+            BuildNavigationTree();
+            ShowPayeesLanding();
+        };
+
+        menu.Items.Add(del);
+        return menu;
+    }
+
     private void ShowBanksLanding()
     {
         var form = new BanksLandingForm(openBankDetails: bankId =>
@@ -687,9 +798,42 @@ public partial class MainForm : Form
         ShowChildForm(form);
     }
 
+    private void ShowPayeesLanding()
+    {
+        var form = new PayeesLandingForm(openPayeeDetails: payeeId =>
+        {
+            ShowPayeeDetails(payeeId);
+        });
+
+        form.SetPayees(_payeeCache);
+
+        ShowChildForm(form);
+    }
+
     private void ShowBudgetsLanding()
     {
         var form = new BudgetsLandingForm();
+        ShowChildForm(form);
+    }
+
+    private void ShowPayeeDetails(string payeeId)
+    {
+        var payee = _payeeCache.FirstOrDefault(p => p.PayeeId == payeeId);
+        if (payee is null)
+        {
+            MessageBox.Show(this, "Payee not found.", "Expensa", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        var form = new PayeeDetailsForm(
+            repo: _payees,
+            onSaved: () =>
+            {
+                RefreshCaches();
+                BuildNavigationTree();
+            });
+
+        form.LoadPayee(payee);
         ShowChildForm(form);
     }
 
@@ -742,7 +886,7 @@ public partial class MainForm : Form
 
     private void ShowBudgetTemplate()
     {
-        var form = new BudgetTemplateForm();
+        var form = new BudgetTemplateForm(_payees);
         ShowChildForm(form);
     }
 
@@ -797,5 +941,35 @@ public partial class MainForm : Form
             title,
             MessageBoxButtons.OK,
             MessageBoxIcon.Error);
+    }
+
+    private static string? PromptForText(IWin32Window owner, string title, string prompt)
+    {
+        using var form = new Form
+        {
+            Text = title,
+            StartPosition = FormStartPosition.CenterParent,
+            FormBorderStyle = FormBorderStyle.FixedDialog,
+            MinimizeBox = false,
+            MaximizeBox = false,
+            ShowInTaskbar = false,
+            Width = 520,
+            Height = 170
+        };
+
+        var lbl = new Label { Left = 12, Top = 16, AutoSize = true, Text = prompt };
+        var txt = new TextBox { Left = 12, Top = 44, Width = 480, Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
+        var ok = new Button { Text = "OK", Left = 312, Width = 80, Top = 82, DialogResult = DialogResult.OK };
+        var cancel = new Button { Text = "Cancel", Left = 412, Width = 80, Top = 82, DialogResult = DialogResult.Cancel };
+
+        form.Controls.Add(lbl);
+        form.Controls.Add(txt);
+        form.Controls.Add(ok);
+        form.Controls.Add(cancel);
+
+        form.AcceptButton = ok;
+        form.CancelButton = cancel;
+
+        return form.ShowDialog(owner) == DialogResult.OK ? txt.Text.Trim() : null;
     }
 }

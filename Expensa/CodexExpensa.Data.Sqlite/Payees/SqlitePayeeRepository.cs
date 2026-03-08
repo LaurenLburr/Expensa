@@ -19,12 +19,36 @@ public sealed class SqlitePayeeRepository : IPayeeRepository
     {
         const string sql =
             """
-            SELECT PayeeId, PayeeName
+            SELECT PayeeId, PayeeName, IncludeInBudgetTemplate
             FROM Payee
             ORDER BY PayeeName;
             """;
 
         return _db.Query(sql, MapPayee);
+    }
+
+    public IReadOnlyList<Payee> GetBudgetTemplatePayees()
+    {
+        const string sql =
+            """
+            SELECT PayeeId, PayeeName, SortIndex
+            FROM vw_BudgetTemplatePayees
+            ORDER BY SortIndex, PayeeName;
+            """;
+
+        // View doesn't include IncludeInBudgetTemplate, but these are all included by definition.
+        return _db.Query(sql, r =>
+        {
+            var id = GetRequiredString(r, "PayeeId");
+            var name = GetRequiredString(r, "PayeeName");
+
+            return new Payee
+            {
+                PayeeId = id,
+                PayeeName = name,
+                IncludeInBudgetTemplate = true
+            };
+        });
     }
 
     public Payee? GetById(string payeeId)
@@ -34,7 +58,7 @@ public sealed class SqlitePayeeRepository : IPayeeRepository
 
         const string sql =
             """
-            SELECT PayeeId, PayeeName
+            SELECT PayeeId, PayeeName, IncludeInBudgetTemplate
             FROM Payee
             WHERE PayeeId = @PayeeId
             LIMIT 1;
@@ -55,7 +79,7 @@ public sealed class SqlitePayeeRepository : IPayeeRepository
 
         const string sql =
             """
-            SELECT PayeeId, PayeeName
+            SELECT PayeeId, PayeeName, IncludeInBudgetTemplate
             FROM Payee
             WHERE PayeeName = @PayeeName
             LIMIT 1;
@@ -76,14 +100,15 @@ public sealed class SqlitePayeeRepository : IPayeeRepository
 
         const string sql =
             """
-            INSERT INTO Payee (PayeeId, PayeeName)
-            VALUES (@PayeeId, @PayeeName);
+            INSERT INTO Payee (PayeeId, PayeeName, IncludeInBudgetTemplate)
+            VALUES (@PayeeId, @PayeeName, @IncludeInBudgetTemplate);
             """;
 
         _db.ExecuteNonQuery(sql, new[]
         {
             new SqliteParameter("@PayeeId", payee.PayeeId),
             new SqliteParameter("@PayeeName", payee.PayeeName.Trim()),
+            new SqliteParameter("@IncludeInBudgetTemplate", payee.IncludeInBudgetTemplate ? 1 : 0)
         });
     }
 
@@ -95,7 +120,9 @@ public sealed class SqlitePayeeRepository : IPayeeRepository
         const string sql =
             """
             UPDATE Payee
-            SET PayeeName = @PayeeName
+            SET
+                PayeeName = @PayeeName,
+                IncludeInBudgetTemplate = @IncludeInBudgetTemplate
             WHERE PayeeId = @PayeeId;
             """;
 
@@ -103,6 +130,26 @@ public sealed class SqlitePayeeRepository : IPayeeRepository
         {
             new SqliteParameter("@PayeeId", payee.PayeeId),
             new SqliteParameter("@PayeeName", payee.PayeeName.Trim()),
+            new SqliteParameter("@IncludeInBudgetTemplate", payee.IncludeInBudgetTemplate ? 1 : 0)
+        });
+    }
+
+    public void UpdateIncludeInBudgetTemplate(string payeeId, bool includeInBudgetTemplate)
+    {
+        if (string.IsNullOrWhiteSpace(payeeId))
+            throw new ArgumentException("payeeId is required.", nameof(payeeId));
+
+        const string sql =
+            """
+            UPDATE Payee
+            SET IncludeInBudgetTemplate = @IncludeInBudgetTemplate
+            WHERE PayeeId = @PayeeId;
+            """;
+
+        _db.ExecuteNonQuery(sql, new[]
+        {
+            new SqliteParameter("@PayeeId", payeeId),
+            new SqliteParameter("@IncludeInBudgetTemplate", includeInBudgetTemplate ? 1 : 0)
         });
     }
 
@@ -134,10 +181,16 @@ public sealed class SqlitePayeeRepository : IPayeeRepository
         var id = GetRequiredString(r, "PayeeId");
         var name = GetRequiredString(r, "PayeeName");
 
+        var include = false;
+        var ord = r.GetOrdinal("IncludeInBudgetTemplate");
+        if (!r.IsDBNull(ord))
+            include = r.GetInt32(ord) == 1;
+
         return new Payee
         {
             PayeeId = id,
-            PayeeName = name
+            PayeeName = name,
+            IncludeInBudgetTemplate = include
         };
     }
 
