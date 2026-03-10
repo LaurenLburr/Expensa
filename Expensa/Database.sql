@@ -1,0 +1,673 @@
+--
+-- File generated with SQLiteStudio v3.4.15 on Mon Mar 9 19:24:58 2026
+--
+-- Text encoding used: System
+--
+PRAGMA foreign_keys = off;
+BEGIN TRANSACTION;
+
+-- Table: __MigrationTest_0002
+CREATE TABLE IF NOT EXISTS __MigrationTest_0002 (
+    Id INTEGER NOT NULL
+             PRIMARY KEY
+);
+
+
+-- Table: Account
+CREATE TABLE IF NOT EXISTS Account (
+    AccountId       TEXT    NOT NULL
+                            PRIMARY KEY,
+    BankId          TEXT    NOT NULL,
+    AccountNickname TEXT    NOT NULL,
+    SortIndex       INTEGER NOT NULL
+                            DEFAULT 0,
+    AccountNumber   TEXT    NOT NULL,
+    AccountType     TEXT    NOT NULL,
+    IsActive        INTEGER NOT NULL
+                            DEFAULT 1,
+    FOREIGN KEY (
+        BankId
+    )
+    REFERENCES Bank (BankId) 
+);
+
+
+-- Table: Bank
+CREATE TABLE IF NOT EXISTS Bank (
+    BankId        TEXT    NOT NULL
+                          PRIMARY KEY,
+    BankName      TEXT    NOT NULL,
+    RoutingNumber TEXT    NOT NULL,
+    Url           TEXT    NULL,
+    IsActive      INTEGER NOT NULL
+                          DEFAULT 1
+);
+
+
+-- Table: BankAccount
+CREATE TABLE IF NOT EXISTS BankAccount (
+    BankAccountID '"[INTEGER]"' DEFAULT (0) 
+                                NOT NULL
+                                COLLATE NOCASE,
+    BankName      '"[TEXT]"'    DEFAULT ('') 
+                                NOT NULL
+                                COLLATE NOCASE,
+    Routing       '"[TEXT]"'    DEFAULT ('') 
+                                NOT NULL
+                                COLLATE NOCASE,
+    Account       '"[TEXT]"'    DEFAULT ('') 
+                                NOT NULL
+                                COLLATE NOCASE,
+    Description   '"[TEXT]"'    DEFAULT ('') 
+                                NOT NULL
+                                COLLATE NOCASE,
+    BankBalance   '"[REAL]"'    DEFAULT (0) 
+                                NOT NULL
+                                COLLATE NOCASE,
+    WebID         '"[INTEGER]"' DEFAULT (0) 
+                                NOT NULL
+                                COLLATE NOCASE,
+    DisplayOrder  '"[INTEGER]"' DEFAULT (0) 
+                                NOT NULL
+                                COLLATE NOCASE
+);
+
+
+-- Table: BudgetMonth
+CREATE TABLE IF NOT EXISTS BudgetMonth (
+    BudgetMonthId TEXT    NOT NULL
+                          PRIMARY KEY,
+    Year          INTEGER NOT NULL,
+    Month         INTEGER NOT NULL,
+    CreatedUtc    TEXT    NOT NULL
+);
+
+
+-- Table: BudgetMonthPayee
+CREATE TABLE IF NOT EXISTS BudgetMonthPayee (
+    BudgetMonthPayeeId TEXT    NOT NULL
+                               PRIMARY KEY,
+    BudgetMonthId      TEXT    NOT NULL,
+    PayeeId            TEXT    NOT NULL,
+    SortIndex          INTEGER NOT NULL
+                               DEFAULT 0,
+    PlannedAmount      REAL    NOT NULL
+                               DEFAULT 0,
+    AccountId          TEXT    NULL,
+    FOREIGN KEY (
+        BudgetMonthId
+    )
+    REFERENCES BudgetMonth (BudgetMonthId),
+    FOREIGN KEY (
+        PayeeId
+    )
+    REFERENCES Payee (PayeeId) 
+);
+
+
+-- Table: BudgetMonthRow
+CREATE TABLE IF NOT EXISTS BudgetMonthRow (
+    BudgetMonthRowId TEXT    NOT NULL
+                             PRIMARY KEY,
+    BudgetMonthId    TEXT    NOT NULL,
+    TemplateRowId    TEXT    NULL,
+    Name             TEXT    NOT NULL,
+    SortIndex        INTEGER NOT NULL
+                             DEFAULT 0,
+    PlannedAmount    REAL    NOT NULL,
+    FOREIGN KEY (
+        BudgetMonthId
+    )
+    REFERENCES BudgetMonth (BudgetMonthId),
+    FOREIGN KEY (
+        TemplateRowId
+    )
+    REFERENCES BudgetTemplateRow (TemplateRowId) 
+);
+
+
+-- Table: Payee
+CREATE TABLE IF NOT EXISTS Payee (
+    PayeeId                 TEXT    PRIMARY KEY,
+    PayeeName               TEXT    NOT NULL,
+    IncludeInBudgetTemplate INTEGER NOT NULL
+                                    DEFAULT 0,
+    SortIndex               INTEGER NOT NULL
+                                    DEFAULT 0,
+    IsActive                INTEGER NOT NULL
+                                    DEFAULT 1,
+    WebsiteId               TEXT    NULL,
+    UNIQUE (
+        PayeeName
+    )
+);
+
+
+-- Table: PayeeTag
+CREATE TABLE IF NOT EXISTS PayeeTag (
+    PayeeTagId TEXT    NOT NULL
+                       PRIMARY KEY,
+    PayeeId    TEXT    NOT NULL,
+    TagId      TEXT    NOT NULL,
+    SortIndex  INTEGER NOT NULL
+                       DEFAULT 0,
+    FOREIGN KEY (
+        PayeeId
+    )
+    REFERENCES Payee (PayeeId),
+    FOREIGN KEY (
+        TagId
+    )
+    REFERENCES Tag (TagId) 
+);
+
+
+-- Table: SchemaMigrations
+CREATE TABLE IF NOT EXISTS SchemaMigrations (
+    MigrationId TEXT NOT NULL
+                     PRIMARY KEY,
+    AppliedUtc  TEXT NOT NULL,
+    Checksum    TEXT NULL
+);
+
+
+-- Table: SqlQuery
+CREATE TABLE IF NOT EXISTS SqlQuery (
+    QueryIndex  INTEGER NOT NULL
+                        PRIMARY KEY,
+    QueryName   TEXT    NOT NULL
+                        UNIQUE,
+    Description TEXT    NULL,
+    SqlText     TEXT    NOT NULL,
+    Fingerprint TEXT    AS (printf('%d-%d-%d-%d', length(SqlText), unicode(substr(SqlText, 1, 1) ), unicode(substr(SqlText, 2, 1) ), unicode(substr(SqlText, length(SqlText), 1) ) ) ) STORED,
+    IsActive    INTEGER NOT NULL
+                        DEFAULT 1
+);
+
+
+-- Table: stage_BankAccount
+CREATE TABLE IF NOT EXISTS stage_BankAccount (
+    BankAccountID '"[INTEGER]"' DEFAULT (0) 
+                                NOT NULL
+                                COLLATE NOCASE,
+    BankName      '"[TEXT]"'    DEFAULT ('') 
+                                NOT NULL
+                                COLLATE NOCASE,
+    Routing       '"[TEXT]"'    DEFAULT ('') 
+                                NOT NULL
+                                COLLATE NOCASE,
+    Account       '"[TEXT]"'    DEFAULT ('') 
+                                NOT NULL
+                                COLLATE NOCASE,
+    Description   '"[TEXT]"'    DEFAULT ('') 
+                                NOT NULL
+                                COLLATE NOCASE,
+    BankBalance   '"[REAL]"'    DEFAULT (0) 
+                                NOT NULL
+                                COLLATE NOCASE,
+    WebID         '"[INTEGER]"' DEFAULT (0) 
+                                NOT NULL
+                                COLLATE NOCASE,
+    DisplayOrder  '"[INTEGER]"' DEFAULT (0) 
+                                NOT NULL
+                                COLLATE NOCASE
+);
+
+
+-- Table: stage_Budget
+CREATE TABLE IF NOT EXISTS stage_Budget (
+    BudgetYear    "[INTEGER]" DEFAULT (2012) 
+                              NOT NULL
+                              COLLATE NOCASE,
+    BudgetMonth   "[INTEGER]" DEFAULT (0) 
+                              NOT NULL
+                              COLLATE NOCASE,
+    PayeeID       "[INTEGER]" DEFAULT (0) 
+                              NOT NULL
+                              COLLATE NOCASE,
+    PayeeName     "[TEXT]"    DEFAULT ('') 
+                              NOT NULL
+                              COLLATE NOCASE,
+    Status        "[TEXT]"    DEFAULT ('') 
+                              NOT NULL
+                              COLLATE NOCASE,
+    TotalAmount   "[REAL]"    DEFAULT (0) 
+                              NOT NULL
+                              COLLATE NOCASE,
+    LaurenPercent "[REAL]"    DEFAULT (0.5) 
+                              NOT NULL
+                              COLLATE NOCASE,
+    NickPercent   "[REAL]"    DEFAULT (0.5) 
+                              NOT NULL
+                              COLLATE NOCASE,
+    Notes         "[TEXT]"    DEFAULT ('') 
+                              NOT NULL
+                              COLLATE NOCASE,
+    DateSent      "[DATE]"    DEFAULT ('2/22/2012 12:00:00 AM') 
+                              NOT NULL
+                              COLLATE NOCASE,
+    BankAccountID "[INTEGER]" DEFAULT (0) 
+                              NOT NULL
+                              COLLATE NOCASE,
+    TransActionID "[INTEGER]" DEFAULT (0) 
+                              NOT NULL
+                              COLLATE NOCASE,
+    [Group]       "[INTEGER]" DEFAULT (0) 
+                              NOT NULL
+                              COLLATE NOCASE,
+    Confirm       "[TEXT]"    DEFAULT ('') 
+                              NOT NULL
+                              COLLATE NOCASE,
+    PieChart      "[INTEGER]" DEFAULT (1) 
+                              NOT NULL
+                              COLLATE NOCASE,
+    PRIMARY KEY (
+        BudgetYear,
+        BudgetMonth,
+        PayeeID
+    )
+);
+
+
+-- Table: stage_BudgetTemplate
+CREATE TABLE IF NOT EXISTS stage_BudgetTemplate (
+    PayeeID       "[INTEGER]" DEFAULT (0) 
+                              NOT NULL
+                              COLLATE NOCASE,
+    PayeeName     "[TEXT]"    DEFAULT ('') 
+                              NOT NULL
+                              COLLATE NOCASE,
+    BankAccountID "[INTEGER]" DEFAULT (0) 
+                              NOT NULL
+                              COLLATE NOCASE,
+    TotalAmount   "[REAL]"    DEFAULT (0) 
+                              NOT NULL
+                              COLLATE NOCASE,
+    LaurenPercent "[REAL]"    DEFAULT (0) 
+                              NOT NULL
+                              COLLATE NOCASE,
+    NickPercent   "[REAL]"    DEFAULT (0) 
+                              NOT NULL
+                              COLLATE NOCASE,
+    Active        "[INTEGER]" DEFAULT (1) 
+                              NOT NULL
+                              COLLATE NOCASE,
+    PRIMARY KEY (
+        PayeeID
+    )
+);
+
+
+-- Table: stage_Payee
+CREATE TABLE IF NOT EXISTS stage_Payee (
+    PayeeID              "[INTEGER]" DEFAULT (0) 
+                                     NOT NULL
+                                     COLLATE NOCASE,
+    Balance              "[REAL]"    DEFAULT (0) 
+                                     NOT NULL
+                                     COLLATE NOCASE,
+    StandardPayment      "[REAL]"    DEFAULT (0) 
+                                     NOT NULL
+                                     COLLATE NOCASE,
+    StandardPayDate      "[INTEGER]" DEFAULT (0) 
+                                     NOT NULL
+                                     COLLATE NOCASE,
+    BudgetID             "[INTEGER]" DEFAULT (0) 
+                                     NOT NULL
+                                     COLLATE NOCASE,
+    WebID                "[INTEGER]" DEFAULT (0) 
+                                     NOT NULL
+                                     COLLATE NOCASE,
+    StandardPayAccountID "[INTEGER]" DEFAULT (0) 
+                                     NOT NULL
+                                     COLLATE NOCASE,
+    PaymentMethod        "[TEXT]"    DEFAULT ('BillPay') 
+                                     NOT NULL
+                                     COLLATE NOCASE,
+    Category             "[TEXT]"    DEFAULT ('') 
+                                     NOT NULL
+                                     COLLATE NOCASE,
+    Name                 "[TEXT]"    DEFAULT ('') 
+                                     NOT NULL
+                                     COLLATE NOCASE,
+    Description          "[TEXT]"    DEFAULT ('') 
+                                     NOT NULL
+                                     COLLATE NOCASE,
+    AccountNumber        "[TEXT]"    DEFAULT ('') 
+                                     NOT NULL
+                                     COLLATE NOCASE,
+    PhoneNumber          "[TEXT]"    DEFAULT ('') 
+                                     NOT NULL
+                                     COLLATE NOCASE,
+    Address1             "[TEXT]"    DEFAULT ('') 
+                                     NOT NULL
+                                     COLLATE NOCASE,
+    Address2             "[TEXT]"    DEFAULT ('') 
+                                     NOT NULL
+                                     COLLATE NOCASE,
+    Address3             "[TEXT]"    DEFAULT ('') 
+                                     NOT NULL
+                                     COLLATE NOCASE,
+    City                 "[TEXT]"    DEFAULT ('') 
+                                     NOT NULL
+                                     COLLATE NOCASE,
+    State                "[TEXT]"    DEFAULT ('') 
+                                     NOT NULL
+                                     COLLATE NOCASE,
+    Zipcode              "[TEXT]"    DEFAULT ('') 
+                                     NOT NULL
+                                     COLLATE NOCASE,
+    Include              "[INTEGER]" DEFAULT (0) 
+                                     NOT NULL
+                                     COLLATE NOCASE,
+    FixedAmount          "[INTEGER]" DEFAULT (0) 
+                                     NOT NULL
+                                     COLLATE NOCASE,
+    PRIMARY KEY (
+        PayeeID
+    )
+);
+
+
+-- Table: stage_Web
+CREATE TABLE IF NOT EXISTS stage_Web (
+    WebID          "[INTEGER]" DEFAULT (0) 
+                               NOT NULL
+                               COLLATE NOCASE,
+    URL            "[TEXT]"    DEFAULT ('') 
+                               NOT NULL
+                               COLLATE NOCASE,
+    UserId         "[TEXT]"    DEFAULT ('') 
+                               NOT NULL
+                               COLLATE NOCASE,
+    PW             "[TEXT]"    DEFAULT ('') 
+                               NOT NULL
+                               COLLATE NOCASE,
+    Name           "[TEXT]"    DEFAULT ('') 
+                               NOT NULL
+                               COLLATE NOCASE,
+    PwLength       "[INTEGER]" DEFAULT (10) 
+                               NOT NULL
+                               COLLATE NOCASE,
+    LowerCaseChar  "[TEXT]"    DEFAULT ('abcdefghijklmnopqrstuvwxyz') 
+                               NOT NULL
+                               COLLATE NOCASE,
+    UpperCaseChars "[TEXT]"    DEFAULT ('ABCDEFGHIJKLMNOPQRSTUVWXYZ') 
+                               NOT NULL
+                               COLLATE NOCASE,
+    NumericChars   "[TEXT]"    DEFAULT ('1234567890') 
+                               NOT NULL
+                               COLLATE NOCASE,
+    SpecialChars   "[TEXT]"    DEFAULT ('!#$%&()*+-_,./\;:<>[]|~`{}£') 
+                               NOT NULL
+                               COLLATE NOCASE,
+    PRIMARY KEY (
+        WebID
+    )
+);
+
+
+-- Table: stage_WebQuestion
+CREATE TABLE IF NOT EXISTS stage_WebQuestion (
+    WebID          "[INTEGER]" DEFAULT (0) 
+                               NOT NULL
+                               COLLATE NOCASE,
+    QuestionID     "[INTEGER]" DEFAULT (0) 
+                               NOT NULL
+                               COLLATE NOCASE,
+    QuestionNumber "[INTEGER]" DEFAULT (0) 
+                               NOT NULL
+                               COLLATE NOCASE,
+    Question       "[TEXT]"    DEFAULT ('') 
+                               NOT NULL
+                               COLLATE NOCASE,
+    Answer         "[TEXT]"    DEFAULT ('') 
+                               NOT NULL
+                               COLLATE NOCASE,
+    PRIMARY KEY (
+        WebID,
+        QuestionID
+    ),
+    CONSTRAINT Unq_WebQuestion_QuestionID UNIQUE (
+        QuestionID COLLATE NOCASE ASC
+    )
+);
+
+
+-- Table: Tag
+CREATE TABLE IF NOT EXISTS Tag (
+    TagId     TEXT    NOT NULL
+                      PRIMARY KEY,
+    TagName   TEXT    NOT NULL,
+    SortIndex INTEGER NOT NULL
+                      DEFAULT 0,
+    IsActive  INTEGER NOT NULL
+                      DEFAULT 1
+);
+
+
+-- Table: WebQuestion
+CREATE TABLE IF NOT EXISTS WebQuestion (
+    WebQuestionId TEXT    NOT NULL
+                          PRIMARY KEY,
+    WebsiteId     TEXT    NOT NULL,
+    QuestionName  TEXT    NOT NULL,
+    QuestionText  TEXT    NOT NULL,
+    SortIndex     INTEGER NOT NULL
+                          DEFAULT 0,
+    IsActive      INTEGER NOT NULL
+                          DEFAULT 1,
+    FOREIGN KEY (
+        WebsiteId
+    )
+    REFERENCES Website (WebsiteId) 
+);
+
+
+-- Table: Website
+CREATE TABLE IF NOT EXISTS Website (
+    WebsiteId TEXT    NOT NULL
+                      PRIMARY KEY,
+    Name      TEXT    NOT NULL,
+    Url       TEXT    NOT NULL,
+    SortIndex INTEGER NOT NULL
+                      DEFAULT 0,
+    Notes     TEXT    NULL,
+    IsActive  INTEGER NOT NULL
+                      DEFAULT 1
+);
+
+
+-- Table: WebsiteCredential
+CREATE TABLE IF NOT EXISTS WebsiteCredential (
+    WebsiteCredentialId TEXT    NOT NULL
+                                PRIMARY KEY,
+    WebsiteId           TEXT    NOT NULL,
+    CredentialKey       TEXT    NOT NULL,-- key used in Windows Credential Manager
+    Label               TEXT    NULL,-- e.g. "Main login", "Billing portal"
+    IsActive            INTEGER NOT NULL
+                                DEFAULT 1,
+    FOREIGN KEY (
+        WebsiteId
+    )
+    REFERENCES Website (WebsiteId) 
+);
+
+
+-- Table: WebsiteSearch
+CREATE VIRTUAL TABLE IF NOT EXISTS WebsiteSearch USING fts5 (
+    WebsiteId UNINDEXED,
+    Name,
+    Url,
+    content = ''''
+);
+
+
+-- Table: WebsiteSearch_config
+CREATE TABLE IF NOT EXISTS WebsiteSearch_config (
+    k  PRIMARY KEY,
+    v
+)
+WITHOUT ROWID;
+
+
+-- Table: WebsiteSearch_data
+CREATE TABLE IF NOT EXISTS WebsiteSearch_data (
+    id    INTEGER PRIMARY KEY,
+    block BLOB
+);
+
+
+-- Table: WebsiteSearch_docsize
+CREATE TABLE IF NOT EXISTS WebsiteSearch_docsize (
+    id INTEGER PRIMARY KEY,
+    sz BLOB
+);
+
+
+-- Table: WebsiteSearch_idx
+CREATE TABLE IF NOT EXISTS WebsiteSearch_idx (
+    segid,
+    term,
+    pgno,
+    PRIMARY KEY (
+        segid,
+        term
+    )
+)
+WITHOUT ROWID;
+
+
+-- Table: WebsiteTag
+CREATE TABLE IF NOT EXISTS WebsiteTag (
+    WebsiteTagId TEXT    NOT NULL
+                         PRIMARY KEY,
+    WebsiteId    TEXT    NOT NULL,
+    TagId        TEXT    NOT NULL,
+    SortIndex    INTEGER NOT NULL
+                         DEFAULT 0,
+    FOREIGN KEY (
+        WebsiteId
+    )
+    REFERENCES Website (WebsiteId),
+    FOREIGN KEY (
+        TagId
+    )
+    REFERENCES Tag (TagId) 
+);
+
+
+-- Index: IX_Payee_IsActive
+CREATE INDEX IF NOT EXISTS IX_Payee_IsActive ON Payee (
+    IsActive
+);
+
+
+-- Index: IX_Payee_TemplateFlag
+CREATE INDEX IF NOT EXISTS IX_Payee_TemplateFlag ON Payee (
+    IncludeInBudgetTemplate
+);
+
+
+-- Index: IX_Payee_WebsiteId
+CREATE INDEX IF NOT EXISTS IX_Payee_WebsiteId ON Payee (
+    WebsiteId
+);
+
+
+-- Index: IX_PayeeTag_PayeeId
+CREATE INDEX IF NOT EXISTS IX_PayeeTag_PayeeId ON PayeeTag (
+    PayeeId
+);
+
+
+-- Index: IX_PayeeTag_TagId
+CREATE INDEX IF NOT EXISTS IX_PayeeTag_TagId ON PayeeTag (
+    TagId
+);
+
+
+-- View: vw_BudgetTemplatePayees
+CREATE VIEW IF NOT EXISTS vw_BudgetTemplatePayees AS
+    SELECT PayeeId,
+           PayeeName,
+           SortIndex
+      FROM Payee
+     WHERE IncludeInBudgetTemplate = 1 AND
+           IsActive = 1
+     ORDER BY SortIndex,
+              PayeeName;
+
+
+-- View: vw_PayeeWithTag
+CREATE VIEW IF NOT EXISTS vw_PayeeWithTag AS
+    SELECT p.PayeeId,
+           p.PayeeName,
+           p.SortIndex,
+           COALESCE(t.TagName, 'None') AS TagName,
+           COALESCE(t.SortIndex, 9999) AS TagSortIndex
+      FROM Payee p
+           LEFT JOIN
+           PayeeTag pt ON pt.PayeeId = p.PayeeId
+           LEFT JOIN
+           Tag t ON t.TagId = pt.TagId;
+
+
+-- View: vw_PayeeWithTags
+CREATE VIEW IF NOT EXISTS vw_PayeeWithTags AS
+    SELECT p.PayeeId,
+           p.PayeeName,
+           p.SortIndex,
+           t.TagName,
+           t.SortIndex AS TagSortIndex
+      FROM Payee p
+           LEFT JOIN
+           PayeeTag pt ON pt.PayeeId = p.PayeeId
+           LEFT JOIN
+           Tag t ON t.TagId = pt.TagId;
+
+
+-- View: vw_WebsiteTags
+CREATE VIEW IF NOT EXISTS vw_WebsiteTags AS
+    SELECT wt.WebsiteId,
+           t.TagId,
+           t.TagName,
+           t.SortIndex
+      FROM WebsiteTag wt
+           JOIN
+           Tag t ON t.TagId = wt.TagId
+     WHERE t.IsActive = 1
+     ORDER BY t.SortIndex,
+              t.TagName;
+
+
+-- View: vw_WebsiteWithTag
+CREATE VIEW IF NOT EXISTS vw_WebsiteWithTag AS
+    SELECT w.WebsiteId,
+           w.Name,
+           w.Url,
+           COALESCE(t.TagName, 'None') AS TagName,
+           COALESCE(t.SortIndex, 9999) AS TagSortIndex
+      FROM Website w
+           LEFT JOIN
+           WebsiteTag wt ON wt.WebsiteId = w.WebsiteId
+           LEFT JOIN
+           Tag t ON t.TagId = wt.TagId;
+
+
+-- View: vw_WebsiteWithTags
+CREATE VIEW IF NOT EXISTS vw_WebsiteWithTags AS
+    SELECT w.WebsiteId,
+           w.Name,
+           w.Url,
+           t.TagName,
+           t.SortIndex AS TagSortIndex
+      FROM Website w
+           LEFT JOIN
+           WebsiteTag wt ON wt.WebsiteId = w.WebsiteId
+           LEFT JOIN
+           Tag t ON t.TagId = wt.TagId;
+
+
+COMMIT TRANSACTION;
+PRAGMA foreign_keys = on;
