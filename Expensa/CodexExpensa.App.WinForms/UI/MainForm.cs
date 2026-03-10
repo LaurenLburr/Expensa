@@ -1,17 +1,18 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Windows.Forms;
-using CodexExpensa.App.WinForms.Infrastructure;
+﻿using CodexExpensa.App.WinForms.Infrastructure;
 using CodexExpensa.App.WinForms.UI.Accounts;
 using CodexExpensa.App.WinForms.UI.Banks;
 using CodexExpensa.App.WinForms.UI.Budgets;
+using CodexExpensa.App.WinForms.UI.Diagnostics;
 using CodexExpensa.App.WinForms.UI.Payees;
 using CodexExpensa.Core.Abstractions;
 using CodexExpensa.Core.Domain.Accounts;
 using CodexExpensa.Core.Domain.Banks;
 using CodexExpensa.Core.Domain.Payees;
 using CodexExpensa.Core.Domain.Transactions;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Windows.Forms;
 
 namespace CodexExpensa.App.WinForms.UI;
 
@@ -365,6 +366,13 @@ public partial class MainForm : Form
         {
             treeNav.EndUpdate();
         }
+    }
+
+
+    private void btnDiagnostics_Click(object sender, EventArgs e)
+    {
+        using var form = new DatabaseDiagnosticsForm(_dbSession);
+        form.ShowDialog(this);
     }
 
     private string GetBankDisplayName(string bankId)
@@ -971,5 +979,11 @@ public partial class MainForm : Form
         form.CancelButton = cancel;
 
         return form.ShowDialog(owner) == DialogResult.OK ? txt.Text.Trim() : null;
+    }
+
+    private void diagnosticsToolStripMenuItem_Click(object sender, EventArgs e)
+    {
+        using var form = new DatabaseDiagnosticsForm(_dbSession);
+        form.ShowDialog(this);
     }
 }

@@ -1,24 +1,21 @@
-﻿namespace CodexExpensa.App.WinForms.Abstractions;
+﻿using System.Data;
+using System.Data.Common;
 
-/// <summary>
-/// Represents the active database session for the application.
-/// This is the single abstraction the UI talks to.
-/// </summary>
+namespace CodexExpensa.Core.Abstractions;
+
 public interface IDatabaseSession
 {
-    /// <summary>
-    /// Flush in-memory data to disk.
-    /// File-based databases may treat this as a no-op.
-    /// </summary>
     void Save();
 
-    /// <summary>
-    /// True when the database is running in memory with a persisted backing file.
-    /// </summary>
     bool IsInMemory { get; }
 
-    /// <summary>
-    /// Full path to the persisted database file if one exists.
-    /// </summary>
     string? PersistedFilePath { get; }
+
+    DataTable QueryDataTable(
+        string queryName,
+        IEnumerable<DbParameter>? parameters = null);
+
+    void Execute(
+        string queryName,
+        IEnumerable<DbParameter>? parameters = null);
 }

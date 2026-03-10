@@ -1,4 +1,7 @@
-﻿using CodexExpensa.Core.Abstractions;
+﻿using System.Data;
+using System.Data.Common;
+using CodexExpensa.Core.Abstractions;
+using CodexExpensa.Data.Sqlite.SqlQueries;
 using Microsoft.Data.Sqlite;
 
 namespace CodexExpensa.Data.Sqlite.Db;
@@ -6,12 +9,13 @@ namespace CodexExpensa.Data.Sqlite.Db;
 /// <summary>
 /// SQLite database session used by the app.
 /// Supports:
-/// - File DB (direct)
+/// - File-backed DB (direct)
 /// - In-memory DB seeded from a file DB, with Save() flushing memory back to disk.
 /// </summary>
 public sealed class SqliteDatabase : IDatabaseSession, IDisposable
 {
     private readonly SqliteConnection _connection;
+    private readonly SqliteQueryCatalog _queryCatalog;
     private readonly string? _persistedFilePath;
     private bool _disposed;
 
@@ -19,6 +23,7 @@ public sealed class SqliteDatabase : IDatabaseSession, IDisposable
     {
         _connection = connection ?? throw new ArgumentNullException(nameof(connection));
         _persistedFilePath = persistedFilePath;
+        _queryCatalog = new SqliteQueryCatalog(_connection);
     }
 
     /// <summary>
@@ -29,22 +34,22 @@ public sealed class SqliteDatabase : IDatabaseSession, IDisposable
         if (string.IsNullOrWhiteSpace(dbPath))
             throw new ArgumentException("dbPath is required.", nameof(dbPath));
 
-        var folder = Path.GetDirectoryName(dbPath);
+        string? folder = Path.GetDirectoryName(dbPath);
         if (string.IsNullOrWhiteSpace(folder))
             throw new ArgumentException("dbPath must include a directory.", nameof(dbPath));
 
         Directory.CreateDirectory(folder);
 
-        var builder = new SqliteConnectionStringBuilder
+        SqliteConnectionStringBuilder builder = new()
         {
             DataSource = dbPath,
             Mode = SqliteOpenMode.ReadWriteCreate
         };
 
-        var conn = new SqliteConnection(builder.ToString());
+        SqliteConnection conn = new(builder.ToString());
         conn.Open();
 
-        // NOTE: In file mode, Save() is a no-op.
+        // In file mode, Save() is a no-op.
         return new SqliteDatabase(conn, persistedFilePath: null);
     }
 
@@ -58,21 +63,21 @@ public sealed class SqliteDatabase : IDatabaseSession, IDisposable
             throw new ArgumentException("dbPath is required.", nameof(dbPath));
 
         // Ensure the file DB exists and is a valid SQLite database.
-        using var fileDb = OpenFile(dbPath);
+        using SqliteDatabase fileDb = OpenFile(dbPath);
 
         // Create the in-memory DB and keep it open for the entire app session.
-        var memBuilder = new SqliteConnectionStringBuilder
+        SqliteConnectionStringBuilder memBuilder = new()
         {
             DataSource = ":memory:",
             Mode = SqliteOpenMode.Memory,
             Cache = SqliteCacheMode.Shared
         };
 
-        var memConn = new SqliteConnection(memBuilder.ToString());
+        SqliteConnection memConn = new(memBuilder.ToString());
         memConn.Open();
 
         // Copy disk -> memory
-         fileDb._connection.BackupDatabase(memConn);
+        fileDb._connection.BackupDatabase(memConn);
 
         return new SqliteDatabase(memConn, persistedFilePath: dbPath);
     }
@@ -90,15 +95,28 @@ public sealed class SqliteDatabase : IDatabaseSession, IDisposable
             return;
 
         // Flush memory -> disk
-        using var fileDb = OpenFile(_persistedFilePath);
+        using SqliteDatabase fileDb = OpenFile(_persistedFilePath);
         _connection.BackupDatabase(fileDb._connection);
     }
 
+    /// <summary>
+    /// True when the database is running in memory with a persisted backing file.
+    /// </summary>
     public bool IsInMemory => !string.IsNullOrWhiteSpace(_persistedFilePath);
 
+    /// <summary>
+    /// Full path to the persisted database file if one exists.
+    /// </summary>
     public string? PersistedFilePath => _persistedFilePath;
 
-    public int ExecuteNonQuery(string sql, IEnumerable<SqliteParameter>? parameters = null, SqliteTransaction? tx = null)
+    /// <summary>
+    /// Executes raw SQL and returns the affected row count.
+    /// Use this for bootstrap/schema operations that must not depend on the SqlQuery catalog.
+    /// </summary>
+    public int ExecuteNonQuery(
+        string sql,
+        IEnumerable<SqliteParameter>? parameters = null,
+        SqliteTransaction? tx = null)
     {
         ThrowIfDisposed();
 
@@ -107,31 +125,81 @@ public sealed class SqliteDatabase : IDatabaseSession, IDisposable
 
         if (tx is not null)
         {
-            using var cmd = tx.Connection!.CreateCommand();
+            using SqliteCommand cmd = tx.Connection!.CreateCommand();
             cmd.Transaction = tx;
             cmd.CommandText = sql;
 
             if (parameters is not null)
             {
-                foreach (var p in parameters)
+                foreach (SqliteParameter p in parameters)
                     cmd.Parameters.Add(p);
             }
 
             return cmd.ExecuteNonQuery();
         }
 
-        using var cmd2 = _connection.CreateCommand();
+        using SqliteCommand cmd2 = _connection.CreateCommand();
         cmd2.CommandText = sql;
 
         if (parameters is not null)
         {
-            foreach (var p in parameters)
+            foreach (SqliteParameter p in parameters)
                 cmd2.Parameters.Add(p);
         }
 
         return cmd2.ExecuteNonQuery();
     }
 
+    /// <summary>
+    /// Executes a named query from the SqlQuery catalog and returns nothing.
+    /// This method implements the UI-facing IDatabaseSession contract.
+    /// </summary>
+    public void Execute(
+        string queryName,
+        IEnumerable<DbParameter>? parameters = null)
+    {
+        ThrowIfDisposed();
+
+        if (string.IsNullOrWhiteSpace(queryName))
+            throw new ArgumentException("queryName is required.", nameof(queryName));
+
+        string sql = _queryCatalog.GetSql(queryName);
+
+        using SqliteCommand cmd = _connection.CreateCommand();
+        cmd.CommandText = sql;
+
+        if (parameters is not null)
+        {
+            foreach (DbParameter p in parameters)
+                cmd.Parameters.Add(p);
+        }
+
+        cmd.ExecuteNonQuery();
+    }
+
+    /// <summary>
+    /// Executes a named query from the SqlQuery catalog and returns the affected row count.
+    /// Use this in the SQLite data layer when transaction support is needed.
+    /// </summary>
+    public int ExecuteNamedNonQuery(
+        string queryName,
+        IEnumerable<SqliteParameter>? parameters = null,
+        SqliteTransaction? tx = null)
+    {
+        ThrowIfDisposed();
+
+        if (string.IsNullOrWhiteSpace(queryName))
+            throw new ArgumentException("queryName is required.", nameof(queryName));
+
+        string sql = _queryCatalog.GetSql(queryName);
+
+        return ExecuteNonQuery(sql, parameters, tx);
+    }
+
+    /// <summary>
+    /// Executes raw SQL and maps the result set.
+    /// Use this for bootstrap/schema operations that must not depend on the SqlQuery catalog.
+    /// </summary>
     public IReadOnlyList<T> Query<T>(
         string sql,
         Func<SqliteDataReader, T> map,
@@ -145,41 +213,95 @@ public sealed class SqliteDatabase : IDatabaseSession, IDisposable
         if (map is null)
             throw new ArgumentNullException(nameof(map));
 
-        var results = new List<T>();
+        List<T> results = new();
 
         if (tx is not null)
         {
-            using var cmd = tx.Connection!.CreateCommand();
+            using SqliteCommand cmd = tx.Connection!.CreateCommand();
             cmd.Transaction = tx;
             cmd.CommandText = sql;
 
             if (parameters is not null)
             {
-                foreach (var p in parameters)
+                foreach (SqliteParameter p in parameters)
                     cmd.Parameters.Add(p);
             }
 
-            using var reader = cmd.ExecuteReader();
+            using SqliteDataReader reader = cmd.ExecuteReader();
             while (reader.Read())
                 results.Add(map(reader));
 
             return results;
         }
 
-        using var cmd2 = _connection.CreateCommand();
+        using SqliteCommand cmd2 = _connection.CreateCommand();
         cmd2.CommandText = sql;
 
         if (parameters is not null)
         {
-            foreach (var p in parameters)
+            foreach (SqliteParameter p in parameters)
                 cmd2.Parameters.Add(p);
         }
 
-        using var reader2 = cmd2.ExecuteReader();
+        using SqliteDataReader reader2 = cmd2.ExecuteReader();
         while (reader2.Read())
             results.Add(map(reader2));
 
         return results;
+    }
+
+    /// <summary>
+    /// Executes a named query from the SqlQuery catalog and maps the result set.
+    /// Use this for normal application queries stored in SqlQuery.
+    /// </summary>
+    public IReadOnlyList<T> QueryNamed<T>(
+        string queryName,
+        Func<SqliteDataReader, T> map,
+        IEnumerable<SqliteParameter>? parameters = null,
+        SqliteTransaction? tx = null)
+    {
+        ThrowIfDisposed();
+
+        if (string.IsNullOrWhiteSpace(queryName))
+            throw new ArgumentException("queryName is required.", nameof(queryName));
+        if (map is null)
+            throw new ArgumentNullException(nameof(map));
+
+        string sql = _queryCatalog.GetSql(queryName);
+
+        return Query(sql, map, parameters, tx);
+    }
+
+    /// <summary>
+    /// Executes a named query from the SqlQuery catalog and returns a DataTable.
+    /// This method implements the UI-facing IDatabaseSession contract.
+    /// </summary>
+    public DataTable QueryDataTable(
+        string queryName,
+        IEnumerable<DbParameter>? parameters = null)
+    {
+        ThrowIfDisposed();
+
+        if (string.IsNullOrWhiteSpace(queryName))
+            throw new ArgumentException("queryName is required.", nameof(queryName));
+
+        string sql = _queryCatalog.GetSql(queryName);
+
+        DataTable table = new();
+
+        using SqliteCommand cmd = _connection.CreateCommand();
+        cmd.CommandText = sql;
+
+        if (parameters is not null)
+        {
+            foreach (DbParameter p in parameters)
+                cmd.Parameters.Add(p);
+        }
+
+        using SqliteDataReader reader = cmd.ExecuteReader();
+        table.Load(reader);
+
+        return table;
     }
 
     public void ExecuteInTransaction(Action<SqliteTransaction> action)
@@ -189,7 +311,7 @@ public sealed class SqliteDatabase : IDatabaseSession, IDisposable
         if (action is null)
             throw new ArgumentNullException(nameof(action));
 
-        using var tx = _connection.BeginTransaction();
+        using SqliteTransaction tx = _connection.BeginTransaction();
         try
         {
             action(tx);
@@ -197,14 +319,24 @@ public sealed class SqliteDatabase : IDatabaseSession, IDisposable
         }
         catch
         {
-            try { tx.Rollback(); } catch { /* ignore */ }
+            try
+            {
+                tx.Rollback();
+            }
+            catch
+            {
+                // ignore rollback failures
+            }
+
             throw;
         }
     }
 
     public void Dispose()
     {
-        if (_disposed) return;
+        if (_disposed)
+            return;
+
         _disposed = true;
         _connection.Dispose();
     }

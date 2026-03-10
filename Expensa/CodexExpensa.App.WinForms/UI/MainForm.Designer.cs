@@ -46,6 +46,7 @@
             menuViewRefresh = new ToolStripMenuItem();
             menuTools = new ToolStripMenuItem();
             menuToolsDbStatus = new ToolStripMenuItem();
+            diagnosticsToolStripMenuItem = new ToolStripMenuItem();
             menuHelp = new ToolStripMenuItem();
             menuHelpAbout = new ToolStripMenuItem();
             statusMain = new StatusStrip();
@@ -105,7 +106,7 @@
             // 
             // menuTools
             // 
-            menuTools.DropDownItems.AddRange(new ToolStripItem[] { menuToolsDbStatus });
+            menuTools.DropDownItems.AddRange(new ToolStripItem[] { menuToolsDbStatus, diagnosticsToolStripMenuItem });
             menuTools.Name = "menuTools";
             menuTools.Size = new Size(46, 20);
             menuTools.Text = "&Tools";
@@ -113,8 +114,15 @@
             // menuToolsDbStatus
             // 
             menuToolsDbStatus.Name = "menuToolsDbStatus";
-            menuToolsDbStatus.Size = new Size(133, 22);
+            menuToolsDbStatus.Size = new Size(180, 22);
             menuToolsDbStatus.Text = "DB &Status...";
+            // 
+            // diagnosticsToolStripMenuItem
+            // 
+            diagnosticsToolStripMenuItem.Name = "diagnosticsToolStripMenuItem";
+            diagnosticsToolStripMenuItem.Size = new Size(180, 22);
+            diagnosticsToolStripMenuItem.Text = "Diagnostics";
+            diagnosticsToolStripMenuItem.Click += diagnosticsToolStripMenuItem_Click;
             // 
             // menuHelp
             // 
@@ -126,7 +134,7 @@
             // menuHelpAbout
             // 
             menuHelpAbout.Name = "menuHelpAbout";
-            menuHelpAbout.Size = new Size(180, 22);
+            menuHelpAbout.Size = new Size(107, 22);
             menuHelpAbout.Text = "&About";
             menuHelpAbout.Click += menuHelpAbout_Click_1;
             // 
@@ -211,5 +219,7 @@
         }
 
         #endregion
+
+        private ToolStripMenuItem diagnosticsToolStripMenuItem;
     }
 }

@@ -10,9 +10,18 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+	  <Compile Remove="Abstractions\IDatabaseSession.cs" />
+	</ItemGroup>
+
+	<ItemGroup>
 		<ProjectReference Include="..\CodexExpensa.Core\CodexExpensa.Core.csproj" />
 		<ProjectReference Include="..\CodexExpensa.Data.Sqlite\CodexExpensa.Data.Sqlite.csproj" />
 		<ProjectReference Include="..\CodexExpensa.Security.Windows\CodexExpensa.Security.Windows.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Folder Include="Abstractions\" />
+	  <Folder Include="Infrastructure\Database\" />
 	</ItemGroup>
 
 </Project>
