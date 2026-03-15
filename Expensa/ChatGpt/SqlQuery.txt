@@ -1,0 +1,176 @@
+UPDATE [SqlQuery]
+SET
+    [Category] =
+        CASE [QueryName]
+
+            -- Account
+            WHEN 'Account.Insert' THEN 'Account'
+            WHEN 'Account.SelectByBankId' THEN 'Account'
+            WHEN 'Account.SelectById' THEN 'Account'
+            WHEN 'Account.Update' THEN 'Account'
+            WHEN 'AccountsByBank' THEN 'Account'
+
+            -- Bank
+            WHEN 'Bank.Insert' THEN 'Bank'
+            WHEN 'Bank.SelectById' THEN 'Bank'
+            WHEN 'Bank.Update' THEN 'Bank'
+            WHEN 'Banks.SelectAll' THEN 'Bank'
+
+            -- Budget
+            WHEN 'BudgetMonth.CopyTemplatePayees' THEN 'Budget'
+            WHEN 'BudgetMonth.Create' THEN 'Budget'
+            WHEN 'BudgetMonth.ExistsByYearMonth' THEN 'Budget'
+            WHEN 'BudgetMonth.SelectAll' THEN 'Budget'
+            WHEN 'BudgetMonth.SelectById' THEN 'Budget'
+            WHEN 'BudgetMonth.SelectByYearMonth' THEN 'Budget'
+            WHEN 'BudgetMonthPayee.SelectByBudgetMonthId' THEN 'Budget'
+            WHEN 'BudgetMonthPayee.UpdatePlannedAmount' THEN 'Budget'
+            WHEN 'BudgetTemplate.SelectRows' THEN 'Budget'
+            WHEN 'TemplatePayees' THEN 'Budget'
+
+            -- Import
+            WHEN 'BudgetMonth.InsertFromStage' THEN 'Import'
+            WHEN 'BudgetMonth.MissingFromStage' THEN 'Import'
+            WHEN 'BudgetMonthPayee.ImportFromStage' THEN 'Import'
+            WHEN 'BudgetMonthPayee.MissingAccountMappingsFromStage' THEN 'Import'
+            WHEN 'BudgetMonthPayee.MissingPayeeMappingsFromStage' THEN 'Import'
+            WHEN 'BudgetMonthPayee.PreviewImportFromStage' THEN 'Import'
+
+            -- Diagnostics
+            WHEN 'BudgetMonth.SelectWithCounts' THEN 'Diagnostics'
+
+            -- Payee
+            WHEN 'Payee.DeleteById' THEN 'Payee'
+            WHEN 'Payee.Insert' THEN 'Payee'
+            WHEN 'Payee.SelectAll' THEN 'Payee'
+            WHEN 'Payee.SelectById' THEN 'Payee'
+            WHEN 'Payee.Update' THEN 'Payee'
+
+            -- Migration
+            WHEN 'SchemaMigrations.InsertApplied' THEN 'Migration'
+            WHEN 'SchemaMigrations.SelectAll' THEN 'Migration'
+            WHEN 'SchemaMigrations.SelectAppliedIds' THEN 'Migration'
+
+            -- Infrastructure
+            WHEN 'SqlQuery.SelectActiveByName' THEN 'Infrastructure'
+
+            ELSE [Category]
+        END,
+
+    [Description] =
+        CASE [QueryName]
+
+            -- Account
+            WHEN 'Account.Insert' THEN
+                'Inserts a new Account row into the current schema.'
+
+            WHEN 'Account.SelectByBankId' THEN
+                'Returns all Account rows for a specific BankId ordered by SortIndex and AccountNickname for display in account lists.'
+
+            WHEN 'Account.SelectById' THEN
+                'Returns a single Account row by AccountId for editing or display.'
+
+            WHEN 'Account.Update' THEN
+                'Updates an existing Account row identified by AccountId.'
+
+            WHEN 'AccountsByBank' THEN
+                'Returns all Account rows for a given BankId ordered by SortIndex. Used by AccountTransactionsPanel.'
+
+            -- Bank
+            WHEN 'Bank.Insert' THEN
+                'Inserts a new Bank row into the current schema.'
+
+            WHEN 'Bank.SelectById' THEN
+                'Returns a single Bank row by BankId.'
+
+            WHEN 'Bank.Update' THEN
+                'Updates an existing Bank row identified by BankId.'
+
+            WHEN 'Banks.SelectAll' THEN
+                'Returns all Bank rows ordered by BankName for navigation lists and selection screens.'
+
+            -- Budget
+            WHEN 'BudgetMonth.CopyTemplatePayees' THEN
+                'Copies payees that are flagged for inclusion in the budget template into BudgetMonthPayee for a specific budget month. Used when creating a new budget so the new month starts with the standard set of budget items.'
+
+            WHEN 'BudgetMonth.Create' THEN
+                'Creates a new BudgetMonth row for a specific BudgetMonthId, Year, and Month.'
+
+            WHEN 'BudgetMonth.ExistsByYearMonth' THEN
+                'Checks whether a BudgetMonth already exists for a given Year and Month and returns its BudgetMonthId if present.'
+
+            WHEN 'BudgetMonth.SelectAll' THEN
+                'Returns all BudgetMonth rows ordered by Year and Month.'
+
+            WHEN 'BudgetMonth.SelectById' THEN
+                'Returns a single BudgetMonth row by BudgetMonthId.'
+
+            WHEN 'BudgetMonth.SelectByYearMonth' THEN
+                'Returns the BudgetMonth row for a given Year and Month. Used to resolve BudgetMonthId from a selected year and month.'
+
+            WHEN 'BudgetMonth.SelectWithCounts' THEN
+                'Diagnostic query that returns all BudgetMonth rows with a count of related BudgetMonthPayee rows for each month.'
+
+            WHEN 'BudgetMonthPayee.SelectByBudgetMonthId' THEN
+                'Returns the full catalog of budget items for a specific BudgetMonthId including PayeeName for display in the monthly budget grid.'
+
+            WHEN 'BudgetMonthPayee.UpdatePlannedAmount' THEN
+                'Updates PlannedAmount for a single BudgetMonthPayee row identified by BudgetMonthPayeeId.'
+
+            WHEN 'BudgetTemplate.SelectRows' THEN
+                'Returns the payees included in the budget template view ordered by SortIndex and PayeeName.'
+
+            WHEN 'TemplatePayees' THEN
+                'Legacy template-payee query returning payees selected for the budget template. Superseded by BudgetTemplate.SelectRows.'
+
+            -- Import
+            WHEN 'BudgetMonth.InsertFromStage' THEN
+                'Creates missing BudgetMonth rows from legacy stage_Budget_old data using distinct year and month values. Existing months are ignored.'
+
+            WHEN 'BudgetMonth.MissingFromStage' THEN
+                'Preview query for budget migration. Shows year and month combinations in stage_Budget_old that do not yet exist in BudgetMonth.'
+
+            WHEN 'BudgetMonthPayee.ImportFromStage' THEN
+                'Imports BudgetMonthPayee rows from legacy stage_Budget_old data by mapping legacy Payee and Account ids into the current schema and upserting by BudgetMonthPayeeId.'
+
+            WHEN 'BudgetMonthPayee.MissingAccountMappingsFromStage' THEN
+                'Diagnostic query for budget migration. Shows legacy stage_Budget_old rows whose BankAccountID does not map to a current Account record.'
+
+            WHEN 'BudgetMonthPayee.MissingPayeeMappingsFromStage' THEN
+                'Diagnostic query for budget migration. Shows legacy stage_Budget_old rows whose PayeeID does not map to a current Payee record.'
+
+            WHEN 'BudgetMonthPayee.PreviewImportFromStage' THEN
+                'Preview query for budget migration. Shows the BudgetMonthPayee rows that would be created from stage_Budget_old before running the import.'
+
+            -- Payee
+            WHEN 'Payee.DeleteById' THEN
+                'Deletes a Payee row by PayeeId.'
+
+            WHEN 'Payee.Insert' THEN
+                'Inserts a new Payee row into the current schema.'
+
+            WHEN 'Payee.SelectAll' THEN
+                'Returns all Payee rows ordered so that payees included in the budget template appear first, followed by the remaining payees sorted alphabetically by PayeeName. Used by payee management screens.'
+
+            WHEN 'Payee.SelectById' THEN
+                'Returns a single Payee row by PayeeId.'
+
+            WHEN 'Payee.Update' THEN
+                'Updates an existing Payee row identified by PayeeId.'
+
+            -- Migration
+            WHEN 'SchemaMigrations.InsertApplied' THEN
+                'Records a migration as applied in the SchemaMigrations table. Stores the MigrationId, the UTC timestamp when the migration was applied, and the SHA256 checksum of the migration SQL.'
+
+            WHEN 'SchemaMigrations.SelectAll' THEN
+                'Returns all migration records from SchemaMigrations ordered by MigrationId.'
+
+            WHEN 'SchemaMigrations.SelectAppliedIds' THEN
+                'Returns the list of applied migration identifiers from SchemaMigrations ordered by MigrationId.'
+
+            -- Infrastructure
+            WHEN 'SqlQuery.SelectActiveByName' THEN
+                'Returns an active SqlQuery catalog entry by QueryName. Used by the query loader to resolve SQL text.'
+
+            ELSE [Description]
+        END;

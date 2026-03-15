@@ -1,5 +1,5 @@
 --
--- File generated with SQLiteStudio v3.4.15 on Mon Mar 9 19:24:58 2026
+-- File generated with SQLiteStudio v3.4.15 on Sat Mar 14 19:47:25 2026
 --
 -- Text encoding used: System
 --
@@ -126,6 +126,19 @@ CREATE TABLE IF NOT EXISTS BudgetMonthRow (
 );
 
 
+-- Table: BudgetTemplateRow
+CREATE TABLE IF NOT EXISTS BudgetTemplateRow (
+    TemplateRowId TEXT    NOT NULL
+                          PRIMARY KEY,
+    Name          TEXT    NOT NULL,
+    SortIndex     INTEGER NOT NULL
+                          DEFAULT 0,
+    DefaultAmount REAL    NOT NULL,
+    IsActive      INTEGER NOT NULL
+                          DEFAULT 1
+);
+
+
 -- Table: Payee
 CREATE TABLE IF NOT EXISTS Payee (
     PayeeId                 TEXT    PRIMARY KEY,
@@ -137,6 +150,8 @@ CREATE TABLE IF NOT EXISTS Payee (
     IsActive                INTEGER NOT NULL
                                     DEFAULT 1,
     WebsiteId               TEXT    NULL,
+    DefaultAccountId        TEXT    NULL,
+    DefaultAmount           NUMERIC NULL,
     UNIQUE (
         PayeeName
     )
@@ -158,7 +173,12 @@ CREATE TABLE IF NOT EXISTS PayeeTag (
     FOREIGN KEY (
         TagId
     )
-    REFERENCES Tag (TagId) 
+    REFERENCES Tag (TagId),
+    CONSTRAINT IX_PayeeTag_PayeeId_TagId UNIQUE (
+        PayeeTagId,
+        PayeeId
+    )
+    ON CONFLICT IGNORE
 );
 
 
@@ -173,15 +193,18 @@ CREATE TABLE IF NOT EXISTS SchemaMigrations (
 
 -- Table: SqlQuery
 CREATE TABLE IF NOT EXISTS SqlQuery (
-    QueryIndex  INTEGER NOT NULL
-                        PRIMARY KEY,
-    QueryName   TEXT    NOT NULL
-                        UNIQUE,
-    Description TEXT    NULL,
+    QueryName   TEXT    PRIMARY KEY,
+    Description TEXT    NOT NULL,
     SqlText     TEXT    NOT NULL,
-    Fingerprint TEXT    AS (printf('%d-%d-%d-%d', length(SqlText), unicode(substr(SqlText, 1, 1) ), unicode(substr(SqlText, 2, 1) ), unicode(substr(SqlText, length(SqlText), 1) ) ) ) STORED,
+    CreatedUtc  TEXT    NOT NULL
+                        DEFAULT CURRENT_TIMESTAMP,
+    Category    TEXT    NOT NULL
+                        DEFAULT (''),
     IsActive    INTEGER NOT NULL
-                        DEFAULT 1
+                        DEFAULT (1),
+    UNIQUE (
+        QueryName ASC
+    )
 );
 
 
@@ -214,8 +237,8 @@ CREATE TABLE IF NOT EXISTS stage_BankAccount (
 );
 
 
--- Table: stage_Budget
-CREATE TABLE IF NOT EXISTS stage_Budget (
+-- Table: stage_Budget_old
+CREATE TABLE IF NOT EXISTS stage_Budget_old (
     BudgetYear    "[INTEGER]" DEFAULT (2012) 
                               NOT NULL
                               COLLATE NOCASE,
@@ -446,6 +469,49 @@ CREATE TABLE IF NOT EXISTS Tag (
 );
 
 
+-- Table: Txn
+CREATE TABLE IF NOT EXISTS Txn (
+    TransactionId INTEGER PRIMARY KEY AUTOINCREMENT,
+    AccountId     TEXT    NOT NULL,
+    PayeeId       TEXT    NULL,
+    Status        INTEGER NOT NULL,-- 0=Projected,1=Outstanding,2=Cleared
+    Amount        REAL    NOT NULL,
+    StartDate     TEXT    NOT NULL,-- ISO yyyy-MM-dd
+    Confirm       TEXT    NULL,
+    Note          TEXT    NULL,
+    FOREIGN KEY (
+        AccountId
+    )
+    REFERENCES Account (AccountId) ON DELETE CASCADE,
+    FOREIGN KEY (
+        PayeeId
+    )
+    REFERENCES Payee (PayeeId) ON DELETE SET NULL
+);
+
+
+-- Table: UiColorRule
+CREATE TABLE IF NOT EXISTS UiColorRule (
+    RuleId        TEXT    NOT NULL
+                          PRIMARY KEY,
+    ScreenName    TEXT    NOT NULL,
+    ColumnName    TEXT    NOT NULL,
+    MatchValue    TEXT    NOT NULL,
+    BackColorArgb INTEGER NOT NULL,
+    ForeColorArgb INTEGER NULL,
+    IsActive      INTEGER NOT NULL
+                          DEFAULT 1
+);
+
+
+-- Table: UserSettings
+CREATE TABLE IF NOT EXISTS UserSettings (
+    SettingName  TEXT PRIMARY KEY,
+    SettingValue TEXT NOT NULL,
+    UpdatedUtc   TEXT
+);
+
+
 -- Table: WebQuestion
 CREATE TABLE IF NOT EXISTS WebQuestion (
     WebQuestionId TEXT    NOT NULL
@@ -553,37 +619,12 @@ CREATE TABLE IF NOT EXISTS WebsiteTag (
     FOREIGN KEY (
         TagId
     )
-    REFERENCES Tag (TagId) 
-);
-
-
--- Index: IX_Payee_IsActive
-CREATE INDEX IF NOT EXISTS IX_Payee_IsActive ON Payee (
-    IsActive
-);
-
-
--- Index: IX_Payee_TemplateFlag
-CREATE INDEX IF NOT EXISTS IX_Payee_TemplateFlag ON Payee (
-    IncludeInBudgetTemplate
-);
-
-
--- Index: IX_Payee_WebsiteId
-CREATE INDEX IF NOT EXISTS IX_Payee_WebsiteId ON Payee (
-    WebsiteId
-);
-
-
--- Index: IX_PayeeTag_PayeeId
-CREATE INDEX IF NOT EXISTS IX_PayeeTag_PayeeId ON PayeeTag (
-    PayeeId
-);
-
-
--- Index: IX_PayeeTag_TagId
-CREATE INDEX IF NOT EXISTS IX_PayeeTag_TagId ON PayeeTag (
-    TagId
+    REFERENCES Tag (TagId),
+    CONSTRAINT IX_Website_Tag_WebsiteId_TagId UNIQUE (
+        WebsiteTagId,
+        WebsiteId
+    )
+    ON CONFLICT IGNORE
 );
 
 

@@ -6,4 +6,12 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <Compile Remove="Domain\Budgets\BudgetTemplateRow.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Domain\Budgets\" />
+  </ItemGroup>
+
 </Project>

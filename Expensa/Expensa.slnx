@@ -3,7 +3,6 @@
     <File Path="ChatGpt/Expensa_1.md" />
     <File Path="ChatGpt/Expensa_2.md" />
     <File Path="ChatGpt/Expensa_3.md" />
-    <File Path="Database.sql" />
     <File Path="Directory.Build.props" />
   </Folder>
   <Project Path="CodexExpensa.App.WinForms/CodexExpensa.App.WinForms.csproj" />

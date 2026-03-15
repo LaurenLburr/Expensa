@@ -11,6 +11,7 @@ using CodexExpensa.Core.Domain.Payees;
 using CodexExpensa.Core.Domain.Transactions;
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
 using System.Windows.Forms;
 
@@ -42,6 +43,8 @@ public partial class MainForm : Form
     private readonly ContextMenuStrip _ctxAccountNode;
     private readonly ContextMenuStrip _ctxPayeeNode;
 
+    private string _payeeNameFilter = string.Empty;
+
     private enum NavTag
     {
         BanksRoot,
@@ -50,29 +53,51 @@ public partial class MainForm : Form
         BudgetsRoot
     }
 
-    // Budget node ids (string tags)
     private static class BudgetNav
     {
         public const string Template = "Budget.Template";
+
         public static string Current(int year, int month) => $"Budget.Current.{year:D4}.{month:D2}";
+
         public static string Year(int year) => $"Budget.Year.{year}";
+
         public static string Month(int year, int month) => $"Budget.Month.{year:D4}.{month:D2}";
+
+        public static bool TryParseYear(string id, out int year)
+        {
+            year = 0;
+
+            if (string.IsNullOrWhiteSpace(id))
+                return false;
+
+            string[] parts = id.Split('.');
+            if (parts.Length != 3)
+                return false;
+
+            if (!string.Equals(parts[0], "Budget", StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            if (!string.Equals(parts[1], "Year", StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            return int.TryParse(parts[2], out year);
+        }
 
         public static bool TryParseMonth(string id, out int year, out int month)
         {
             year = 0;
             month = 0;
 
-            // Budget.Month.2026.12
             if (string.IsNullOrWhiteSpace(id))
                 return false;
 
-            var parts = id.Split('.');
+            string[] parts = id.Split('.');
             if (parts.Length != 4)
                 return false;
 
             if (!string.Equals(parts[0], "Budget", StringComparison.OrdinalIgnoreCase))
                 return false;
+
             if (!string.Equals(parts[1], "Month", StringComparison.OrdinalIgnoreCase))
                 return false;
 
@@ -82,10 +107,7 @@ public partial class MainForm : Form
             if (!int.TryParse(parts[3], out month))
                 return false;
 
-            if (month < 1 || month > 12)
-                return false;
-
-            return true;
+            return month is >= 1 and <= 12;
         }
 
         public static bool TryParseCurrent(string id, out int year, out int month)
@@ -93,16 +115,16 @@ public partial class MainForm : Form
             year = 0;
             month = 0;
 
-            // Budget.Current.2026.03
             if (string.IsNullOrWhiteSpace(id))
                 return false;
 
-            var parts = id.Split('.');
+            string[] parts = id.Split('.');
             if (parts.Length != 4)
                 return false;
 
             if (!string.Equals(parts[0], "Budget", StringComparison.OrdinalIgnoreCase))
                 return false;
+
             if (!string.Equals(parts[1], "Current", StringComparison.OrdinalIgnoreCase))
                 return false;
 
@@ -112,11 +134,56 @@ public partial class MainForm : Form
             if (!int.TryParse(parts[3], out month))
                 return false;
 
-            if (month < 1 || month > 12)
+            return month is >= 1 and <= 12;
+        }
+    }
+
+    private static class PayeeNav
+    {
+        public const string NameView = "Payee.NameView";
+        public const string TagView = "Payee.TagView";
+        public const string TagGroupNone = "Payee.TagGroup.None";
+
+        public static string TagGroup(string tagId) => $"Payee.TagGroup.{tagId}";
+        public static string Item(string payeeId) => $"Payee.{payeeId}";
+
+        public static bool TryParseItem(string id, out string payeeId)
+        {
+            payeeId = string.Empty;
+
+            if (string.IsNullOrWhiteSpace(id))
                 return false;
 
-            return true;
+            if (!id.StartsWith("Payee.", StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            string[] parts = id.Split('.');
+            if (parts.Length != 2)
+                return false;
+
+            if (string.Equals(parts[1], "NameView", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(parts[1], "TagView", StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            payeeId = parts[1];
+            return !string.IsNullOrWhiteSpace(payeeId);
         }
+    }
+
+    private static Form WrapControlInForm(Control control, string title)
+    {
+        Form form = new()
+        {
+            Text = title,
+            TopLevel = false,
+            FormBorderStyle = FormBorderStyle.None,
+            Dock = DockStyle.Fill
+        };
+
+        control.Dock = DockStyle.Fill;
+        form.Controls.Add(control);
+
+        return form;
     }
 
     public MainForm(
@@ -133,6 +200,7 @@ public partial class MainForm : Form
         _transactions = transactions ?? throw new ArgumentNullException(nameof(transactions));
         _payees = payees ?? throw new ArgumentNullException(nameof(payees));
         _createDbStatusForm = createDbStatusForm ?? throw new ArgumentNullException(nameof(createDbStatusForm));
+
 
         InitializeComponent();
 
@@ -155,7 +223,6 @@ public partial class MainForm : Form
         menuViewRefresh.Click += MenuViewRefresh_Click;
         menuToolsDbStatus.Click += MenuToolsDbStatus_Click;
 
-        // Designer wires menuHelpAbout_Click_1; keep both safe.
         menuHelpAbout.Click += MenuHelpAbout_Click;
 
         UpdateDbStatus();
@@ -207,7 +274,7 @@ public partial class MainForm : Form
     {
         try
         {
-            using var dlg = _createDbStatusForm();
+            using Form dlg = _createDbStatusForm();
             dlg.ShowDialog(this);
         }
         catch (Exception ex)
@@ -226,9 +293,14 @@ public partial class MainForm : Form
             MessageBoxIcon.Information);
     }
 
-    // Designer wires this method name.
     private void menuHelpAbout_Click_1(object sender, EventArgs e)
         => MenuHelpAbout_Click(sender, e);
+
+    private void queryCatalogToolStripMenuItem_Click(object sender, EventArgs e)
+    {
+        using QueryCatalogForm form = new(_dbSession);
+        form.ShowDialog(this);
+    }
 
     private void RefreshCaches()
     {
@@ -244,27 +316,24 @@ public partial class MainForm : Form
         {
             treeNav.Nodes.Clear();
 
-            // Banks root
-            var banksRoot = new TreeNode("Banks") { Tag = NavTag.BanksRoot };
-            foreach (var b in _bankCache.OrderBy(b => b.BankName).ThenBy(b => b.RoutingNumber))
+            TreeNode banksRoot = new("Banks") { Tag = NavTag.BanksRoot };
+            foreach (Bank b in _bankCache.OrderBy(b => b.BankName).ThenBy(b => b.RoutingNumber))
             {
-                var label = $"{b.BankName} ({b.RoutingNumber})";
+                string label = $"{b.BankName} ({b.RoutingNumber})";
                 banksRoot.Nodes.Add(new TreeNode(label) { Tag = b.BankId });
             }
-            //banksRoot.Expand();
             treeNav.Nodes.Add(banksRoot);
 
-            // Accounts root: Accounts -> Bank (tag=bankId) -> Account leaf (tag=accountId)
-            var accountsRoot = new TreeNode("Accounts") { Tag = NavTag.AccountsRoot };
+            TreeNode accountsRoot = new("Accounts") { Tag = NavTag.AccountsRoot };
 
-            var bankAccounts = new Dictionary<string, List<Account>>(StringComparer.Ordinal);
-            foreach (var acct in _accountCache)
+            Dictionary<string, List<Account>> bankAccounts = new(StringComparer.Ordinal);
+            foreach (Account acct in _accountCache)
             {
-                var bankId = acct.BankId;
+                string bankId = acct.BankId;
                 if (string.IsNullOrWhiteSpace(bankId))
                     continue;
 
-                if (!bankAccounts.TryGetValue(bankId, out var list))
+                if (!bankAccounts.TryGetValue(bankId, out List<Account>? list))
                 {
                     list = new List<Account>();
                     bankAccounts[bankId] = list;
@@ -273,93 +342,88 @@ public partial class MainForm : Form
                 list.Add(acct);
             }
 
-            foreach (var kvp in bankAccounts.OrderBy(k => GetBankDisplayName(k.Key), StringComparer.OrdinalIgnoreCase))
+            foreach (KeyValuePair<string, List<Account>> kvp in bankAccounts.OrderBy(k => GetBankDisplayName(k.Key), StringComparer.OrdinalIgnoreCase))
             {
-                var bankId = kvp.Key;
-                var accountsForBank = kvp.Value;
+                string bankId = kvp.Key;
+                List<Account> accountsForBank = kvp.Value;
 
-                var bankDisplay = GetBankDisplayName(bankId);
-                var bankNode = new TreeNode(bankDisplay) { Tag = bankId };
+                string bankDisplay = GetBankDisplayName(bankId);
+                TreeNode bankNode = new(bankDisplay) { Tag = bankId };
 
-                foreach (var acct in accountsForBank
+                foreach (Account acct in accountsForBank
                              .OrderBy(a => a.SortIndex)
                              .ThenBy(a => a.AccountNickname)
                              .ThenBy(a => a.AccountNumber))
                 {
-                    var last4 = Last4(acct.AccountNumber);
-                    var label = $"{acct.AccountNickname} - {last4}";
+                    string last4 = Last4(acct.AccountNumber);
+                    string label = $"{acct.AccountNickname} - {last4}";
                     bankNode.Nodes.Add(new TreeNode(label) { Tag = acct.AccountId });
                 }
 
-                //bankNode.Expand();
                 accountsRoot.Nodes.Add(bankNode);
             }
 
-            //accountsRoot.Expand();
             treeNav.Nodes.Add(accountsRoot);
 
-            // Payees root
-            var payeesRoot = new TreeNode("Payees") { Tag = NavTag.PayeesRoot };
-            foreach (var p in _payeeCache
+            TreeNode payeesRoot = new("Payees") { Tag = NavTag.PayeesRoot };
+
+            TreeNode payeeNameNode = new("Name") { Tag = PayeeNav.NameView };
+            TreeNode payeeTagNode = new("Tags") { Tag = PayeeNav.TagView };
+
+            payeesRoot.Nodes.Add(payeeNameNode);
+            payeesRoot.Nodes.Add(payeeTagNode);
+
+            // Default normal payee list under root for now
+            foreach (Payee p in _payeeCache
                          .OrderByDescending(p => p.IncludeInBudgetTemplate)
                          .ThenBy(p => p.PayeeName))
             {
-                var label = p.IncludeInBudgetTemplate ? $"{p.PayeeName}  ✓" : p.PayeeName;
-                payeesRoot.Nodes.Add(new TreeNode(label) { Tag = p.PayeeId });
+                string label = p.IncludeInBudgetTemplate ? $"{p.PayeeName}  ✓" : p.PayeeName;
+                payeesRoot.Nodes.Add(new TreeNode(label) { Tag = PayeeNav.Item(p.PayeeId) });
             }
-            //payeesRoot.Expand();
+
             treeNav.Nodes.Add(payeesRoot);
 
-            // Budgets root
-            var budgetsRoot = new TreeNode("Budgets") { Tag = NavTag.BudgetsRoot };
+            TreeNode budgetsRoot = new("Budgets") { Tag = NavTag.BudgetsRoot };
 
-            // Template node immediately under Budgets
             budgetsRoot.Nodes.Add(new TreeNode("Template") { Tag = BudgetNav.Template });
 
-            // Current node immediately under Budgets
-            var today = DateTime.Today;
+            DateTime today = DateTime.Today;
             budgetsRoot.Nodes.Add(new TreeNode($"Current ({today:MMM/yyyy})")
             {
                 Tag = BudgetNav.Current(today.Year, today.Month)
             });
 
-            // Years and months scaffold
-            var currentYear = today.Year;
-            var currentMonth = today.Month;
+            int currentYear = today.Year;
+            int currentMonth = today.Month;
 
-            // Keep a simple rolling range for now.
-            var years = Enumerable.Range(currentYear - 4, 5).Reverse().ToList();
+            List<int> years = Enumerable.Range(currentYear - 4, 5).Reverse().ToList();
 
-            foreach (var year in years)
+            foreach (int year in years)
             {
-                var yearNode = new TreeNode(year.ToString()) { Tag = BudgetNav.Year(year) };
+                TreeNode yearNode = new(year.ToString()) { Tag = BudgetNav.Year(year) };
 
                 List<int> months;
-
                 if (year == currentYear)
                 {
-                    // Current year: only months before Current.
-                    var count = Math.Max(0, currentMonth - 1);
+                    int count = Math.Max(0, currentMonth - 1);
                     months = Enumerable.Range(1, count).ToList();
-                    months.Reverse(); // show most recent first
+                    months.Reverse();
                 }
                 else
                 {
-                    // Past years: show all months Jan..Dec
                     months = Enumerable.Range(1, 12).ToList();
                 }
 
-                foreach (var m in months)
+                foreach (int m in months)
                 {
-                    var monthName = new DateTime(year, m, 1).ToString("MMM");
+                    string monthName = new DateTime(year, m, 1).ToString("MMM");
                     yearNode.Nodes.Add(new TreeNode(monthName) { Tag = BudgetNav.Month(year, m) });
                 }
 
-                //yearNode.Expand();
                 budgetsRoot.Nodes.Add(yearNode);
             }
 
-            //budgetsRoot.Expand();
             treeNav.Nodes.Add(budgetsRoot);
         }
         finally
@@ -368,20 +432,149 @@ public partial class MainForm : Form
         }
     }
 
-
-    private void btnDiagnostics_Click(object sender, EventArgs e)
+    private void BuildPayeeTagNodes(TreeNode payeeTagNode)
     {
-        using var form = new DatabaseDiagnosticsForm(_dbSession);
-        form.ShowDialog(this);
+        if (payeeTagNode is null)
+            return;
+
+        payeeTagNode.Nodes.Clear();
+
+        var payeesById = _payeeCache.ToDictionary(p => p.PayeeId, StringComparer.Ordinal);
+
+        var tagRows = _dbSession.QueryDataTable("PayeeTag.SelectAllForNavigation");
+
+        var grouped = new Dictionary<string, List<Payee>>(StringComparer.OrdinalIgnoreCase);
+        var taggedPayeeIds = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (DataRow row in tagRows.Rows)
+        {
+            string payeeId = row["PayeeId"]?.ToString() ?? string.Empty;
+            string tagId = row["TagId"]?.ToString() ?? string.Empty;
+            string tagName = row["TagName"]?.ToString() ?? string.Empty;
+
+            if (string.IsNullOrWhiteSpace(payeeId) ||
+                string.IsNullOrWhiteSpace(tagId) ||
+                string.IsNullOrWhiteSpace(tagName))
+                continue;
+
+            if (!payeesById.TryGetValue(payeeId, out Payee? payee))
+                continue;
+
+            taggedPayeeIds.Add(payeeId);
+
+            if (!grouped.TryGetValue(tagName, out List<Payee>? list))
+            {
+                list = new List<Payee>();
+                grouped[tagName] = list;
+            }
+
+            list.Add(payee);
+        }
+
+        // None group
+        TreeNode noneNode = new("None") { Tag = PayeeNav.TagGroupNone };
+
+        foreach (Payee payee in _payeeCache
+                     .Where(p => !taggedPayeeIds.Contains(p.PayeeId))
+                     .OrderBy(p => p.PayeeName))
+        {
+            noneNode.Nodes.Add(new TreeNode(payee.PayeeName)
+            {
+                Tag = PayeeNav.Item(payee.PayeeId)
+            });
+        }
+
+        payeeTagNode.Nodes.Add(noneNode);
+
+        // Tag groups
+        foreach (var kvp in grouped.OrderBy(x => x.Key, StringComparer.OrdinalIgnoreCase))
+        {
+            string tagName = kvp.Key;
+            List<Payee> payees = kvp.Value
+                .GroupBy(p => p.PayeeId, StringComparer.Ordinal)
+                .Select(g => g.First())
+                .OrderBy(p => p.PayeeName)
+                .ToList();
+
+            TreeNode tagNode = new(tagName)
+            {
+                Tag = PayeeNav.TagGroup(tagName)
+            };
+
+            foreach (Payee payee in payees)
+            {
+                tagNode.Nodes.Add(new TreeNode(payee.PayeeName)
+                {
+                    Tag = PayeeNav.Item(payee.PayeeId)
+                });
+            }
+
+            payeeTagNode.Nodes.Add(tagNode);
+        }
+    }
+
+    private void ShowPayeeTagView()
+    {
+        Label label = new()
+        {
+            Dock = DockStyle.Fill,
+            Text = "Payees are grouped in the tree under each tag.\r\nSelect a payee under a tag group to open it.",
+            TextAlign = ContentAlignment.MiddleCenter
+        };
+
+        Panel panel = new()
+        {
+            Dock = DockStyle.Fill
+        };
+
+        panel.Controls.Add(label);
+
+        ShowChildForm(WrapControlInForm(panel, "Payee Tags"));
+    }
+
+    private void BuildPayeeNameNodes(TreeNode payeesRoot)
+    {
+        if (payeesRoot is null)
+            return;
+
+        // Keep Name and Tags nodes, remove only real payee item nodes
+        while (payeesRoot.Nodes.Count > 2)
+            payeesRoot.Nodes.RemoveAt(2);
+
+        IEnumerable<Payee> filtered = _payeeCache;
+
+        if (!string.IsNullOrWhiteSpace(_payeeNameFilter))
+        {
+            filtered = filtered.Where(p =>
+                p.PayeeName.Contains(_payeeNameFilter, StringComparison.OrdinalIgnoreCase));
+        }
+
+        foreach (Payee p in filtered
+                     .OrderByDescending(p => p.IncludeInBudgetTemplate)
+                     .ThenBy(p => p.PayeeName))
+        {
+            string label = p.IncludeInBudgetTemplate ? $"{p.PayeeName}  ✓" : p.PayeeName;
+
+            payeesRoot.Nodes.Add(new TreeNode(label)
+            {
+                Tag = PayeeNav.Item(p.PayeeId)
+            });
+        }
     }
 
     private string GetBankDisplayName(string bankId)
     {
-        var bank = _bankCache.FirstOrDefault(b => b.BankId == bankId);
+        Bank? bank = _bankCache.FirstOrDefault(b => b.BankId == bankId);
         if (bank is null)
             return bankId;
 
         return $"{bank.BankName} ({bank.RoutingNumber})";
+    }
+
+    private void ShowBudgetYear(int year)
+    {
+        BudgetYearForm form = new(_dbSession, year);
+        ShowChildForm(form);
     }
 
     private static string Last4(string accountNumber)
@@ -389,7 +582,7 @@ public partial class MainForm : Form
         if (string.IsNullOrWhiteSpace(accountNumber))
             return "????";
 
-        var cleaned = accountNumber.Replace(" ", "").Replace("-", "");
+        string cleaned = accountNumber.Replace(" ", "").Replace("-", "");
         return cleaned.Length <= 4 ? cleaned : cleaned.Substring(cleaned.Length - 4);
     }
 
@@ -406,97 +599,175 @@ public partial class MainForm : Form
         if (e.Node is null)
             return;
 
-        if (e.Node.Tag is NavTag tag)
-        {
-            switch (tag)
-            {
-                case NavTag.BanksRoot:
-                    SetStatus("Banks");
-                    ShowBanksLanding();
-                    return;
-
-                case NavTag.AccountsRoot:
-                    SetStatus("Accounts");
-                    ShowAccountsList();
-                    return;
-
-                case NavTag.PayeesRoot:
-                    SetStatus("Payees");
-                    ShowPayeesLanding();
-                    return;
-
-                case NavTag.BudgetsRoot:
-                    SetStatus("Budgets");
-                    ShowBudgetsLanding();
-                    return;
-            }
-        }
-
-        // Budgets
-        if (e.Node.Tag is string budgetTag)
-        {
-            if (string.Equals(budgetTag, BudgetNav.Template, StringComparison.OrdinalIgnoreCase))
-            {
-                ShowBudgetTemplate();
-                SetStatus("Budgets: Template");
-                return;
-            }
-
-            if (BudgetNav.TryParseCurrent(budgetTag, out var cy, out var cm))
-            {
-                ShowBudgetMonth(cy, cm);
-                SetStatus($"Budgets: Current ({new DateTime(cy, cm, 1):MMM/yyyy})");
-                return;
-            }
-
-            if (BudgetNav.TryParseMonth(budgetTag, out var year, out var month))
-            {
-                ShowBudgetMonth(year, month);
-                SetStatus($"Budgets: {year}-{month:D2}");
-                return;
-            }
-        }
-
-        // Payee leaf under Payees root
-        if (e.Node.Tag is string payeeId &&
-            e.Node.Parent?.Tag is NavTag pRoot &&
-            pRoot == NavTag.PayeesRoot)
-        {
-            ShowPayeeDetails(payeeId);
-            SetStatus($"Payee: {e.Node.Text}");
+        if (TryHandleBudgetNodeSelection(e.Node))
             return;
-        }
 
-        // Bank leaf under Banks root
-        if (e.Node.Tag is string bankId &&
-            e.Node.Parent?.Tag is NavTag parentTag &&
-            parentTag == NavTag.BanksRoot)
-        {
-            ShowBankDetails(bankId);
-            SetStatus($"Bank: {e.Node.Text}");
+        if (TryHandlePayeeViewNodeSelection(e.Node))
             return;
-        }
 
-        // Bank node under Accounts root
-        if (e.Node.Tag is string bankId2 &&
-            e.Node.Parent?.Tag is NavTag parentTag2 &&
-            parentTag2 == NavTag.AccountsRoot)
-        {
-            ShowBankDetails(bankId2);
-            SetStatus($"Bank: {e.Node.Text}");
+        if (TryHandleRootNodeSelection(e.Node))
             return;
+
+        if (TryHandlePayeeNodeSelection(e.Node))
+            return;
+
+        if (TryHandleBankNodeSelection(e.Node))
+            return;
+
+        if (TryHandleAccountNodeSelection(e.Node))
+            return;
+    }
+
+    private bool TryHandleBudgetNodeSelection(TreeNode node)
+    {
+        if (node.Tag is not string tag)
+            return false;
+
+        if (string.Equals(tag, BudgetNav.Template, StringComparison.OrdinalIgnoreCase))
+        {
+            ShowBudgetTemplate();
+            SetStatus("Budgets: Template");
+            return true;
         }
 
-        // Account leaf under Accounts root
-        if (e.Node.Tag is string accountId &&
-            e.Node.Parent?.Parent?.Tag is NavTag rootTag &&
-            rootTag == NavTag.AccountsRoot)
+        if (BudgetNav.TryParseCurrent(tag, out int currentYear, out int currentMonth))
         {
-            ShowAccountDetails(accountId);
-            SetStatus($"Account: {e.Node.Text}");
+            ShowBudgetMonth(currentYear, currentMonth);
+            SetStatus($"Budgets: Current ({new DateTime(currentYear, currentMonth, 1):MMM/yyyy})");
+            return true;
+        }
+
+        if (BudgetNav.TryParseYear(tag, out int budgetYear))
+        {
+            ShowBudgetYear(budgetYear);
+            SetStatus($"Budgets: {budgetYear}");
+            return true;
+        }
+
+        if (BudgetNav.TryParseMonth(tag, out int year, out int month))
+        {
+            ShowBudgetMonth(year, month);
+            SetStatus($"Budgets: {year}-{month:D2}");
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool TryHandlePayeeViewNodeSelection(TreeNode node)
+    {
+        if (node.Tag is not string tag)
+            return false;
+
+        if (string.Equals(tag, PayeeNav.NameView, StringComparison.OrdinalIgnoreCase))
+        {
+            ShowPayeeNameFilter();
+            SetStatus("Payees: Name");
+            return true;
+        }
+
+        if (string.Equals(tag, PayeeNav.TagView, StringComparison.OrdinalIgnoreCase))
+        {
+            BuildPayeeTagNodes(node);
+            node.Expand();
+            ShowPayeeTagView();
+            SetStatus("Payees: Tags");
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool TryHandleRootNodeSelection(TreeNode node)
+    {
+        if (node.Tag is not NavTag rootTag)
+            return false;
+
+        switch (rootTag)
+        {
+            case NavTag.BanksRoot:
+                SetStatus("Banks");
+                ShowBanksLanding();
+                return true;
+
+            case NavTag.AccountsRoot:
+                SetStatus("Accounts");
+                ShowAccountsList();
+                return true;
+
+            case NavTag.PayeesRoot:
+                SetStatus("Payees");
+                ShowPayeesLanding();
+                return true;
+
+            case NavTag.BudgetsRoot:
+                SetStatus("Budgets");
+                ShowBudgetsLanding();
+                return true;
+
+            default:
+                return false;
         }
     }
 
+    private bool TryHandlePayeeNodeSelection(TreeNode node)
+    {
+        if (node.Tag is string taggedNode &&
+            PayeeNav.TryParseItem(taggedNode, out string parsedPayeeId))
+        {
+            ShowPayeeDetails(parsedPayeeId);
+            SetStatus($"Payee: {node.Text}");
+            return true;
+        }
+
+        if (node.Tag is string payeeId &&
+            node.Parent?.Tag is NavTag payeeRootTag &&
+            payeeRootTag == NavTag.PayeesRoot)
+        {
+            ShowPayeeDetails(payeeId);
+            SetStatus($"Payee: {node.Text}");
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool TryHandleBankNodeSelection(TreeNode node)
+    {
+        if (node.Tag is string bankId &&
+            node.Parent?.Tag is NavTag banksRootTag &&
+            banksRootTag == NavTag.BanksRoot)
+        {
+            ShowBankDetails(bankId);
+            SetStatus($"Bank: {node.Text}");
+            return true;
+        }
+
+        if (node.Tag is string accountBankId &&
+            node.Parent?.Tag is NavTag accountsRootTag &&
+            accountsRootTag == NavTag.AccountsRoot)
+        {
+            ShowBankDetails(accountBankId);
+            SetStatus($"Bank: {node.Text}");
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool TryHandleAccountNodeSelection(TreeNode node)
+    {
+        if (node.Tag is string accountId &&
+            node.Parent?.Parent?.Tag is NavTag accountsRootTag &&
+            accountsRootTag == NavTag.AccountsRoot)
+        {
+            ShowAccountDetails(accountId);
+            SetStatus($"Account: {node.Text}");
+            return true;
+        }
+
+        return false;
+    }
     private void TreeNav_NodeMouseClick(object? sender, TreeNodeMouseClickEventArgs e)
     {
         if (e.Node is null)
@@ -529,8 +800,6 @@ public partial class MainForm : Form
             }
         }
 
-        // Payee node under Payees root
-        // Payee node under Payees root (ignore Search node)
         if (e.Node.Tag is string payeeId &&
             payeeId != "Payee.Search" &&
             e.Node.Parent?.Tag is NavTag pr &&
@@ -540,7 +809,6 @@ public partial class MainForm : Form
             return;
         }
 
-        // Bank node under Banks root
         if (e.Node.Tag is string &&
             e.Node.Parent?.Tag is NavTag parentTag &&
             parentTag == NavTag.BanksRoot)
@@ -549,7 +817,6 @@ public partial class MainForm : Form
             return;
         }
 
-        // Bank node under Accounts root
         if (e.Node.Tag is string &&
             e.Node.Parent?.Tag is NavTag parentTag2 &&
             parentTag2 == NavTag.AccountsRoot)
@@ -558,7 +825,6 @@ public partial class MainForm : Form
             return;
         }
 
-        // Account leaf node under Accounts root
         if (e.Node.Tag is string &&
             e.Node.Parent?.Parent?.Tag is NavTag rootTag2 &&
             rootTag2 == NavTag.AccountsRoot)
@@ -569,16 +835,16 @@ public partial class MainForm : Form
 
     private ContextMenuStrip BuildBanksRootMenu()
     {
-        var menu = new ContextMenuStrip();
+        ContextMenuStrip menu = new();
 
-        var add = new ToolStripMenuItem("Add Bank");
+        ToolStripMenuItem add = new("Add Bank");
         add.Click += (_, _) =>
         {
-            using var dlg = new AddBankForm();
+            using AddBankForm dlg = new();
             if (dlg.ShowDialog(this) != DialogResult.OK)
                 return;
 
-            var bank = new Bank
+            Bank bank = new()
             {
                 BankId = Guid.NewGuid().ToString("N"),
                 BankName = dlg.BankName,
@@ -598,31 +864,30 @@ public partial class MainForm : Form
 
     private ContextMenuStrip BuildAccountsRootMenu()
     {
-        var menu = new ContextMenuStrip();
+        ContextMenuStrip menu = new();
 
-        var addChecking = new ToolStripMenuItem("Add Checking Account...");
+        ToolStripMenuItem addChecking = new("Add Checking Account...");
         addChecking.Click += (_, _) =>
         {
-            using var dlg = new AddCheckingAccountForm(_bankCache);
+            using AddCheckingAccountForm dlg = new(_bankCache);
             if (dlg.ShowDialog(this) != DialogResult.OK)
                 return;
 
-            var bankId = dlg.BankId;
+            string? bankId = dlg.BankId;
             if (string.IsNullOrWhiteSpace(bankId))
                 return;
 
-            var bank = _bankCache.FirstOrDefault(b => b.BankId == bankId);
+            Bank? bank = _bankCache.FirstOrDefault(b => b.BankId == bankId);
             if (bank is null)
                 return;
 
-            var acct = new Account
+            Account acct = new()
             {
                 AccountId = Guid.NewGuid().ToString("N"),
                 BankId = bank.BankId,
                 BankName = bank.BankName,
                 RoutingNumber = bank.RoutingNumber,
                 Url = bank.Url,
-
                 AccountNickname = dlg.AccountNickname,
                 SortIndex = 0,
                 AccountNumber = dlg.AccountNumber,
@@ -641,17 +906,16 @@ public partial class MainForm : Form
 
     private ContextMenuStrip BuildPayeesRootMenu()
     {
-        var menu = new ContextMenuStrip();
+        ContextMenuStrip menu = new();
 
-        var add = new ToolStripMenuItem("Add Payee...");
+        ToolStripMenuItem add = new("Add Payee...");
         add.Click += (_, _) =>
         {
-            // Minimal add dialog (InputBox style) without building a separate form yet.
-            var name = PromptForText(this, "Add Payee", "Payee name:");
+            string? name = PromptForText(this, "Add Payee", "Payee name:");
             if (string.IsNullOrWhiteSpace(name))
                 return;
 
-            var payee = new Payee
+            Payee payee = new()
             {
                 PayeeId = Guid.NewGuid().ToString("N"),
                 PayeeName = name.Trim(),
@@ -669,41 +933,40 @@ public partial class MainForm : Form
 
     private ContextMenuStrip BuildBudgetsRootMenu()
     {
-        var menu = new ContextMenuStrip();
+        ContextMenuStrip menu = new();
         return menu;
     }
 
     private ContextMenuStrip BuildBankNodeMenu()
     {
-        var menu = new ContextMenuStrip();
+        ContextMenuStrip menu = new();
 
-        var addChecking = new ToolStripMenuItem("Add Checking Account...");
+        ToolStripMenuItem addChecking = new("Add Checking Account...");
         addChecking.Click += (_, _) =>
         {
-            var bankId = treeNav.SelectedNode?.Tag as string;
+            string? bankId = treeNav.SelectedNode?.Tag as string;
             if (string.IsNullOrWhiteSpace(bankId))
                 return;
 
-            using var dlg = new AddCheckingAccountForm(_bankCache, preselectedBankId: bankId);
+            using AddCheckingAccountForm dlg = new(_bankCache, preselectedBankId: bankId);
             if (dlg.ShowDialog(this) != DialogResult.OK)
                 return;
 
-            var selectedBankId = dlg.BankId;
+            string? selectedBankId = dlg.BankId;
             if (string.IsNullOrWhiteSpace(selectedBankId))
                 return;
 
-            var bank = _bankCache.FirstOrDefault(b => b.BankId == selectedBankId);
+            Bank? bank = _bankCache.FirstOrDefault(b => b.BankId == selectedBankId);
             if (bank is null)
                 return;
 
-            var acct = new Account
+            Account acct = new()
             {
                 AccountId = Guid.NewGuid().ToString("N"),
                 BankId = bank.BankId,
                 BankName = bank.BankName,
                 RoutingNumber = bank.RoutingNumber,
                 Url = bank.Url,
-
                 AccountNickname = dlg.AccountNickname,
                 SortIndex = 0,
                 AccountNumber = dlg.AccountNumber,
@@ -722,16 +985,16 @@ public partial class MainForm : Form
 
     private ContextMenuStrip BuildAccountNodeMenu()
     {
-        var menu = new ContextMenuStrip();
+        ContextMenuStrip menu = new();
 
-        var del = new ToolStripMenuItem("Delete Account");
+        ToolStripMenuItem del = new("Delete Account");
         del.Click += (_, _) =>
         {
-            var accountId = treeNav.SelectedNode?.Tag as string;
+            string? accountId = treeNav.SelectedNode?.Tag as string;
             if (string.IsNullOrWhiteSpace(accountId))
                 return;
 
-            var confirm = MessageBox.Show(
+            DialogResult confirm = MessageBox.Show(
                 this,
                 "Delete this account?",
                 "Confirm",
@@ -753,16 +1016,16 @@ public partial class MainForm : Form
 
     private ContextMenuStrip BuildPayeeNodeMenu()
     {
-        var menu = new ContextMenuStrip();
+        ContextMenuStrip menu = new();
 
-        var del = new ToolStripMenuItem("Delete Payee");
+        ToolStripMenuItem del = new("Delete Payee");
         del.Click += (_, _) =>
         {
-            var payeeId = treeNav.SelectedNode?.Tag as string;
+            string? payeeId = treeNav.SelectedNode?.Tag as string;
             if (string.IsNullOrWhiteSpace(payeeId))
                 return;
 
-            var confirm = MessageBox.Show(
+            DialogResult confirm = MessageBox.Show(
                 this,
                 "Delete this payee?",
                 "Confirm",
@@ -782,9 +1045,60 @@ public partial class MainForm : Form
         return menu;
     }
 
+    private void ShowPayeeNameFilter()
+    {
+        TextBox box = new()
+        {
+            Dock = DockStyle.Top,
+            Width = 300,
+            Text = _payeeNameFilter
+        };
+
+        Label label = new()
+        {
+            Dock = DockStyle.Top,
+            Height = 24,
+            Text = "Filter payees by name",
+            TextAlign = ContentAlignment.MiddleLeft
+        };
+
+        Panel panel = new()
+        {
+            Dock = DockStyle.Fill
+        };
+
+        box.TextChanged += (_, _) =>
+        {
+            _payeeNameFilter = box.Text.Trim();
+
+            TreeNode? payeesRoot = treeNav.Nodes
+                .Cast<TreeNode>()
+                .FirstOrDefault(n => n.Tag is NavTag tag && tag == NavTag.PayeesRoot);
+
+            if (payeesRoot is not null)
+            {
+                treeNav.BeginUpdate();
+                try
+                {
+                    BuildPayeeNameNodes(payeesRoot);
+                    payeesRoot.Expand();
+                }
+                finally
+                {
+                    treeNav.EndUpdate();
+                }
+            }
+        };
+
+        panel.Controls.Add(box);
+        panel.Controls.Add(label);
+
+        ShowChildForm(WrapControlInForm(panel, "Payee Name Filter"));
+    }
+
     private void ShowBanksLanding()
     {
-        var form = new BanksLandingForm(openBankDetails: bankId =>
+        BanksLandingForm form = new(openBankDetails: bankId =>
         {
             ShowBankDetails(bankId);
         });
@@ -796,7 +1110,7 @@ public partial class MainForm : Form
 
     private void ShowAccountsList()
     {
-        var form = new AccountsListForm(openAccountDetails: accountId =>
+        AccountsListForm form = new(openAccountDetails: accountId =>
         {
             ShowAccountDetails(accountId);
         });
@@ -808,10 +1122,18 @@ public partial class MainForm : Form
 
     private void ShowPayeesLanding()
     {
-        var form = new PayeesLandingForm(openPayeeDetails: payeeId =>
-        {
-            ShowPayeeDetails(payeeId);
-        });
+        PayeesLandingForm form = new(
+            _dbSession,
+            openPayeeDetails: payeeId =>
+            {
+                ShowPayeeDetails(payeeId);
+            },
+            savePayee: payee =>
+            {
+                _payees.Update(payee);
+                RefreshCaches();
+                BuildNavigationTree();
+            });
 
         form.SetPayees(_payeeCache);
 
@@ -820,20 +1142,20 @@ public partial class MainForm : Form
 
     private void ShowBudgetsLanding()
     {
-        var form = new BudgetsLandingForm();
+        BudgetsLandingForm form = new();
         ShowChildForm(form);
     }
 
     private void ShowPayeeDetails(string payeeId)
     {
-        var payee = _payeeCache.FirstOrDefault(p => p.PayeeId == payeeId);
+        Payee? payee = _payeeCache.FirstOrDefault(p => p.PayeeId == payeeId);
         if (payee is null)
         {
             MessageBox.Show(this, "Payee not found.", "Expensa", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
 
-        var form = new PayeeDetailsForm(
+        PayeeDetailsForm form = new(
             repo: _payees,
             onSaved: () =>
             {
@@ -847,14 +1169,14 @@ public partial class MainForm : Form
 
     private void ShowBankDetails(string bankId)
     {
-        var bank = _bankCache.FirstOrDefault(b => b.BankId == bankId);
+        Bank? bank = _bankCache.FirstOrDefault(b => b.BankId == bankId);
         if (bank is null)
         {
             MessageBox.Show(this, "Bank not found.", "Expensa", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
 
-        var form = new BankDetailsForm(
+        BankDetailsForm form = new(
             repo: _banks,
             credentialStore: _creds,
             onSaved: () =>
@@ -869,14 +1191,14 @@ public partial class MainForm : Form
 
     private void ShowAccountDetails(string accountId)
     {
-        var acct = _accountCache.FirstOrDefault(a => a.AccountId == accountId);
+        Account? acct = _accountCache.FirstOrDefault(a => a.AccountId == accountId);
         if (acct is null)
         {
             MessageBox.Show(this, "Account not found.", "Expensa", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
 
-        var form = new AccountDetailsForm(
+        AccountDetailsForm form = new(
             repo: _accounts,
             banks: _bankCache,
             creds: _creds,
@@ -894,13 +1216,13 @@ public partial class MainForm : Form
 
     private void ShowBudgetTemplate()
     {
-        var form = new BudgetTemplateForm(_payees);
+        BudgetTemplateForm form = new(_payees);
         ShowChildForm(form);
     }
 
     private void ShowBudgetMonth(int year, int month)
     {
-        var form = new BudgetMonthForm(year, month);
+        BudgetMonthForm form = new(_dbSession, year, month);
         ShowChildForm(form);
     }
 
@@ -953,7 +1275,7 @@ public partial class MainForm : Form
 
     private static string? PromptForText(IWin32Window owner, string title, string prompt)
     {
-        using var form = new Form
+        using Form form = new()
         {
             Text = title,
             StartPosition = FormStartPosition.CenterParent,
@@ -965,10 +1287,10 @@ public partial class MainForm : Form
             Height = 170
         };
 
-        var lbl = new Label { Left = 12, Top = 16, AutoSize = true, Text = prompt };
-        var txt = new TextBox { Left = 12, Top = 44, Width = 480, Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
-        var ok = new Button { Text = "OK", Left = 312, Width = 80, Top = 82, DialogResult = DialogResult.OK };
-        var cancel = new Button { Text = "Cancel", Left = 412, Width = 80, Top = 82, DialogResult = DialogResult.Cancel };
+        Label lbl = new() { Left = 12, Top = 16, AutoSize = true, Text = prompt };
+        TextBox txt = new() { Left = 12, Top = 44, Width = 480, Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
+        Button ok = new() { Text = "OK", Left = 312, Width = 80, Top = 82, DialogResult = DialogResult.OK };
+        Button cancel = new() { Text = "Cancel", Left = 412, Width = 80, Top = 82, DialogResult = DialogResult.Cancel };
 
         form.Controls.Add(lbl);
         form.Controls.Add(txt);
@@ -983,7 +1305,15 @@ public partial class MainForm : Form
 
     private void diagnosticsToolStripMenuItem_Click(object sender, EventArgs e)
     {
-        using var form = new DatabaseDiagnosticsForm(_dbSession);
+        using DatabaseDiagnosticsForm form = new(_dbSession);
+        form.ShowDialog(this);
+    }
+
+    private void budgetMonthsToolStripMenuItem_Click(object sender, EventArgs e)
+    {
+        DateTime today = DateTime.Today;
+
+        using BudgetMonthForm form = new(_dbSession, today.Year, today.Month);
         form.ShowDialog(this);
     }
 }

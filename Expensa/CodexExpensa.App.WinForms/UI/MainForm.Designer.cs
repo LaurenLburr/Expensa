@@ -47,6 +47,7 @@
             menuTools = new ToolStripMenuItem();
             menuToolsDbStatus = new ToolStripMenuItem();
             diagnosticsToolStripMenuItem = new ToolStripMenuItem();
+            budgetMonthsToolStripMenuItem = new ToolStripMenuItem();
             menuHelp = new ToolStripMenuItem();
             menuHelpAbout = new ToolStripMenuItem();
             statusMain = new StatusStrip();
@@ -55,6 +56,7 @@
             splitMain = new SplitContainer();
             treeNav = new TreeView();
             panelHost = new Panel();
+            queryCatalogToolStripMenuItem = new ToolStripMenuItem();
             menuMain.SuspendLayout();
             statusMain.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)splitMain).BeginInit();
@@ -69,7 +71,7 @@
             menuMain.Items.AddRange(new ToolStripItem[] { menuFile, menuView, menuTools, menuHelp });
             menuMain.Location = new Point(0, 0);
             menuMain.Name = "menuMain";
-            menuMain.Size = new Size(1100, 24);
+            menuMain.Size = new Size(1060, 24);
             menuMain.TabIndex = 0;
             // 
             // menuFile
@@ -106,7 +108,7 @@
             // 
             // menuTools
             // 
-            menuTools.DropDownItems.AddRange(new ToolStripItem[] { menuToolsDbStatus, diagnosticsToolStripMenuItem });
+            menuTools.DropDownItems.AddRange(new ToolStripItem[] { menuToolsDbStatus, diagnosticsToolStripMenuItem, budgetMonthsToolStripMenuItem, queryCatalogToolStripMenuItem });
             menuTools.Name = "menuTools";
             menuTools.Size = new Size(46, 20);
             menuTools.Text = "&Tools";
@@ -123,6 +125,13 @@
             diagnosticsToolStripMenuItem.Size = new Size(180, 22);
             diagnosticsToolStripMenuItem.Text = "Diagnostics";
             diagnosticsToolStripMenuItem.Click += diagnosticsToolStripMenuItem_Click;
+            // 
+            // budgetMonthsToolStripMenuItem
+            // 
+            budgetMonthsToolStripMenuItem.Name = "budgetMonthsToolStripMenuItem";
+            budgetMonthsToolStripMenuItem.Size = new Size(180, 22);
+            budgetMonthsToolStripMenuItem.Text = "Budget Months";
+            budgetMonthsToolStripMenuItem.Click += budgetMonthsToolStripMenuItem_Click;
             // 
             // menuHelp
             // 
@@ -144,13 +153,13 @@
             statusMain.Items.AddRange(new ToolStripItem[] { statusText, statusDbMode });
             statusMain.Location = new Point(0, 628);
             statusMain.Name = "statusMain";
-            statusMain.Size = new Size(1100, 22);
+            statusMain.Size = new Size(1060, 22);
             statusMain.TabIndex = 2;
             // 
             // statusText
             // 
             statusText.Name = "statusText";
-            statusText.Size = new Size(1042, 17);
+            statusText.Size = new Size(1002, 17);
             statusText.Spring = true;
             statusText.Text = "Ready";
             // 
@@ -174,7 +183,7 @@
             // splitMain.Panel2
             // 
             splitMain.Panel2.Controls.Add(panelHost);
-            splitMain.Size = new Size(1100, 604);
+            splitMain.Size = new Size(1060, 604);
             splitMain.SplitterDistance = 280;
             splitMain.TabIndex = 1;
             // 
@@ -192,14 +201,21 @@
             panelHost.Dock = DockStyle.Fill;
             panelHost.Location = new Point(0, 0);
             panelHost.Name = "panelHost";
-            panelHost.Size = new Size(816, 604);
+            panelHost.Size = new Size(776, 604);
             panelHost.TabIndex = 0;
+            // 
+            // queryCatalogToolStripMenuItem
+            // 
+            queryCatalogToolStripMenuItem.Name = "queryCatalogToolStripMenuItem";
+            queryCatalogToolStripMenuItem.Size = new Size(180, 22);
+            queryCatalogToolStripMenuItem.Text = "Query Catalog";
+            queryCatalogToolStripMenuItem.Click += queryCatalogToolStripMenuItem_Click;
             // 
             // MainForm
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(1100, 650);
+            ClientSize = new Size(1060, 650);
             Controls.Add(splitMain);
             Controls.Add(statusMain);
             Controls.Add(menuMain);
@@ -221,5 +237,7 @@
         #endregion
 
         private ToolStripMenuItem diagnosticsToolStripMenuItem;
+        private ToolStripMenuItem budgetMonthsToolStripMenuItem;
+        private ToolStripMenuItem queryCatalogToolStripMenuItem;
     }
 }

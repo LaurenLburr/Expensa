@@ -14,6 +14,8 @@ internal sealed class SqliteQueryCatalog
 
     public string GetSql(string queryName)
     {
+        System.Diagnostics.Debug.WriteLine("Query " + queryName);
+
         if (string.IsNullOrWhiteSpace(queryName))
         {
             throw new ArgumentException("Query name is required.", nameof(queryName));
@@ -29,7 +31,7 @@ SELECT
     [SqlText]
 FROM [SqlQuery]
 WHERE [QueryName] = @QueryName
-AND [IsActive] = 1;
+AND [IsActive] = 1
 """;
 
         using SqliteCommand command = _connection.CreateCommand();
