@@ -1,15 +1,24 @@
 ﻿using System.ComponentModel;
 using System.Data;
 using System.Data.Common;
+using System.Reflection;
+using System.Windows.Forms.VisualStyles;
 using CodexExpensa.App.WinForms.Services;
 using CodexExpensa.Core.Abstractions;
+using CodexExpensa.Core.Domain.Transactions;
 using Microsoft.Data.Sqlite;
 
 namespace CodexExpensa.App.WinForms.UI.Budgets;
 
 public sealed class BudgetMonthForm : Form
 {
+    private const int DeleteButtonWidth = 18;
+    private const int DeleteButtonHeight = 16;
+    private const int DeleteButtonLeftMargin = 2;
+    private const int DeleteButtonTextGap = 4;
+
     private readonly IDatabaseSession _db;
+    private readonly ITransactionRepository _transactions;
     private readonly int _year;
     private readonly int _month;
     private readonly string _budgetMonthId;
@@ -29,9 +38,10 @@ public sealed class BudgetMonthForm : Form
     private bool _isApplyingGridLayout;
     private bool _isSavingAmount;
 
-    public BudgetMonthForm(IDatabaseSession db, int year, int month)
+    public BudgetMonthForm(IDatabaseSession db, ITransactionRepository transactions, int year, int month)
     {
         _db = db ?? throw new ArgumentNullException(nameof(db));
+        _transactions = transactions ?? throw new ArgumentNullException(nameof(transactions));
         _year = year;
         _month = month;
         _budgetMonthId = $"{year:D4}-{month:D2}";
@@ -67,9 +77,13 @@ public sealed class BudgetMonthForm : Form
             MultiSelect = false
         };
 
+        EnableDoubleBuffering(_grid);
+
         _grid.CellContentClick += Grid_CellContentClick;
+        _grid.CellMouseClick += Grid_CellMouseClick;
         _grid.CellMouseDown += Grid_CellMouseDown;
         _grid.CellFormatting += Grid_CellFormatting;
+        _grid.CellPainting += Grid_CellPainting;
         _grid.CellEndEdit += Grid_CellEndEdit;
         _grid.ColumnDisplayIndexChanged += Grid_LayoutChanged;
         _grid.ColumnWidthChanged += Grid_LayoutChanged;
@@ -88,12 +102,21 @@ public sealed class BudgetMonthForm : Form
         BuildGridColumns();
 
         Load += BudgetMonthForm_Load;
+        FormClosing += BudgetMonthForm_FormClosing;
     }
 
     private void BudgetMonthForm_Load(object? sender, EventArgs e)
     {
         LoadBudgetRows();
         ApplySavedGridLayout();
+    }
+
+    private void BudgetMonthForm_FormClosing(object? sender, FormClosingEventArgs e)
+    {
+        if (_isApplyingGridLayout)
+            return;
+
+        _gridLayoutService.SaveLayout(_grid, "BudgetMonth.GridLayout");
     }
 
     private void BuildRightPanelPlaceholder()
@@ -103,7 +126,7 @@ public sealed class BudgetMonthForm : Form
             Text = "Future Controls",
             Dock = DockStyle.Top,
             Height = 28,
-            TextAlign = ContentAlignment.MiddleLeft,
+            TextAlign = System.Drawing.ContentAlignment.MiddleLeft,
             Padding = new Padding(8, 0, 0, 0),
             Font = new Font(Font, FontStyle.Bold)
         };
@@ -132,15 +155,15 @@ public sealed class BudgetMonthForm : Form
             HeaderText = "Payee",
             Frozen = true,
             ReadOnly = true,
-            Width = 220
+            Width = 260
         };
 
-        DataGridViewTextBoxColumn bankAcct = new()
+        DataGridViewTextBoxColumn account = new()
         {
-            Name = "BankAcct",
-            DataPropertyName = nameof(BudgetRow.AccountId),
-            HeaderText = "Bank Acct",
-            Width = 90,
+            Name = "Account",
+            DataPropertyName = nameof(BudgetRow.AccountName),
+            HeaderText = "Account",
+            Width = 220,
             ReadOnly = true
         };
 
@@ -154,32 +177,23 @@ public sealed class BudgetMonthForm : Form
             DefaultCellStyle = new DataGridViewCellStyle { Format = "N2" }
         };
 
-        DataGridViewLinkColumn action = new()
+        DataGridViewLinkColumn status = new()
         {
-            Name = "Action",
-            DataPropertyName = nameof(BudgetRow.Action),
-            HeaderText = "Action",
-            Width = 95,
+            Name = "Status",
+            DataPropertyName = nameof(BudgetRow.Status),
+            HeaderText = "Status",
+            Width = 110,
             LinkBehavior = LinkBehavior.HoverUnderline,
             TrackVisitedState = false,
             UseColumnTextForLinkValue = false
         };
 
-        DataGridViewTextBoxColumn group = new()
-        {
-            Name = "Group",
-            DataPropertyName = nameof(BudgetRow.Group),
-            HeaderText = "Group",
-            Width = 70,
-            ReadOnly = true
-        };
-
         DataGridViewTextBoxColumn confirm = new()
         {
             Name = "Confirm",
-            DataPropertyName = nameof(BudgetRow.Confirm),
+            DataPropertyName = nameof(BudgetRow.ConfirmDisplay),
             HeaderText = "Confirm",
-            Width = 180,
+            Width = 220,
             ReadOnly = true
         };
 
@@ -192,10 +206,9 @@ public sealed class BudgetMonthForm : Form
         };
 
         _grid.Columns.Add(payee);
-        _grid.Columns.Add(bankAcct);
+        _grid.Columns.Add(account);
         _grid.Columns.Add(amount);
-        _grid.Columns.Add(action);
-        _grid.Columns.Add(group);
+        _grid.Columns.Add(status);
         _grid.Columns.Add(confirm);
         _grid.Columns.Add(transactionId);
 
@@ -225,11 +238,15 @@ public sealed class BudgetMonthForm : Form
                 SortIndex = Convert.ToInt32(r["SortIndex"]),
                 PlannedAmount = Convert.ToDecimal(r["PlannedAmount"]),
                 AccountId = r["AccountId"] == DBNull.Value ? null : r["AccountId"]?.ToString(),
+                AccountName = table.Columns.Contains("AccountDisplayName") && r["AccountDisplayName"] != DBNull.Value
+                    ? r["AccountDisplayName"]?.ToString()
+                    : null,
                 Group = string.Empty,
                 Confirm = string.Empty,
                 TransactionId = null,
                 ActualAmount = null,
-                IsCleared = false
+                IsCleared = false,
+                Transaction = null
             };
 
             if (table.Columns.Contains("TransactionId") && r["TransactionId"] != DBNull.Value)
@@ -246,6 +263,9 @@ public sealed class BudgetMonthForm : Form
 
             if (table.Columns.Contains("ActualAmount") && r["ActualAmount"] != DBNull.Value)
                 row.ActualAmount = Convert.ToDecimal(r["ActualAmount"]);
+
+            if (!string.IsNullOrWhiteSpace(row.TransactionId) && int.TryParse(row.TransactionId, out int transactionId))
+                row.Transaction = CreateTransactionFromRow(row, transactionId);
 
             list.Add(row);
         }
@@ -309,6 +329,31 @@ public sealed class BudgetMonthForm : Form
                     new SqliteParameter("@BudgetMonthPayeeId", row.BudgetMonthPayeeId),
                     new SqliteParameter("@PlannedAmount", row.PlannedAmount)
                 });
+
+            if (row.Transaction is not null)
+            {
+                Transaction updatedTransaction = new()
+                {
+                    AccountId = row.Transaction.AccountId,
+                    PayeeId = row.Transaction.PayeeId,
+                    Status = row.Transaction.Status,
+                    Amount = row.PlannedAmount,
+                    StartDate = row.Transaction.StartDate,
+                    Confirm = row.Transaction.Confirm,
+                    Note = row.Transaction.Note
+                };
+
+                if (row.Transaction.TransactionId > 0)
+                    updatedTransaction.SetTransactionId(row.Transaction.TransactionId);
+
+                _transactions.Update(updatedTransaction);
+                ApplyTransactionToRow(row, updatedTransaction);
+            }
+
+            if (e.RowIndex >= 0 && e.RowIndex < _rows.Count)
+                _rows.ResetItem(e.RowIndex);
+
+            _grid.InvalidateRow(e.RowIndex);
         }
         catch (Exception ex)
         {
@@ -331,45 +376,136 @@ public sealed class BudgetMonthForm : Form
             return;
 
         DataGridViewColumn? clickedColumn = _grid.Columns[e.ColumnIndex];
-        if (clickedColumn is null || clickedColumn.Name != "Action")
+        if (clickedColumn is null || clickedColumn.Name != "Status")
             return;
 
         BudgetRow? row = _grid.Rows[e.RowIndex].DataBoundItem as BudgetRow;
         if (row is null)
             return;
 
-        switch (row.Action)
-        {
-            case "Add":
-                AddTransaction(row);
-                break;
+        HandleStatusClick(row);
 
-            case "Clear":
-                ClearTransaction(row);
-                break;
+        if (e.RowIndex >= 0 && e.RowIndex < _rows.Count)
+            _rows.ResetItem(e.RowIndex);
+
+        _grid.InvalidateRow(e.RowIndex);
+    }
+
+    private void Grid_CellMouseClick(object? sender, DataGridViewCellMouseEventArgs e)
+    {
+        if (e.Button != MouseButtons.Left || e.RowIndex < 0 || e.ColumnIndex < 0)
+            return;
+
+        DataGridViewColumn? clickedColumn = _grid.Columns[e.ColumnIndex];
+        if (clickedColumn is null || clickedColumn.Name != "PayeeName")
+            return;
+
+        BudgetRow? row = _grid.Rows[e.RowIndex].DataBoundItem as BudgetRow;
+        if (row is null || row.PlannedAmount != 0m)
+            return;
+
+        Rectangle deleteBounds = GetDeleteButtonBounds(e.RowIndex, e.ColumnIndex);
+        Point clickPoint = new(e.X, e.Y);
+
+        if (!deleteBounds.Contains(clickPoint))
+            return;
+
+        HandleDeleteRowClick(row);
+    }
+
+    private void HandleDeleteRowClick(BudgetRow row)
+    {
+        if (row.PlannedAmount != 0m)
+            return;
+
+        MessageBox.Show(
+            this,
+            $"TODO: Delete budget row for {row.PayeeName}",
+            "Delete Budget Row",
+            MessageBoxButtons.OK,
+            MessageBoxIcon.Information);
+    }
+
+    private void HandleStatusClick(BudgetRow row)
+    {
+        string status = row.Status;
+
+        if (string.IsNullOrWhiteSpace(status))
+        {
+            MessageBox.Show(
+                this,
+                "Enter a planned amount greater than zero to move this row into Projected.",
+                "Budget Status",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
+            return;
         }
 
-        _grid.Refresh();
-    }
+        if (string.Equals(status, "Projected", StringComparison.OrdinalIgnoreCase))
+        {
+            if (string.IsNullOrWhiteSpace(row.AccountId))
+            {
+                MessageBox.Show(
+                    this,
+                    "Assign an account before creating a transaction.",
+                    "Budget Status",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+                return;
+            }
 
-    private void AddTransaction(BudgetRow row)
-    {
-        MessageBox.Show(
-            this,
-            $"TODO: Add transaction for {row.PayeeName}",
-            "Add Transaction",
-            MessageBoxButtons.OK,
-            MessageBoxIcon.Information);
-    }
+            Transaction transaction = new()
+            {
+                AccountId = row.AccountId,
+                PayeeId = row.PayeeId,
+                Status = TransactionStatus.Outstanding,
+                Amount = row.PlannedAmount,
+                StartDate = new DateTime(_year, _month, 1),
+                Confirm = $"UI dev outstanding {DateTime.Now:g}",
+                Note = $"Created from BudgetMonthForm for {row.PayeeName}"
+            };
 
-    private void ClearTransaction(BudgetRow row)
-    {
-        MessageBox.Show(
-            this,
-            $"TODO: Mark transaction cleared for {row.PayeeName}",
-            "Clear Transaction",
-            MessageBoxButtons.OK,
-            MessageBoxIcon.Information);
+            int parsedTransactionId = ParseTransactionId(row.TransactionId);
+            if (parsedTransactionId > 0)
+                transaction.SetTransactionId(parsedTransactionId);
+
+            _transactions.Add(transaction);
+            ApplyTransactionToRow(row, transaction);
+            return;
+        }
+
+        if (string.Equals(status, "Outstanding", StringComparison.OrdinalIgnoreCase))
+        {
+            if (row.Transaction is null)
+                return;
+
+            Transaction transaction = new()
+            {
+                AccountId = row.Transaction.AccountId,
+                PayeeId = row.Transaction.PayeeId,
+                Status = TransactionStatus.Cleared,
+                Amount = row.Transaction.Amount,
+                StartDate = row.Transaction.StartDate,
+                Confirm = $"UI dev cleared {DateTime.Now:g}",
+                Note = row.Transaction.Note
+            };
+
+            if (row.Transaction.TransactionId > 0)
+                transaction.SetTransactionId(row.Transaction.TransactionId);
+
+            _transactions.Update(transaction);
+            ApplyTransactionToRow(row, transaction);
+            return;
+        }
+
+        if (string.Equals(status, "Cleared", StringComparison.OrdinalIgnoreCase))
+        {
+            if (row.Transaction is null)
+                return;
+
+            _transactions.Delete(row.Transaction.TransactionId);
+            ClearTransactionFromRow(row);
+        }
     }
 
     private void Grid_CellMouseDown(object? sender, DataGridViewCellMouseEventArgs e)
@@ -415,36 +551,182 @@ public sealed class BudgetMonthForm : Form
             MessageBoxIcon.Information);
     }
 
+    private void Grid_CellPainting(object? sender, DataGridViewCellPaintingEventArgs e)
+    {
+        if (e.RowIndex < 0 || e.ColumnIndex < 0)
+            return;
+
+        DataGridViewColumn? column = _grid.Columns[e.ColumnIndex];
+        if (column is null || column.Name != "PayeeName")
+            return;
+
+        if (_grid.Rows[e.RowIndex].DataBoundItem is not BudgetRow row)
+            return;
+
+        if (row.PlannedAmount != 0m)
+            return;
+
+        e.PaintBackground(e.CellBounds, true);
+        e.Paint(e.CellBounds, DataGridViewPaintParts.Border | DataGridViewPaintParts.Focus);
+
+        Rectangle buttonBounds = GetDeleteButtonBounds(e.RowIndex, e.ColumnIndex);
+        ButtonRenderer.DrawButton(
+            e.Graphics,
+            buttonBounds,
+            "X",
+            Font,
+            false,
+            PushButtonState.Normal);
+
+        Rectangle textBounds = new(
+            buttonBounds.Right + DeleteButtonTextGap,
+            e.CellBounds.Y,
+            Math.Max(0, e.CellBounds.Width - (buttonBounds.Right - e.CellBounds.X) - DeleteButtonTextGap),
+            e.CellBounds.Height);
+
+        TextRenderer.DrawText(
+            e.Graphics,
+            row.PayeeName,
+            e.CellStyle.Font ?? Font,
+            textBounds,
+            e.CellStyle.ForeColor,
+            TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+
+        e.Handled = true;
+    }
+
     private void Grid_CellFormatting(object? sender, DataGridViewCellFormattingEventArgs e)
     {
         if (e.RowIndex < 0)
             return;
 
-        BudgetRow? row = _grid.Rows[e.RowIndex].DataBoundItem as BudgetRow;
-        if (row is null)
+        if (sender is not DataGridView grid)
             return;
 
-        if (string.Equals(row.Action, "Clear", StringComparison.OrdinalIgnoreCase))
+        if (grid.Rows[e.RowIndex].DataBoundItem is not BudgetRow row)
+            return;
+
+        DataGridViewRow gridRow = grid.Rows[e.RowIndex];
+
+        if (grid.Columns[e.ColumnIndex].Name == "PayeeName")
         {
-            e.CellStyle.BackColor = Color.LightGreen;
+            if (row.PlannedAmount == 0m)
+            {
+                e.CellStyle.Padding = new Padding(
+                    DeleteButtonLeftMargin + DeleteButtonWidth + DeleteButtonTextGap,
+                    0,
+                    0,
+                    0);
+            }
+            else
+            {
+                e.CellStyle.Padding = Padding.Empty;
+            }
+        }
+
+        if (e.ColumnIndex != 0)
+            return;
+
+        gridRow.DefaultCellStyle.BackColor = Color.Empty;
+
+        string status = row.Status;
+
+        if (string.Equals(status, "Cleared", StringComparison.OrdinalIgnoreCase))
+        {
+            gridRow.DefaultCellStyle.BackColor = Color.LightGreen;
             return;
         }
 
-        if (string.Equals(row.Action, "Add", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(status, "Outstanding", StringComparison.OrdinalIgnoreCase))
         {
-            e.CellStyle.BackColor = Color.MistyRose;
+            gridRow.DefaultCellStyle.BackColor = Color.LightYellow;
+            return;
+        }
+
+        if (string.Equals(status, "Projected", StringComparison.OrdinalIgnoreCase))
+        {
+            gridRow.DefaultCellStyle.BackColor = Color.MistyRose;
             return;
         }
 
         if (string.Equals(row.AccountId, "4", StringComparison.OrdinalIgnoreCase))
         {
-            e.CellStyle.BackColor = Color.LightCyan;
+            gridRow.DefaultCellStyle.BackColor = Color.LightCyan;
             return;
         }
 
         if (string.Equals(row.AccountId, "9", StringComparison.OrdinalIgnoreCase))
         {
-            e.CellStyle.BackColor = Color.LemonChiffon;
+            gridRow.DefaultCellStyle.BackColor = Color.LemonChiffon;
         }
+    }
+
+    private Rectangle GetDeleteButtonBounds(int rowIndex, int columnIndex)
+    {
+        Rectangle cellRect = _grid.GetCellDisplayRectangle(columnIndex, rowIndex, false);
+
+        int x = cellRect.X + DeleteButtonLeftMargin;
+        int y = cellRect.Y + Math.Max(0, (cellRect.Height - DeleteButtonHeight) / 2);
+
+        return new Rectangle(x, y, DeleteButtonWidth, DeleteButtonHeight);
+    }
+
+    private static void EnableDoubleBuffering(DataGridView grid)
+    {
+        typeof(DataGridView)
+            .GetProperty("DoubleBuffered", BindingFlags.Instance | BindingFlags.NonPublic)
+            ?.SetValue(grid, true);
+
+        grid.GetType()
+            .GetProperty("DoubleBuffered", BindingFlags.Instance | BindingFlags.NonPublic)
+            ?.SetValue(grid, true);
+    }
+
+    private Transaction CreateTransactionFromRow(BudgetRow row, int transactionId)
+    {
+        TransactionStatus transactionStatus = row.IsCleared
+            ? TransactionStatus.Cleared
+            : TransactionStatus.Outstanding;
+
+        Transaction transaction = new()
+        {
+            AccountId = row.AccountId ?? string.Empty,
+            PayeeId = row.PayeeId,
+            Status = transactionStatus,
+            Amount = row.ActualAmount ?? row.PlannedAmount,
+            StartDate = new DateTime(_year, _month, 1),
+            Confirm = row.Confirm,
+            Note = $"Loaded into BudgetMonthForm for {row.PayeeName}"
+        };
+
+        if (transactionId > 0)
+            transaction.SetTransactionId(transactionId);
+
+        return transaction;
+    }
+
+    private void ApplyTransactionToRow(BudgetRow row, Transaction transaction)
+    {
+        row.Transaction = transaction;
+        row.TransactionId = transaction.TransactionId == 0 ? row.TransactionId : transaction.TransactionId.ToString();
+        row.ActualAmount = transaction.Amount;
+        row.IsCleared = transaction.Status == TransactionStatus.Cleared;
+        row.Confirm = transaction.Confirm ?? string.Empty;
+    }
+
+    private void ClearTransactionFromRow(BudgetRow row)
+    {
+        row.Transaction = null;
+        row.TransactionId = null;
+        row.ActualAmount = null;
+        row.IsCleared = false;
+        row.Confirm = string.Empty;
+    }
+
+    private static int ParseTransactionId(string? transactionId)
+    {
+        return int.TryParse(transactionId, out int parsed)
+            ? parsed
+            : 0;
     }
 }

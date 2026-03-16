@@ -1,8 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using CodexExpensa.Core.Domain.Transactions;
+﻿using CodexExpensa.Core.Domain.Transactions;
 using CodexExpensa.Data.Sqlite.Db;
 using Microsoft.Data.Sqlite;
+using System;
+using System.Collections.Generic;
+using System.Data.Common;
 
 namespace CodexExpensa.Data.Sqlite.Transactions;
 
@@ -44,7 +45,9 @@ public sealed class SqliteTransactionRepository : ITransactionRepository
 
     public void Add(Transaction txn)
     {
-        if (txn is null) throw new ArgumentNullException(nameof(txn));
+        if (txn is null)
+            throw new ArgumentNullException(nameof(txn));
+
         ValidateForWrite(txn);
 
         const string sql =
@@ -81,11 +84,28 @@ public sealed class SqliteTransactionRepository : ITransactionRepository
             new SqliteParameter("@Confirm", (object?)txn.Confirm ?? DBNull.Value),
             new SqliteParameter("@Note", (object?)txn.Note ?? DBNull.Value),
         });
+
+        const string identitySql =
+            """
+            SELECT last_insert_rowid();
+            """;
+
+        IReadOnlyList<int> ids = _db.Query(
+    identitySql,
+    reader => Convert.ToInt32(reader.GetInt64(0)),
+    Array.Empty<SqliteParameter>());
+
+        if (ids.Count == 0 || ids[0] <= 0)
+            throw new InvalidOperationException("Failed to retrieve TransactionId after insert.");
+
+        txn.SetTransactionId(ids[0]);
     }
 
     public void Update(Transaction txn)
     {
-        if (txn is null) throw new ArgumentNullException(nameof(txn));
+        if (txn is null)
+            throw new ArgumentNullException(nameof(txn));
+
         ValidateForWrite(txn);
 
         if (txn.TransactionId <= 0)
@@ -129,7 +149,10 @@ public sealed class SqliteTransactionRepository : ITransactionRepository
             WHERE TransactionId = @TransactionId;
             """;
 
-        _db.ExecuteNonQuery(sql, new[] { new SqliteParameter("@TransactionId", transactionId) });
+        _db.ExecuteNonQuery(sql, new[]
+        {
+            new SqliteParameter("@TransactionId", transactionId)
+        });
     }
 
     private static void ValidateForWrite(Transaction txn)
@@ -137,32 +160,29 @@ public sealed class SqliteTransactionRepository : ITransactionRepository
         if (string.IsNullOrWhiteSpace(txn.AccountId))
             throw new ArgumentException("AccountId is required.", nameof(txn));
 
-        // Amount can be 0 legitimately (e.g. placeholder/entry in progress), so no validation here.
-        // StartDate required:
         if (txn.StartDate == default)
             throw new ArgumentException("StartDate is required.", nameof(txn));
     }
 
-    private static Transaction MapTxn(SqliteDataReader r)
+    private static Transaction MapTxn(SqliteDataReader reader)
     {
-        var id = GetInt(r, "TransactionId", 0);
-        var accountId = GetRequiredString(r, "AccountId");
-        var payeeId = GetNullableString(r, "PayeeId");
-        var statusInt = GetInt(r, "Status", 1);
-        var amount = GetDecimal(r, "Amount", 0m);
-        var startDateText = GetRequiredString(r, "StartDate");
-        var confirm = GetNullableString(r, "Confirm");
-        var note = GetNullableString(r, "Note");
+        int id = GetInt(reader, "TransactionId", 0);
+        string accountId = GetRequiredString(reader, "AccountId");
+        string? payeeId = GetNullableString(reader, "PayeeId");
+        int statusInt = GetInt(reader, "Status", (int)TransactionStatus.Outstanding);
+        decimal amount = GetDecimal(reader, "Amount", 0m);
+        string startDateText = GetRequiredString(reader, "StartDate");
+        string? confirm = GetNullableString(reader, "Confirm");
+        string? note = GetNullableString(reader, "Note");
 
         if (!Enum.IsDefined(typeof(TransactionStatus), statusInt))
             statusInt = (int)TransactionStatus.Outstanding;
 
-        if (!DateTime.TryParse(startDateText, out var startDate))
+        if (!DateTime.TryParse(startDateText, out DateTime startDate))
             startDate = DateTime.Today;
 
-        return new Transaction
+        Transaction txn = new()
         {
-            TransactionId = id,
             AccountId = accountId,
             PayeeId = payeeId,
             Status = (TransactionStatus)statusInt,
@@ -171,15 +191,22 @@ public sealed class SqliteTransactionRepository : ITransactionRepository
             Confirm = confirm,
             Note = note
         };
+
+        if (id > 0)
+            txn.SetTransactionId(id);
+
+        return txn;
     }
 
     private static string GetRequiredString(SqliteDataReader reader, string columnName)
     {
-        var ord = reader.GetOrdinal(columnName);
+        int ord = reader.GetOrdinal(columnName);
+
         if (reader.IsDBNull(ord))
             throw new InvalidOperationException($"Column '{columnName}' was NULL but is required.");
 
-        var value = reader.GetString(ord);
+        string value = reader.GetString(ord);
+
         if (string.IsNullOrWhiteSpace(value))
             throw new InvalidOperationException($"Column '{columnName}' was empty/whitespace but is required.");
 
@@ -188,27 +215,41 @@ public sealed class SqliteTransactionRepository : ITransactionRepository
 
     private static string? GetNullableString(SqliteDataReader reader, string columnName)
     {
-        var ord = reader.GetOrdinal(columnName);
+        int ord = reader.GetOrdinal(columnName);
         return reader.IsDBNull(ord) ? null : reader.GetString(ord);
     }
 
     private static int GetInt(SqliteDataReader reader, string columnName, int defaultValue)
     {
-        var ord = reader.GetOrdinal(columnName);
+        int ord = reader.GetOrdinal(columnName);
+
         if (reader.IsDBNull(ord))
             return defaultValue;
 
-        try { return Convert.ToInt32(reader.GetValue(ord)); }
-        catch { return defaultValue; }
+        try
+        {
+            return Convert.ToInt32(reader.GetValue(ord));
+        }
+        catch
+        {
+            return defaultValue;
+        }
     }
 
     private static decimal GetDecimal(SqliteDataReader reader, string columnName, decimal defaultValue)
     {
-        var ord = reader.GetOrdinal(columnName);
+        int ord = reader.GetOrdinal(columnName);
+
         if (reader.IsDBNull(ord))
             return defaultValue;
 
-        try { return Convert.ToDecimal(reader.GetValue(ord)); }
-        catch { return defaultValue; }
+        try
+        {
+            return Convert.ToDecimal(reader.GetValue(ord));
+        }
+        catch
+        {
+            return defaultValue;
+        }
     }
 }

@@ -201,7 +201,6 @@ public partial class MainForm : Form
         _payees = payees ?? throw new ArgumentNullException(nameof(payees));
         _createDbStatusForm = createDbStatusForm ?? throw new ArgumentNullException(nameof(createDbStatusForm));
 
-
         InitializeComponent();
 
         _ctxBanksRoot = BuildBanksRootMenu();
@@ -373,7 +372,6 @@ public partial class MainForm : Form
             payeesRoot.Nodes.Add(payeeNameNode);
             payeesRoot.Nodes.Add(payeeTagNode);
 
-            // Default normal payee list under root for now
             foreach (Payee p in _payeeCache
                          .OrderByDescending(p => p.IncludeInBudgetTemplate)
                          .ThenBy(p => p.PayeeName))
@@ -439,12 +437,12 @@ public partial class MainForm : Form
 
         payeeTagNode.Nodes.Clear();
 
-        var payeesById = _payeeCache.ToDictionary(p => p.PayeeId, StringComparer.Ordinal);
+        Dictionary<string, Payee> payeesById = _payeeCache.ToDictionary(p => p.PayeeId, StringComparer.Ordinal);
 
-        var tagRows = _dbSession.QueryDataTable("PayeeTag.SelectAllForNavigation");
+        DataTable tagRows = _dbSession.QueryDataTable("PayeeTag.SelectAllForNavigation");
 
-        var grouped = new Dictionary<string, List<Payee>>(StringComparer.OrdinalIgnoreCase);
-        var taggedPayeeIds = new HashSet<string>(StringComparer.Ordinal);
+        Dictionary<string, List<Payee>> grouped = new(StringComparer.OrdinalIgnoreCase);
+        HashSet<string> taggedPayeeIds = new(StringComparer.Ordinal);
 
         foreach (DataRow row in tagRows.Rows)
         {
@@ -471,7 +469,6 @@ public partial class MainForm : Form
             list.Add(payee);
         }
 
-        // None group
         TreeNode noneNode = new("None") { Tag = PayeeNav.TagGroupNone };
 
         foreach (Payee payee in _payeeCache
@@ -486,8 +483,7 @@ public partial class MainForm : Form
 
         payeeTagNode.Nodes.Add(noneNode);
 
-        // Tag groups
-        foreach (var kvp in grouped.OrderBy(x => x.Key, StringComparer.OrdinalIgnoreCase))
+        foreach (KeyValuePair<string, List<Payee>> kvp in grouped.OrderBy(x => x.Key, StringComparer.OrdinalIgnoreCase))
         {
             string tagName = kvp.Key;
             List<Payee> payees = kvp.Value
@@ -519,7 +515,7 @@ public partial class MainForm : Form
         {
             Dock = DockStyle.Fill,
             Text = "Payees are grouped in the tree under each tag.\r\nSelect a payee under a tag group to open it.",
-            TextAlign = ContentAlignment.MiddleCenter
+            TextAlign = System.Drawing.ContentAlignment.MiddleCenter
         };
 
         Panel panel = new()
@@ -537,7 +533,6 @@ public partial class MainForm : Form
         if (payeesRoot is null)
             return;
 
-        // Keep Name and Tags nodes, remove only real payee item nodes
         while (payeesRoot.Nodes.Count > 2)
             payeesRoot.Nodes.RemoveAt(2);
 
@@ -768,6 +763,7 @@ public partial class MainForm : Form
 
         return false;
     }
+
     private void TreeNav_NodeMouseClick(object? sender, TreeNodeMouseClickEventArgs e)
     {
         if (e.Node is null)
@@ -1059,7 +1055,7 @@ public partial class MainForm : Form
             Dock = DockStyle.Top,
             Height = 24,
             Text = "Filter payees by name",
-            TextAlign = ContentAlignment.MiddleLeft
+            TextAlign = System.Drawing.ContentAlignment.MiddleLeft
         };
 
         Panel panel = new()
@@ -1222,7 +1218,7 @@ public partial class MainForm : Form
 
     private void ShowBudgetMonth(int year, int month)
     {
-        BudgetMonthForm form = new(_dbSession, year, month);
+        BudgetMonthForm form = new(_dbSession, _transactions, year, month);
         ShowChildForm(form);
     }
 
@@ -1313,7 +1309,7 @@ public partial class MainForm : Form
     {
         DateTime today = DateTime.Today;
 
-        using BudgetMonthForm form = new(_dbSession, today.Year, today.Month);
+        using BudgetMonthForm form = new(_dbSession, _transactions, today.Year, today.Month);
         form.ShowDialog(this);
     }
 }

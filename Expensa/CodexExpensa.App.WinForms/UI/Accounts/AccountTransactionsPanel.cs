@@ -26,7 +26,6 @@ public sealed class AccountTransactionsPanel : UserControl
 
     private readonly BindingList<TransactionRow> _rows = new();
 
-    // Lookups
     private readonly BindingList<BankChoice> _bankChoices = new();
     private readonly BindingList<AccountChoice> _accountChoices = new();
     private readonly BindingList<PayeeChoice> _payeeChoices = new();
@@ -44,7 +43,7 @@ public sealed class AccountTransactionsPanel : UserControl
 
         Dock = DockStyle.Fill;
 
-        var top = new Panel { Dock = DockStyle.Top, Height = 44, Padding = new Padding(8, 8, 8, 0) };
+        Panel top = new() { Dock = DockStyle.Top, Height = 44, Padding = new Padding(8, 8, 8, 0) };
         Controls.Add(top);
 
         _lblScope = new Label { AutoSize = true, Left = 8, Top = 12, Text = "Transactions" };
@@ -92,7 +91,6 @@ public sealed class AccountTransactionsPanel : UserControl
 
         _grid.DataError += (_, e) =>
         {
-            // ComboBox mismatches happen during lookup refresh. Swallow and keep UX calm.
             e.ThrowException = false;
         };
 
@@ -132,23 +130,21 @@ public sealed class AccountTransactionsPanel : UserControl
         _accountsById.Clear();
         _accountsByBankId.Clear();
 
-        var allAccounts = _accounts.GetAll()
+        List<Account> allAccounts = _accounts.GetAll()
             .OrderBy(x => x.BankName)
             .ThenBy(x => x.SortIndex)
             .ThenBy(x => x.AccountNickname)
             .ToList();
 
-        // Banks
-        foreach (var grp in allAccounts
+        foreach (IGrouping<string, Account> grp in allAccounts
                      .GroupBy(a => a.BankId, StringComparer.Ordinal)
                      .OrderBy(g => g.First().BankName, StringComparer.OrdinalIgnoreCase)
                      .ThenBy(g => g.First().RoutingNumber, StringComparer.OrdinalIgnoreCase))
         {
-            var first = grp.First();
+            Account first = grp.First();
             _bankChoices.Add(new BankChoice(first.BankId, $"{first.BankName} ({first.RoutingNumber})"));
 
-            // Accounts under each bank (for quick default selection)
-            var list = grp
+            List<AccountChoice> list = grp
                 .OrderBy(a => a.SortIndex)
                 .ThenBy(a => a.AccountNickname)
                 .ThenBy(a => a.AccountNumber)
@@ -158,20 +154,17 @@ public sealed class AccountTransactionsPanel : UserControl
             _accountsByBankId[first.BankId] = list;
         }
 
-        // Accounts (global list, still useful for direct selection)
-        foreach (var a in allAccounts)
+        foreach (Account a in allAccounts)
         {
             _accountsById[a.AccountId] = a;
 
-            // Display includes bank name so it’s usable even if user ignores the Bank column.
             _accountChoices.Add(new AccountChoice(
                 a.AccountId,
                 $"{a.BankName} - {a.AccountNickname} - {Last4(a.AccountNumber)}"));
         }
 
-        // Payees
         _payeeChoices.Add(new PayeeChoice(null, "(none)"));
-        foreach (var p in _payees.GetAll().OrderBy(x => x.PayeeName))
+        foreach (Payee p in _payees.GetAll().OrderBy(x => x.PayeeName))
         {
             _payeeChoices.Add(new PayeeChoice(p.PayeeId, p.PayeeName));
         }
@@ -184,12 +177,11 @@ public sealed class AccountTransactionsPanel : UserControl
         if (string.IsNullOrWhiteSpace(_currentAccountId))
             return;
 
-        foreach (var t in _txns.GetByAccountId(_currentAccountId))
+        foreach (Transaction t in _txns.GetByAccountId(_currentAccountId))
         {
-            var row = TransactionRow.FromDomain(t);
+            TransactionRow row = TransactionRow.FromDomain(t);
 
-            // Derive BankId from AccountId for the Bank dropdown
-            if (!string.IsNullOrWhiteSpace(row.AccountId) && _accountsById.TryGetValue(row.AccountId, out var acct))
+            if (!string.IsNullOrWhiteSpace(row.AccountId) && _accountsById.TryGetValue(row.AccountId, out Account? acct))
                 row.BankId = acct.BankId;
 
             _rows.Add(row);
@@ -207,7 +199,6 @@ public sealed class AccountTransactionsPanel : UserControl
             Width = 110
         });
 
-        // ✅ Bank dropdown (lets user move a txn between banks)
         _grid.Columns.Add(new DataGridViewComboBoxColumn
         {
             Name = nameof(TransactionRow.BankId),
@@ -221,7 +212,6 @@ public sealed class AccountTransactionsPanel : UserControl
             FlatStyle = FlatStyle.Flat
         });
 
-        // Account dropdown (lets user move a txn between accounts; also implies bank)
         _grid.Columns.Add(new DataGridViewComboBoxColumn
         {
             Name = nameof(TransactionRow.AccountId),
@@ -235,7 +225,6 @@ public sealed class AccountTransactionsPanel : UserControl
             FlatStyle = FlatStyle.Flat
         });
 
-        // Payee dropdown
         _grid.Columns.Add(new DataGridViewComboBoxColumn
         {
             Name = nameof(TransactionRow.PayeeId),
@@ -249,7 +238,6 @@ public sealed class AccountTransactionsPanel : UserControl
             FlatStyle = FlatStyle.Flat
         });
 
-        // Status dropdown (enum names)
         _grid.Columns.Add(TransactionStatusUi.CreateColumn(nameof(TransactionRow.Status), headerText: "Status", width: 130));
 
         _grid.Columns.Add(new DataGridViewTextBoxColumn
@@ -295,21 +283,19 @@ public sealed class AccountTransactionsPanel : UserControl
         if (_grid.Rows[e.RowIndex].DataBoundItem is not TransactionRow row)
             return;
 
-        // If bank changed, auto-pick a default account for that bank.
         if (_grid.Columns[e.ColumnIndex].Name == nameof(TransactionRow.BankId))
         {
             if (string.IsNullOrWhiteSpace(row.BankId))
                 return;
 
-            // Pick first account under bank if current account doesn't match bank
             if (!string.IsNullOrWhiteSpace(row.AccountId) &&
-                _accountsById.TryGetValue(row.AccountId, out var existingAcct) &&
+                _accountsById.TryGetValue(row.AccountId, out Account? existingAcct) &&
                 string.Equals(existingAcct.BankId, row.BankId, StringComparison.Ordinal))
             {
                 return;
             }
 
-            if (_accountsByBankId.TryGetValue(row.BankId, out var acctChoices) && acctChoices.Count > 0)
+            if (_accountsByBankId.TryGetValue(row.BankId, out List<AccountChoice>? acctChoices) && acctChoices.Count > 0)
             {
                 row.AccountId = acctChoices[0].AccountId;
                 _grid.Refresh();
@@ -318,10 +304,9 @@ public sealed class AccountTransactionsPanel : UserControl
             return;
         }
 
-        // If account changed, keep BankId in sync.
         if (_grid.Columns[e.ColumnIndex].Name == nameof(TransactionRow.AccountId))
         {
-            if (!string.IsNullOrWhiteSpace(row.AccountId) && _accountsById.TryGetValue(row.AccountId, out var acct))
+            if (!string.IsNullOrWhiteSpace(row.AccountId) && _accountsById.TryGetValue(row.AccountId, out Account? acct))
             {
                 row.BankId = acct.BankId;
                 _grid.Refresh();
@@ -334,14 +319,13 @@ public sealed class AccountTransactionsPanel : UserControl
         if (string.IsNullOrWhiteSpace(_currentAccountId))
             return;
 
-        // Derive initial bank from current account
         string? bankId = null;
-        if (_accountsById.TryGetValue(_currentAccountId, out var acct))
+        if (_accountsById.TryGetValue(_currentAccountId, out Account? acct))
             bankId = acct.BankId;
 
         _rows.Add(new TransactionRow
         {
-            TransactionId = 0, // new
+            TransactionId = 0,
             BankId = bankId,
             AccountId = _currentAccountId,
             PayeeId = null,
@@ -362,13 +346,12 @@ public sealed class AccountTransactionsPanel : UserControl
         if (_grid.CurrentRow?.DataBoundItem is not TransactionRow row)
             return;
 
-        var confirm = MessageBox.Show(this, "Delete selected transaction?", "Delete",
+        DialogResult confirm = MessageBox.Show(this, "Delete selected transaction?", "Delete",
             MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
 
         if (confirm != DialogResult.Yes)
             return;
 
-        // If not saved yet, just remove from grid
         if (row.TransactionId <= 0)
         {
             _rows.Remove(row);
@@ -383,16 +366,15 @@ public sealed class AccountTransactionsPanel : UserControl
     {
         _grid.EndEdit();
 
-        foreach (var row in _rows.ToList())
+        foreach (TransactionRow row in _rows.ToList())
         {
-            // Guard clauses
             if (string.IsNullOrWhiteSpace(row.AccountId))
                 continue;
 
             if (row.StartDate == default)
                 row.StartDate = DateTime.Today;
 
-            var domain = row.ToDomain();
+            Transaction domain = row.ToDomain();
 
             if (row.TransactionId <= 0)
                 _txns.Add(domain);
@@ -405,10 +387,9 @@ public sealed class AccountTransactionsPanel : UserControl
 
     private void ManagePayees()
     {
-        using var dlg = new PayeesForm(_payees);
+        using PayeesForm dlg = new(_payees);
         dlg.ShowDialog(this);
 
-        // refresh payee dropdown choices after managing payees
         ReloadLookups();
         _grid.Refresh();
     }
@@ -418,7 +399,7 @@ public sealed class AccountTransactionsPanel : UserControl
         if (string.IsNullOrWhiteSpace(accountNumber))
             return "????";
 
-        var cleaned = accountNumber.Replace(" ", "").Replace("-", "");
+        string cleaned = accountNumber.Replace(" ", "").Replace("-", "");
         return cleaned.Length <= 4 ? cleaned : cleaned.Substring(cleaned.Length - 4);
     }
 
@@ -462,7 +443,6 @@ public sealed class AccountTransactionsPanel : UserControl
     {
         public int TransactionId { get; set; }
 
-        // UI-only column to support “Bank” dropdown.
         public string? BankId { get; set; }
 
         public string AccountId { get; set; } = string.Empty;
@@ -481,9 +461,8 @@ public sealed class AccountTransactionsPanel : UserControl
 
         public Transaction ToDomain()
         {
-            return new Transaction
+            Transaction txn = new()
             {
-                TransactionId = TransactionId,
                 AccountId = AccountId,
                 PayeeId = string.IsNullOrWhiteSpace(PayeeId) ? null : PayeeId,
                 Status = Status,
@@ -492,6 +471,11 @@ public sealed class AccountTransactionsPanel : UserControl
                 Confirm = string.IsNullOrWhiteSpace(Confirm) ? null : Confirm,
                 Note = string.IsNullOrWhiteSpace(Note) ? null : Note
             };
+
+            if (TransactionId > 0)
+                txn.SetTransactionId(TransactionId);
+
+            return txn;
         }
 
         public static TransactionRow FromDomain(Transaction t)

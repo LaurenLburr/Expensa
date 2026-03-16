@@ -1,0 +1,566 @@
+CodexExpensa Catch-Up
+Conversation: Current Budget / Query Catalog / Tag Navigation Work
+Date: 2026-03-15
+
+Project Root
+D:\Git\CodexExpensa\Expensa
+
+Current Focus
+Finish Budgets, improve query catalog tooling, and move toward tag-driven navigation/filtering for Payees and later Websites.
+
+==================================================
+1. HIGH-LEVEL STATE
+==================================================
+
+The project is in a good place overall.
+
+Major areas now in progress:
+- Budget creation and month state ownership
+- Query Catalog tooling in the app
+- Grid layout persistence via UserSettings
+- Payee defaults used as budget-template seed data
+- Tag-based navigation design for Payees, later Websites
+
+Key architectural direction now established:
+- Payee owns template defaults
+- BudgetMonthPayee owns month-specific snapshot/state
+- Template is used only at budget creation time
+- SqlQuery catalog is the central source for SQL
+- Grid layouts are saved in UserSettings
+- Tag navigation should be generic and reusable
+
+==================================================
+2. BUDGET ARCHITECTURE DECISIONS LOCKED IN
+==================================================
+
+These decisions are important and should be treated as current truth.
+
+2.1 Budget Template Behavior
+The template is no longer a live ongoing source once a month is created.
+
+Rule:
+- When a new budget month is created, template defaults are copied into BudgetMonthPayee.
+- After that, the month owns its own state.
+- Changes to Payee defaults must NOT retroactively change existing month budgets.
+
+This means:
+- BudgetMonthPayee is the month snapshot.
+- Existing month data is edited only in BudgetMonthPayee.
+- Template/defaults are seed data only.
+
+2.2 Payee Stores Defaults
+Payee now conceptually stores:
+- IncludeInBudgetTemplate
+- DefaultAccountId
+- DefaultAmount
+
+Those values are used only during month creation.
+
+2.3 Paying Account Behavior
+The paying bank account should not need to be manually selected every month in normal use.
+
+Rule:
+- Payee.DefaultAccountId is copied into BudgetMonthPayee.AccountId at month creation.
+- User can override AccountId in the month budget if needed.
+- That override is month-only unless an explicit “make default” feature is added later.
+
+2.4 Default Amount Behavior
+Payee.DefaultAmount is the default planned amount for a new month.
+
+Rule:
+- DefaultAmount is copied into BudgetMonthPayee.PlannedAmount at creation.
+- After that, changes are saved only to the month budget row.
+
+==================================================
+3. CURRENT BUDGET SQL DIRECTION
+==================================================
+
+The key budget creation query now reads from Payee and creates month-owned rows.
+
+Final creation query concept:
+QueryName:
+BudgetMonthPayee.CreateFromTemplate
+
+Behavior:
+- Insert BudgetMonthPayee rows for a specific BudgetMonthId
+- Use Payee rows where IncludeInBudgetTemplate = 1
+- Copy:
+  - SortIndex
+  - DefaultAmount -> PlannedAmount
+  - DefaultAccountId -> AccountId
+- Avoid duplicates using NOT EXISTS
+
+Current SQL shape:
+
+INSERT INTO [BudgetMonthPayee]
+(
+    [BudgetMonthPayeeId],
+    [BudgetMonthId],
+    [PayeeId],
+    [SortIndex],
+    [PlannedAmount],
+    [AccountId]
+)
+SELECT
+    @BudgetMonthId || '-' || p.[PayeeId],
+    @BudgetMonthId,
+    p.[PayeeId],
+    p.[SortIndex],
+    COALESCE(p.[DefaultAmount], 0),
+    p.[DefaultAccountId]
+FROM [Payee] p
+WHERE p.[IncludeInBudgetTemplate] = 1
+AND NOT EXISTS
+(
+    SELECT 1
+    FROM [BudgetMonthPayee] bmp
+    WHERE bmp.[BudgetMonthId] = @BudgetMonthId
+      AND bmp.[PayeeId] = p.[PayeeId]
+);
+
+Important note:
+This query should be stored in SqlQuery using UPSERT logic.
+
+==================================================
+4. QUERY CATALOG TOOLING
+==================================================
+
+A Query Catalog form has been built/being built as an internal tool.
+
+Features now discussed/implemented:
+- Browse SqlQuery catalog
+- See Category / Description / SqlText
+- Run queries
+- Prompt for parameters
+- Remember parameter values per query
+- Save the entire query catalog to:
+  D:\Git\CodexExpensa\Expensa\ChatGpt\sqlquery_catalog_dump.sql
+- Search box
+- Category filter
+- execution timing display
+
+4.1 Query Catalog Save
+The Save Catalog method now needs to include IsActive.
+
+The catalog export should include:
+- QueryName
+- Category
+- Description
+- SqlText
+- IsActive
+
+Export pattern:
+- one UPSERT per query
+- ON CONFLICT(QueryName) DO UPDATE
+
+4.2 SqlQuery.SelectCatalog
+This query must return IsActive too.
+
+Shape:
+SELECT
+    [QueryName],
+    [Category],
+    [Description],
+    [SqlText],
+    [IsActive]
+FROM [SqlQuery]
+ORDER BY
+    [Category],
+    [QueryName];
+
+==================================================
+5. USERSETTINGS / GRID LAYOUT
+==================================================
+
+5.1 UserSettings Table
+UserSettings table was missing at one point and has now been added.
+It was empty at the time discussed, which is fine.
+
+Expected schema:
+CREATE TABLE UserSettings (
+    SettingName  TEXT PRIMARY KEY,
+    SettingValue TEXT NOT NULL
+);
+
+5.2 UserSettings Queries
+Queries added or intended:
+- UserSettings.SelectByName
+- UserSettings.Upsert
+
+Used for storing:
+- BudgetMonth.GridLayout
+- Payees.GridLayout
+- other future UI state
+
+5.3 GridLayoutService
+A reusable GridLayoutService was introduced for saving/restoring:
+- column order
+- column width
+- visible state
+
+Design:
+- takes any DataGridView
+- takes a setting name
+- loads from UserSettings
+- saves to UserSettings
+
+Important:
+This should remain generic so all grids can use it.
+
+5.4 Budget Grid Layout
+BudgetMonthForm now conceptually supports saving:
+- column order
+- column width
+
+PayeeName should remain:
+- forced first column
+- frozen
+
+5.5 Payees Grid Layout
+PayeesLandingForm was also being wired to the same generic GridLayoutService.
+
+==================================================
+6. PAYEE FORM / PAYEE MODEL
+==================================================
+
+6.1 Payee Model Direction
+Payee should include:
+- PayeeId
+- PayeeName
+- SortIndex
+- IsActive
+- IncludeInBudgetTemplate
+- DefaultAccountId
+- DefaultAmount
+
+There was confusion mid-stream because some UI code got ahead of the Payee class.
+The final direction is that those properties belong in Payee.
+
+6.2 BudgetTemplateRow
+BudgetTemplateRow appears to no longer be needed.
+User removed it and compile still succeeded cleanly.
+
+Conclusion:
+- BudgetTemplateRow is dead weight
+- Template data should live in Payee now
+
+Likely cleanup needed:
+- remove remaining references to BudgetTemplateRow
+- review BudgetTemplate.SelectRows / TemplatePayees queries for staleness
+- ensure creation logic reads directly from Payee
+
+==================================================
+7. PAYEE TAGGING
+==================================================
+
+7.1 Existing Tag Tables Already Present
+The uploaded database showed these already exist:
+
+Tag
+- TagId
+- TagName
+- SortIndex
+- IsActive
+
+PayeeTag
+- PayeeTagId
+- PayeeId
+- TagId
+- SortIndex
+
+WebsiteTag
+- WebsiteTagId
+- WebsiteId
+- TagId
+- SortIndex
+
+So no new tables are needed for Payee tags.
+
+7.2 Recommended Index
+Recommended to enforce uniqueness so a payee cannot get the same tag twice:
+
+CREATE UNIQUE INDEX IF NOT EXISTS [IX_PayeeTag_PayeeId_TagId]
+ON [PayeeTag]([PayeeId], [TagId]);
+
+7.3 Tag Queries
+Core tag-related catalog entries discussed:
+- Tag.SelectAll
+- Tag.SelectById
+- Tag.Insert
+- Tag.Update
+- PayeeTag.SelectByPayeeId
+- PayeeTag.Insert
+- PayeeTag.DeleteById
+- PayeeTag.DeleteByPayeeIdAndTagId
+- PayeeTag.SelectAllForNavigation
+- Tag.SelectByNameLike
+- Tag.SelectByExactName
+
+Some of these may still need to be added/confirmed in SqlQuery.
+
+7.4 PayeeDetailsForm Tag UI Direction
+The desired UI pattern for Payee tagging is:
+
+- Textbox for typing tag name
+- ListBox below showing partial matches as user types
+- If textbox empty, listbox empty
+- Link to create/add tag
+- If typed tag is not new, link is disabled
+- Better recommended behavior:
+  - If exact existing tag match and payee does not already have it:
+    allow assign
+  - If tag is new:
+    allow create + assign
+  - If blank:
+    disable
+
+This work belongs on PayeeDetailsForm, not PayeesLandingForm.
+
+==================================================
+8. PAYEE / WEBSITE NAVIGATION FILTERING
+==================================================
+
+This is an important current design thread.
+
+8.1 Two Filter Nodes Under Each Root
+Desired structure under Payees:
+- Name
+- Tags
+
+Desired structure under Websites:
+- Name
+- Tags
+
+8.2 Name Node Behavior
+Selecting Name should show a textbox in panelHost.
+As user types:
+- filter by PayeeName for payees
+- filter by WebsiteName for websites
+- rebuild visible nodes live
+
+8.3 Tags Node Behavior
+Selecting Tags should NOT just show a flat filter list.
+Instead it should group nodes.
+
+Desired Payee tree under Tags:
+Payees
+  Name
+  Tags
+    None
+      Untagged Payee A
+      Untagged Payee B
+    Utilities
+      Electric
+      Water
+    Recurring
+      Mortgage
+      Internet
+
+Same pattern later for Websites.
+
+Important:
+- “None” means no tags assigned
+- items are shown under each tag
+- an item may appear under multiple tags if it has multiple tags
+- this is grouped navigation view, not just filtering
+
+8.4 Node Tag Scheme
+Suggested string tags:
+Payee.NameView
+Payee.TagView
+Payee.TagGroup.None
+Payee.TagGroup.<TagId>
+Payee.<PayeeId>
+
+Likewise later for Website.
+
+8.5 Navigation Refactor
+TreeNav_AfterSelect was getting too large and was refactored into helper dispatch methods:
+
+- TryHandleBudgetNodeSelection
+- TryHandlePayeeViewNodeSelection
+- TryHandleRootNodeSelection
+- TryHandlePayeeNodeSelection
+- TryHandleBankNodeSelection
+- TryHandleAccountNodeSelection
+
+This refactor is important and should be preserved.
+
+There was one compile issue due to duplicated payeeId variable name.
+That was resolved by renaming the parsed out variable.
+
+==================================================
+9. MAINFORM / NAVIGATION STATE
+==================================================
+
+MainForm is large and fragile enough now that full-file regeneration is risky.
+
+Safe rule:
+- Prefer targeted block replacements instead of regenerating full MainForm.cs
+- Especially for tree navigation work
+
+Important existing direction:
+- Payee root should contain Name and Tags nodes
+- Name node shows textbox-based filter form
+- Tags node shows grouped navigation under tag names + None
+- Tree should rebuild only relevant subtree when possible
+
+==================================================
+10. PAYEES LANDING FORM
+==================================================
+
+PayeesLandingForm work included:
+- sorting by IncludeInBudgetTemplate first
+- then PayeeName
+- checkbox/toggle behavior for IncludeInBudgetTemplate
+- grid layout persistence
+
+There was a bad intermediate version that incorrectly tried to bind directly to Payee.AccountId and Payee.InTemplate before the Payee model was confirmed.
+That file was later corrected to keep using an internal Row class.
+
+Important:
+Constructor evolved to require IDatabaseSession for GridLayoutService.
+
+MainForm.ShowPayeesLanding() needed to be updated to pass:
+- _dbSession
+- openPayeeDetails callback
+- savePayee callback
+
+==================================================
+11. VISUAL STUDIO / STARTUP ISSUE
+==================================================
+
+There was a startup issue:
+- 0x80070002 style “file not found”
+- happened three times
+- before Main()
+- app still ran
+
+Conclusion:
+- almost certainly Visual Studio / debugger cache issue, not app code
+
+Fix:
+- close VS
+- delete .vs / bin / obj folders
+- reopen and rebuild
+
+Issue was resolved and the app is working again.
+
+==================================================
+12. QUERY CATALOG DUMP
+==================================================
+
+A catalog dump file was generated previously:
+sqlquery_catalog_dump.sql
+
+Also user wanted the Query Catalog save operation to write to:
+D:\Git\CodexExpensa\Expensa\ChatGpt\sqlquery_catalog_dump.sql
+
+The save/export should use UPSERT style and include IsActive.
+
+==================================================
+13. CURRENT LIKELY NEXT STEPS
+==================================================
+
+Best next steps, in sensible order:
+
+1. Finish budget creation flow
+   - Create BudgetMonth
+   - Create BudgetMonthPayee rows from Payee defaults using BudgetMonthPayee.CreateFromTemplate
+   - Open new month
+
+2. Confirm Payee class and Payee queries all include:
+   - IncludeInBudgetTemplate
+   - DefaultAccountId
+   - DefaultAmount
+
+3. Clean up leftover BudgetTemplate-related artifacts
+   - remove stale classes
+   - update stale query names/descriptions
+   - ensure creation logic uses Payee only
+
+4. Finish PayeeDetailsForm tag UI
+   - textbox
+   - partial-match listbox
+   - create/assign link
+   - remove tag support
+
+5. Finish Payee Name/Tags navigation view in MainForm
+   - Name filter node
+   - Tags grouped navigation
+   - None bucket
+   - item nodes under each tag
+
+6. Mirror same model later for Websites
+
+==================================================
+14. IMPORTANT FILES IN PLAY
+==================================================
+
+Likely key files involved in current work:
+
+MainForm.cs
+MainForm.Designer.cs
+
+UI\Budgets\BudgetMonthForm.cs
+UI\Budgets\BudgetRow.cs
+
+UI\Diagnostics\QueryCatalogForm.cs
+
+UI\Payees\PayeesLandingForm.cs
+UI\Payees\PayeeDetailsForm.cs
+
+Services\GridLayoutService.cs
+
+Core\Domain\Payees\Payee.cs
+
+==================================================
+15. IMPORTANT QUERIES IN PLAY
+==================================================
+
+Budget / creation:
+- BudgetMonth.Create
+- BudgetMonthPayee.CreateFromTemplate
+- BudgetMonthPayee.SelectByBudgetMonthId
+- BudgetMonthPayee.UpdatePlannedAmount
+- BudgetMonth.MissingMonthsForYear
+
+UserSettings / layout:
+- UserSettings.SelectByName
+- UserSettings.Upsert
+
+Query catalog:
+- SqlQuery.SelectCatalog
+- SqlQuery.Upsert
+- SqlQuery.SelectActiveByName
+- SqlQuery.SelectCategoryCounts
+
+Tagging:
+- Tag.SelectAll
+- Tag.SelectById
+- Tag.Insert
+- Tag.Update
+- PayeeTag.SelectByPayeeId
+- PayeeTag.Insert
+- PayeeTag.DeleteById
+- PayeeTag.DeleteByPayeeIdAndTagId
+- PayeeTag.SelectAllForNavigation
+- Tag.SelectByNameLike
+- Tag.SelectByExactName
+
+==================================================
+16. SHORT VERSION OF CURRENT TRUTH
+==================================================
+
+The project has moved to a much cleaner budget model:
+
+- Payee is the template/default source
+- BudgetMonthPayee is the month snapshot
+- Template is used once at creation only
+- Query catalog is DB-driven and exportable
+- Grid layout persistence is shared infrastructure
+- Tag tables already exist and should be used, not recreated
+- Payees and Websites should each get Name and Tags navigation nodes
+- Tags view should group items under each tag, with None for untagged items
+
+End of catch-up.

@@ -1,4 +1,6 @@
-﻿namespace CodexExpensa.App.WinForms.UI.Budgets;
+﻿using CodexExpensa.Core.Domain.Transactions;
+
+namespace CodexExpensa.App.WinForms.UI.Budgets;
 
 public sealed class BudgetRow
 {
@@ -28,17 +30,39 @@ public sealed class BudgetRow
 
     public string Confirm { get; set; } = string.Empty;
 
-    public string Action
+    // REAL transaction
+    public Transaction? Transaction { get; set; }
+
+    public string Status
     {
         get
         {
-            if (string.IsNullOrWhiteSpace(TransactionId))
-                return "Add";
+            if (Transaction == null)
+            {
+                if (PlannedAmount > 0)
+                    return "Projected";
 
-            if (!IsCleared)
-                return "Clear";
+                return string.Empty;
+            }
 
-            return string.Empty;
+            return Transaction.Status switch
+            {
+                TransactionStatus.Projected => "Projected",
+                TransactionStatus.Outstanding => "Outstanding",
+                TransactionStatus.Cleared => "Cleared",
+                _ => string.Empty
+            };
+        }
+    }
+
+    public string ConfirmDisplay
+    {
+        get
+        {
+            if (Transaction == null)
+                return string.Empty;
+
+            return Transaction.Confirm ?? string.Empty;
         }
     }
 }
