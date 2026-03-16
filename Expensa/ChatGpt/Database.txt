@@ -1,5 +1,5 @@
 --
--- File generated with SQLiteStudio v3.4.15 on Sat Mar 14 19:47:25 2026
+-- File generated with SQLiteStudio v3.4.15 on Sun Mar 15 20:06:09 2026
 --
 -- Text encoding used: System
 --
@@ -487,6 +487,24 @@ CREATE TABLE IF NOT EXISTS Txn (
         PayeeId
     )
     REFERENCES Payee (PayeeId) ON DELETE SET NULL
+);
+
+
+-- Table: TxnStatusLog
+CREATE TABLE IF NOT EXISTS TxnStatusLog (
+    TxnStatusLogId INTEGER PRIMARY KEY AUTOINCREMENT,
+    TransactionId  INTEGER NOT NULL,
+    OldStatus      TEXT,
+    NewStatus      TEXT    NOT NULL,
+    ReasonCode     TEXT    NOT NULL,
+    ReasonText     TEXT,
+    ChangedUtc     TEXT    NOT NULL,
+    ChangedBy      TEXT,
+    Source         TEXT,
+    FOREIGN KEY (
+        TransactionId
+    )
+    REFERENCES Txn (TransactionId) 
 );
 
 
