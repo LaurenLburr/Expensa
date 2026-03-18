@@ -28,7 +28,7 @@ public sealed class BudgetRow
 
     public string Group { get; set; } = string.Empty;
 
-    public string Confirm { get; set; } = string.Empty;
+    public string ConfirmationNumber { get; set; } = string.Empty;
 
     // REAL transaction
     public Transaction? Transaction { get; set; }
@@ -62,7 +62,7 @@ public sealed class BudgetRow
             if (Transaction == null)
                 return string.Empty;
 
-            return Transaction.Confirm ?? string.Empty;
+            return Transaction.ConfirmationNumber ?? string.Empty;
         }
     }
 }

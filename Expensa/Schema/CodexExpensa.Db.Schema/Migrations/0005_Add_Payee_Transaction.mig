@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS Txn
     Amount REAL NOT NULL,
     StartDate TEXT NOT NULL, -- ISO yyyy-MM-dd
 
-    Confirm TEXT NULL,
+    ConfirmationNumber TEXT NULL,
     Note TEXT NULL,
 
     FOREIGN KEY (AccountId) REFERENCES Account (AccountId) ON DELETE CASCADE,

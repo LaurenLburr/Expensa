@@ -3,7 +3,6 @@ using CodexExpensa.Data.Sqlite.Db;
 using Microsoft.Data.Sqlite;
 using System;
 using System.Collections.Generic;
-using System.Data.Common;
 
 namespace CodexExpensa.Data.Sqlite.Transactions;
 
@@ -30,7 +29,7 @@ public sealed class SqliteTransactionRepository : ITransactionRepository
                 Status,
                 Amount,
                 StartDate,
-                Confirm,
+                ConfirmationNumber,
                 Note
             FROM Txn
             WHERE AccountId = @AccountId
@@ -59,7 +58,7 @@ public sealed class SqliteTransactionRepository : ITransactionRepository
                 Status,
                 Amount,
                 StartDate,
-                Confirm,
+                ConfirmationNumber,
                 Note
             )
             VALUES
@@ -69,7 +68,7 @@ public sealed class SqliteTransactionRepository : ITransactionRepository
                 @Status,
                 @Amount,
                 @StartDate,
-                @Confirm,
+                @ConfirmationNumber,
                 @Note
             );
             """;
@@ -78,10 +77,10 @@ public sealed class SqliteTransactionRepository : ITransactionRepository
         {
             new SqliteParameter("@AccountId", txn.AccountId),
             new SqliteParameter("@PayeeId", (object?)txn.PayeeId ?? DBNull.Value),
-            new SqliteParameter("@Status", (int)txn.Status),
+            new SqliteParameter("@Status", txn.Status.ToString()),
             new SqliteParameter("@Amount", txn.Amount),
             new SqliteParameter("@StartDate", txn.StartDate.ToString("yyyy-MM-dd")),
-            new SqliteParameter("@Confirm", (object?)txn.Confirm ?? DBNull.Value),
+            new SqliteParameter("@ConfirmationNumber", (object?)txn.ConfirmationNumber ?? DBNull.Value),
             new SqliteParameter("@Note", (object?)txn.Note ?? DBNull.Value),
         });
 
@@ -91,9 +90,9 @@ public sealed class SqliteTransactionRepository : ITransactionRepository
             """;
 
         IReadOnlyList<int> ids = _db.Query(
-    identitySql,
-    reader => Convert.ToInt32(reader.GetInt64(0)),
-    Array.Empty<SqliteParameter>());
+            identitySql,
+            reader => Convert.ToInt32(reader.GetInt64(0)),
+            Array.Empty<SqliteParameter>());
 
         if (ids.Count == 0 || ids[0] <= 0)
             throw new InvalidOperationException("Failed to retrieve TransactionId after insert.");
@@ -120,7 +119,7 @@ public sealed class SqliteTransactionRepository : ITransactionRepository
                 Status = @Status,
                 Amount = @Amount,
                 StartDate = @StartDate,
-                Confirm = @Confirm,
+                ConfirmationNumber = @ConfirmationNumber,
                 Note = @Note
             WHERE TransactionId = @TransactionId;
             """;
@@ -130,10 +129,10 @@ public sealed class SqliteTransactionRepository : ITransactionRepository
             new SqliteParameter("@TransactionId", txn.TransactionId),
             new SqliteParameter("@AccountId", txn.AccountId),
             new SqliteParameter("@PayeeId", (object?)txn.PayeeId ?? DBNull.Value),
-            new SqliteParameter("@Status", (int)txn.Status),
+            new SqliteParameter("@Status", txn.Status.ToString()),
             new SqliteParameter("@Amount", txn.Amount),
             new SqliteParameter("@StartDate", txn.StartDate.ToString("yyyy-MM-dd")),
-            new SqliteParameter("@Confirm", (object?)txn.Confirm ?? DBNull.Value),
+            new SqliteParameter("@ConfirmationNumber", (object?)txn.ConfirmationNumber ?? DBNull.Value),
             new SqliteParameter("@Note", (object?)txn.Note ?? DBNull.Value),
         });
     }
@@ -169,14 +168,14 @@ public sealed class SqliteTransactionRepository : ITransactionRepository
         int id = GetInt(reader, "TransactionId", 0);
         string accountId = GetRequiredString(reader, "AccountId");
         string? payeeId = GetNullableString(reader, "PayeeId");
-        int statusInt = GetInt(reader, "Status", (int)TransactionStatus.Outstanding);
+        string statusText = GetRequiredString(reader, "Status");
         decimal amount = GetDecimal(reader, "Amount", 0m);
         string startDateText = GetRequiredString(reader, "StartDate");
-        string? confirm = GetNullableString(reader, "Confirm");
+        string? confirmationNumber = GetNullableString(reader, "ConfirmationNumber");
         string? note = GetNullableString(reader, "Note");
 
-        if (!Enum.IsDefined(typeof(TransactionStatus), statusInt))
-            statusInt = (int)TransactionStatus.Outstanding;
+        if (!Enum.TryParse<TransactionStatus>(statusText, out TransactionStatus status))
+            status = TransactionStatus.Projected;
 
         if (!DateTime.TryParse(startDateText, out DateTime startDate))
             startDate = DateTime.Today;
@@ -185,10 +184,10 @@ public sealed class SqliteTransactionRepository : ITransactionRepository
         {
             AccountId = accountId,
             PayeeId = payeeId,
-            Status = (TransactionStatus)statusInt,
+            Status = status,
             Amount = amount,
             StartDate = startDate.Date,
-            Confirm = confirm,
+            ConfirmationNumber = confirmationNumber,
             Note = note
         };
 

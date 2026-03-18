@@ -990,14 +990,14 @@ public partial class MainForm : Form
             if (string.IsNullOrWhiteSpace(accountId))
                 return;
 
-            DialogResult confirm = MessageBox.Show(
+            DialogResult ConfirmationNumber = MessageBox.Show(
                 this,
                 "Delete this account?",
-                "Confirm",
+                "ConfirmationNumber",
                 MessageBoxButtons.YesNo,
                 MessageBoxIcon.Warning);
 
-            if (confirm != DialogResult.Yes)
+            if (ConfirmationNumber != DialogResult.Yes)
                 return;
 
             _accounts.Delete(accountId);
@@ -1021,14 +1021,14 @@ public partial class MainForm : Form
             if (string.IsNullOrWhiteSpace(payeeId))
                 return;
 
-            DialogResult confirm = MessageBox.Show(
+            DialogResult ConfirmationNumber = MessageBox.Show(
                 this,
                 "Delete this payee?",
-                "Confirm",
+                "ConfirmationNumber",
                 MessageBoxButtons.YesNo,
                 MessageBoxIcon.Warning);
 
-            if (confirm != DialogResult.Yes)
+            if (ConfirmationNumber != DialogResult.Yes)
                 return;
 
             _payees.Delete(payeeId);

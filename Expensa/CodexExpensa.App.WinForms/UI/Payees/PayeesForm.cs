@@ -106,10 +106,10 @@ public sealed class PayeesForm : Form
         if (_grid.CurrentRow?.DataBoundItem is not PayeeRow row)
             return;
 
-        var confirm = MessageBox.Show(this, $"Delete payee:\n\n{row.PayeeName}\n\nTransactions will keep the PayeeId NULL.",
+        var ConfirmationNumber = MessageBox.Show(this, $"Delete payee:\n\n{row.PayeeName}\n\nTransactions will keep the PayeeId NULL.",
             "Delete Payee", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
 
-        if (confirm != DialogResult.Yes)
+        if (ConfirmationNumber != DialogResult.Yes)
             return;
 
         _repo.Delete(row.PayeeId);

@@ -260,9 +260,9 @@ public sealed class AccountTransactionsPanel : UserControl
 
         _grid.Columns.Add(new DataGridViewTextBoxColumn
         {
-            Name = nameof(TransactionRow.Confirm),
-            HeaderText = "Confirm",
-            DataPropertyName = nameof(TransactionRow.Confirm),
+            Name = nameof(TransactionRow.ConfirmationNumber),
+            HeaderText = "Confirmation Number",
+            DataPropertyName = nameof(TransactionRow.ConfirmationNumber),
             Width = 110
         });
 
@@ -332,7 +332,7 @@ public sealed class AccountTransactionsPanel : UserControl
             Status = TransactionStatus.Outstanding,
             Amount = 0m,
             StartDate = DateTime.Today,
-            Confirm = string.Empty,
+            ConfirmationNumber = string.Empty,
             Note = string.Empty
         });
 
@@ -346,10 +346,10 @@ public sealed class AccountTransactionsPanel : UserControl
         if (_grid.CurrentRow?.DataBoundItem is not TransactionRow row)
             return;
 
-        DialogResult confirm = MessageBox.Show(this, "Delete selected transaction?", "Delete",
+        DialogResult ConfirmationNumber = MessageBox.Show(this, "Delete selected transaction?", "Delete",
             MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
 
-        if (confirm != DialogResult.Yes)
+        if (ConfirmationNumber != DialogResult.Yes)
             return;
 
         if (row.TransactionId <= 0)
@@ -455,7 +455,7 @@ public sealed class AccountTransactionsPanel : UserControl
 
         public DateTime StartDate { get; set; } = DateTime.Today;
 
-        public string? Confirm { get; set; }
+        public string? ConfirmationNumber { get; set; }
 
         public string? Note { get; set; }
 
@@ -468,7 +468,7 @@ public sealed class AccountTransactionsPanel : UserControl
                 Status = Status,
                 Amount = Amount,
                 StartDate = StartDate.Date,
-                Confirm = string.IsNullOrWhiteSpace(Confirm) ? null : Confirm,
+                ConfirmationNumber = string.IsNullOrWhiteSpace(ConfirmationNumber) ? null : ConfirmationNumber,
                 Note = string.IsNullOrWhiteSpace(Note) ? null : Note
             };
 
@@ -488,7 +488,7 @@ public sealed class AccountTransactionsPanel : UserControl
                 Status = t.Status,
                 Amount = t.Amount,
                 StartDate = t.StartDate.Date,
-                Confirm = t.Confirm,
+                ConfirmationNumber = t.ConfirmationNumber,
                 Note = t.Note
             };
         }

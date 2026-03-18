@@ -188,11 +188,11 @@ public sealed class BudgetMonthForm : Form
             UseColumnTextForLinkValue = false
         };
 
-        DataGridViewTextBoxColumn confirm = new()
+        DataGridViewTextBoxColumn ConfirmationNumber = new()
         {
-            Name = "Confirm",
+            Name = "ConfirmationNumber",
             DataPropertyName = nameof(BudgetRow.ConfirmDisplay),
-            HeaderText = "Confirm",
+            HeaderText = "Confirmation Number",
             Width = 220,
             ReadOnly = true
         };
@@ -209,7 +209,7 @@ public sealed class BudgetMonthForm : Form
         _grid.Columns.Add(account);
         _grid.Columns.Add(amount);
         _grid.Columns.Add(status);
-        _grid.Columns.Add(confirm);
+        _grid.Columns.Add(ConfirmationNumber);
         _grid.Columns.Add(transactionId);
 
         _grid.Columns["PayeeName"]!.DisplayIndex = 0;
@@ -242,7 +242,7 @@ public sealed class BudgetMonthForm : Form
                     ? r["AccountDisplayName"]?.ToString()
                     : null,
                 Group = string.Empty,
-                Confirm = string.Empty,
+                ConfirmationNumber = string.Empty,
                 TransactionId = null,
                 ActualAmount = null,
                 IsCleared = false,
@@ -258,8 +258,8 @@ public sealed class BudgetMonthForm : Form
             if (table.Columns.Contains("Group") && r["Group"] != DBNull.Value)
                 row.Group = r["Group"]?.ToString() ?? string.Empty;
 
-            if (table.Columns.Contains("Confirm") && r["Confirm"] != DBNull.Value)
-                row.Confirm = r["Confirm"]?.ToString() ?? string.Empty;
+            if (table.Columns.Contains("ConfirmationNumber") && r["ConfirmationNumber"] != DBNull.Value)
+                row.ConfirmationNumber = r["ConfirmationNumber"]?.ToString() ?? string.Empty;
 
             if (table.Columns.Contains("ActualAmount") && r["ActualAmount"] != DBNull.Value)
                 row.ActualAmount = Convert.ToDecimal(r["ActualAmount"]);
@@ -339,7 +339,7 @@ public sealed class BudgetMonthForm : Form
                     Status = row.Transaction.Status,
                     Amount = row.PlannedAmount,
                     StartDate = row.Transaction.StartDate,
-                    Confirm = row.Transaction.Confirm,
+                    ConfirmationNumber = row.Transaction.ConfirmationNumber,
                     Note = row.Transaction.Note
                 };
 
@@ -461,7 +461,7 @@ public sealed class BudgetMonthForm : Form
                 Status = TransactionStatus.Outstanding,
                 Amount = row.PlannedAmount,
                 StartDate = new DateTime(_year, _month, 1),
-                Confirm = $"UI dev outstanding {DateTime.Now:g}",
+                ConfirmationNumber = $"UI dev outstanding {DateTime.Now:g}",
                 Note = $"Created from BudgetMonthForm for {row.PayeeName}"
             };
 
@@ -486,7 +486,7 @@ public sealed class BudgetMonthForm : Form
                 Status = TransactionStatus.Cleared,
                 Amount = row.Transaction.Amount,
                 StartDate = row.Transaction.StartDate,
-                Confirm = $"UI dev cleared {DateTime.Now:g}",
+                ConfirmationNumber = $"UI dev cleared {DateTime.Now:g}",
                 Note = row.Transaction.Note
             };
 
@@ -695,7 +695,7 @@ public sealed class BudgetMonthForm : Form
             Status = transactionStatus,
             Amount = row.ActualAmount ?? row.PlannedAmount,
             StartDate = new DateTime(_year, _month, 1),
-            Confirm = row.Confirm,
+            ConfirmationNumber = row.ConfirmationNumber,
             Note = $"Loaded into BudgetMonthForm for {row.PayeeName}"
         };
 
@@ -711,7 +711,7 @@ public sealed class BudgetMonthForm : Form
         row.TransactionId = transaction.TransactionId == 0 ? row.TransactionId : transaction.TransactionId.ToString();
         row.ActualAmount = transaction.Amount;
         row.IsCleared = transaction.Status == TransactionStatus.Cleared;
-        row.Confirm = transaction.Confirm ?? string.Empty;
+        row.ConfirmationNumber = transaction.ConfirmationNumber ?? string.Empty;
     }
 
     private void ClearTransactionFromRow(BudgetRow row)
@@ -720,7 +720,7 @@ public sealed class BudgetMonthForm : Form
         row.TransactionId = null;
         row.ActualAmount = null;
         row.IsCleared = false;
-        row.Confirm = string.Empty;
+        row.ConfirmationNumber = string.Empty;
     }
 
     private static int ParseTransactionId(string? transactionId)

@@ -30,7 +30,7 @@ public sealed class DevTransactionRepository : ITransactionRepository
             Status = txn.Status,
             Amount = txn.Amount,
             StartDate = txn.StartDate,
-            Confirm = txn.Confirm,
+            ConfirmationNumber = txn.ConfirmationNumber,
             Note = txn.Note
         };
 
@@ -58,7 +58,7 @@ public sealed class DevTransactionRepository : ITransactionRepository
             Status = txn.Status,
             Amount = txn.Amount,
             StartDate = txn.StartDate,
-            Confirm = txn.Confirm,
+            ConfirmationNumber = txn.ConfirmationNumber,
             Note = txn.Note
         };
 

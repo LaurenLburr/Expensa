@@ -144,14 +144,14 @@ public sealed class BankCredentialsForm : Form
 
     private void ClearStored()
     {
-        var confirm = MessageBox.Show(
+        var ConfirmationNumber = MessageBox.Show(
             this,
             "Clear the stored username/password for this bank?",
             "Clear Stored",
             MessageBoxButtons.YesNo,
             MessageBoxIcon.Warning);
 
-        if (confirm != DialogResult.Yes)
+        if (ConfirmationNumber != DialogResult.Yes)
             return;
 
         try

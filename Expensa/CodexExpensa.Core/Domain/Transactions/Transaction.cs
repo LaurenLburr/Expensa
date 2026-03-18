@@ -16,7 +16,7 @@ public sealed class Transaction
 
     public required DateTime StartDate { get; init; }
 
-    public string? Confirm { get; set; }
+    public string? ConfirmationNumber { get; set; }
 
     public string? Note { get; set; }
 
