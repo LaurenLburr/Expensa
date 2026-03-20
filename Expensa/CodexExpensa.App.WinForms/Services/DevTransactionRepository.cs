@@ -1,9 +1,9 @@
-﻿using CodexExpensa.Core.Domain.Transactions;
+using CodexExpensa.Core.Domain.Transactions;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace CodexExpensa.App.WinForms.Services;
+namespace CodexExpensa.Core.Infrastructure;
 
 public sealed class DevTransactionRepository : ITransactionRepository
 {
@@ -14,7 +14,7 @@ public sealed class DevTransactionRepository : ITransactionRepository
     public IReadOnlyList<Transaction> GetByAccountId(string accountId)
     {
         return _transactions
-            .Where(t => t.AccountId == accountId)
+            .Where(t => string.Equals(t.AccountId, accountId, StringComparison.Ordinal))
             .ToList();
     }
 
@@ -23,22 +23,28 @@ public sealed class DevTransactionRepository : ITransactionRepository
         if (txn is null)
             throw new ArgumentNullException(nameof(txn));
 
-        Transaction stored = new()
-        {
-            AccountId = txn.AccountId,
-            PayeeId = txn.PayeeId,
-            Status = txn.Status,
-            Amount = txn.Amount,
-            StartDate = txn.StartDate,
-            ConfirmationNumber = txn.ConfirmationNumber,
-            Note = txn.Note
-        };
+        txn.SetTransactionId(_nextId++);
+        _transactions.Add(txn);
+    }
 
-        stored.SetTransactionId(_nextId++);
+    public void ChangeStatus(
+        int transactionId,
+        TransactionStatus newStatus,
+        TransactionChangeReason reasonCode,
+        string? reasonText,
+        string source)
+    {
+        if (transactionId <= 0)
+            throw new ArgumentException("transactionId must be > 0.", nameof(transactionId));
 
-        _transactions.Add(stored);
+        if (string.IsNullOrWhiteSpace(source))
+            throw new ArgumentException("source is required.", nameof(source));
 
-        txn.SetTransactionId(stored.TransactionId);
+        Transaction txn = _transactions
+            .FirstOrDefault(t => t.TransactionId == transactionId)
+            ?? throw new InvalidOperationException($"Transaction {transactionId} was not found.");
+
+        txn.Status = newStatus;
     }
 
     public void Update(Transaction txn)
@@ -49,22 +55,9 @@ public sealed class DevTransactionRepository : ITransactionRepository
         int index = _transactions.FindIndex(t => t.TransactionId == txn.TransactionId);
 
         if (index < 0)
-            return;
+            throw new InvalidOperationException("Transaction not found.");
 
-        Transaction stored = new()
-        {
-            AccountId = txn.AccountId,
-            PayeeId = txn.PayeeId,
-            Status = txn.Status,
-            Amount = txn.Amount,
-            StartDate = txn.StartDate,
-            ConfirmationNumber = txn.ConfirmationNumber,
-            Note = txn.Note
-        };
-
-        stored.SetTransactionId(txn.TransactionId);
-
-        _transactions[index] = stored;
+        _transactions[index] = txn;
     }
 
     public void Delete(int transactionId)

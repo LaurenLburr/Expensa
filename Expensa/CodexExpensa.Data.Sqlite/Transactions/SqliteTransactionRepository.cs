@@ -1,4 +1,4 @@
-﻿using CodexExpensa.Core.Domain.Transactions;
+using CodexExpensa.Core.Domain.Transactions;
 using CodexExpensa.Data.Sqlite.Db;
 using Microsoft.Data.Sqlite;
 using System;
@@ -137,6 +137,135 @@ public sealed class SqliteTransactionRepository : ITransactionRepository
         });
     }
 
+    public void ChangeStatus(
+        int transactionId,
+        TransactionStatus newStatus,
+        TransactionChangeReason reasonCode,
+        string? reasonText,
+        string source)
+    {
+        if (transactionId <= 0)
+            throw new ArgumentException("transactionId must be > 0.", nameof(transactionId));
+
+        if (string.IsNullOrWhiteSpace(source))
+            throw new ArgumentException("source is required.", nameof(source));
+
+        const string getCurrentSql =
+            """
+            SELECT
+                TransactionId,
+                AccountId,
+                PayeeId,
+                Status,
+                Amount,
+                StartDate,
+                ConfirmationNumber,
+                Note
+            FROM Txn
+            WHERE TransactionId = @TransactionId;
+            """;
+
+        IReadOnlyList<Transaction> rows = _db.Query(
+            getCurrentSql,
+            MapTxn,
+            new[] { new SqliteParameter("@TransactionId", transactionId) });
+
+        if (rows.Count == 0)
+            throw new InvalidOperationException($"Transaction {transactionId} was not found.");
+
+        Transaction existing = rows[0];
+        TransactionStatus oldStatus = existing.Status;
+
+        if (oldStatus == newStatus)
+            return;
+
+        if (!TransactionStatusRules.IsValidTransition(oldStatus, newStatus))
+        {
+            throw new InvalidOperationException(
+                $"Invalid status transition from {oldStatus} to {newStatus}.");
+        }
+
+        const string updateSql =
+            """
+            UPDATE Txn
+            SET
+                Status = @Status
+            WHERE TransactionId = @TransactionId;
+            """;
+
+        _db.ExecuteNonQuery(updateSql, new[]
+        {
+            new SqliteParameter("@TransactionId", transactionId),
+            new SqliteParameter("@Status", newStatus.ToString())
+        });
+
+        const string logSql =
+            """
+            INSERT INTO TxnStatusLog
+            (
+                TransactionId,
+                OldStatus,
+                NewStatus,
+                ReasonCode,
+                ReasonText,
+                ChangedUtc,
+                ChangedBy,
+                Source
+            )
+            VALUES
+            (
+                @TransactionId,
+                @OldStatus,
+                @NewStatus,
+                @ReasonCode,
+                @ReasonText,
+                @ChangedUtc,
+                @ChangedBy,
+                @Source
+            );
+            """;
+
+        _db.ExecuteNonQuery(logSql, new[]
+        {
+            new SqliteParameter("@TransactionId", transactionId),
+            new SqliteParameter("@OldStatus", oldStatus.ToString()),
+            new SqliteParameter("@NewStatus", newStatus.ToString()),
+            new SqliteParameter("@ReasonCode", reasonCode.ToString()),
+            new SqliteParameter("@ReasonText", (object?)reasonText ?? DBNull.Value),
+            new SqliteParameter("@ChangedUtc", DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss")),
+            new SqliteParameter("@ChangedBy", DBNull.Value),
+            new SqliteParameter("@Source", source)
+        });
+    }
+
+    public IReadOnlyList<TxnStatusLog> GetStatusHistory(int transactionId)
+    {
+        if (transactionId <= 0)
+            throw new ArgumentException("transactionId must be > 0.", nameof(transactionId));
+
+        const string sql =
+            """
+            SELECT
+                TxnStatusLogId,
+                TransactionId,
+                OldStatus,
+                NewStatus,
+                ReasonCode,
+                ReasonText,
+                ChangedUtc,
+                ChangedBy,
+                Source
+            FROM TxnStatusLog
+            WHERE TransactionId = @TransactionId
+            ORDER BY ChangedUtc DESC, TxnStatusLogId DESC;
+            """;
+
+        return _db.Query(
+            sql,
+            MapStatusLog,
+            new[] { new SqliteParameter("@TransactionId", transactionId) });
+    }
+
     public void Delete(int transactionId)
     {
         if (transactionId <= 0)
@@ -174,7 +303,7 @@ public sealed class SqliteTransactionRepository : ITransactionRepository
         string? confirmationNumber = GetNullableString(reader, "ConfirmationNumber");
         string? note = GetNullableString(reader, "Note");
 
-        if (!Enum.TryParse<TransactionStatus>(statusText, out TransactionStatus status))
+        if (!Enum.TryParse(statusText, out TransactionStatus status))
             status = TransactionStatus.Projected;
 
         if (!DateTime.TryParse(startDateText, out DateTime startDate))
@@ -195,6 +324,35 @@ public sealed class SqliteTransactionRepository : ITransactionRepository
             txn.SetTransactionId(id);
 
         return txn;
+    }
+
+    private static TxnStatusLog MapStatusLog(SqliteDataReader reader)
+    {
+        int id = GetInt(reader, "TxnStatusLogId", 0);
+        int transactionId = GetInt(reader, "TransactionId", 0);
+        string? oldStatus = GetNullableString(reader, "OldStatus");
+        string newStatus = GetRequiredString(reader, "NewStatus");
+        string reasonCode = GetRequiredString(reader, "ReasonCode");
+        string? reasonText = GetNullableString(reader, "ReasonText");
+        string changedUtcText = GetRequiredString(reader, "ChangedUtc");
+        string? changedBy = GetNullableString(reader, "ChangedBy");
+        string? source = GetNullableString(reader, "Source");
+
+        if (!DateTime.TryParse(changedUtcText, out DateTime changedUtc))
+            changedUtc = DateTime.UtcNow;
+
+        return new TxnStatusLog
+        {
+            TxnStatusLogId = id,
+            TransactionId = transactionId,
+            OldStatus = oldStatus,
+            NewStatus = newStatus,
+            ReasonCode = reasonCode,
+            ReasonText = reasonText,
+            ChangedUtc = changedUtc,
+            ChangedBy = changedBy,
+            Source = source
+        };
     }
 
     private static string GetRequiredString(SqliteDataReader reader, string columnName)

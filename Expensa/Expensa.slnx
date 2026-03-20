@@ -5,6 +5,7 @@
     <File Path="ChatGpt/Expensa_3.md" />
     <File Path="Directory.Build.props" />
   </Folder>
+  <Project Path="Codex.Data.SQLiteEngine/Codex.Data.SQLiteEngine.csproj" />
   <Project Path="CodexExpensa.App.WinForms/CodexExpensa.App.WinForms.csproj" />
   <Project Path="CodexExpensa.Core/CodexExpensa.Core.csproj" />
   <Project Path="CodexExpensa.Data.Sqlite/CodexExpensa.Data.Sqlite.csproj" />

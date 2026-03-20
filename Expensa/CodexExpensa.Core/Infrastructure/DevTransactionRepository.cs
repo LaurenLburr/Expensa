@@ -5,7 +5,7 @@ using System.Linq;
 
 namespace CodexExpensa.Core.Infrastructure;
 
-public sealed class InMemoryTransactionRepository : ITransactionRepository
+public sealed class DevTransactionRepository : ITransactionRepository
 {
     private readonly List<Transaction> _transactions = new();
     private readonly List<TxnStatusLog> _statusLogs = new();
@@ -25,22 +25,8 @@ public sealed class InMemoryTransactionRepository : ITransactionRepository
         if (txn is null)
             throw new ArgumentNullException(nameof(txn));
 
-        Transaction stored = new()
-        {
-            AccountId = txn.AccountId,
-            PayeeId = txn.PayeeId,
-            Status = txn.Status,
-            Amount = txn.Amount,
-            StartDate = txn.StartDate,
-            ConfirmationNumber = txn.ConfirmationNumber,
-            Note = txn.Note
-        };
-
-        stored.SetTransactionId(_nextId++);
-
-        _transactions.Add(stored);
-
-        txn.SetTransactionId(stored.TransactionId);
+        txn.SetTransactionId(_nextId++);
+        _transactions.Add(txn);
     }
 
     public void ChangeStatus(
@@ -57,7 +43,7 @@ public sealed class InMemoryTransactionRepository : ITransactionRepository
             throw new ArgumentException("source is required.", nameof(source));
 
         Transaction txn = _transactions
-            .SingleOrDefault(t => t.TransactionId == transactionId)
+            .FirstOrDefault(t => t.TransactionId == transactionId)
             ?? throw new InvalidOperationException($"Transaction {transactionId} was not found.");
 
         if (txn.Status == newStatus)
@@ -108,20 +94,7 @@ public sealed class InMemoryTransactionRepository : ITransactionRepository
         if (index < 0)
             throw new InvalidOperationException("Transaction not found.");
 
-        Transaction stored = new()
-        {
-            AccountId = txn.AccountId,
-            PayeeId = txn.PayeeId,
-            Status = txn.Status,
-            Amount = txn.Amount,
-            StartDate = txn.StartDate,
-            ConfirmationNumber = txn.ConfirmationNumber,
-            Note = txn.Note
-        };
-
-        stored.SetTransactionId(txn.TransactionId);
-
-        _transactions[index] = stored;
+        _transactions[index] = txn;
     }
 
     public void Delete(int transactionId)

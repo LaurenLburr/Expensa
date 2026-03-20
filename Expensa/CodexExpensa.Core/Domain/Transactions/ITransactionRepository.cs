@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 
 namespace CodexExpensa.Core.Domain.Transactions;
 
@@ -9,6 +9,15 @@ public interface ITransactionRepository
     void Add(Transaction txn);
 
     void Update(Transaction txn);
+
+    void ChangeStatus(
+        int transactionId,
+        TransactionStatus newStatus,
+        TransactionChangeReason reasonCode,
+        string? reasonText,
+        string source);
+
+    IReadOnlyList<TxnStatusLog> GetStatusHistory(int transactionId);
 
     void Delete(int transactionId);
 }

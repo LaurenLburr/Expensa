@@ -1,9 +1,10 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using System.Data;
 using System.Data.Common;
 using System.Reflection;
 using System.Windows.Forms.VisualStyles;
 using CodexExpensa.App.WinForms.Services;
+using CodexExpensa.App.WinForms.UI.Transactions;
 using CodexExpensa.Core.Abstractions;
 using CodexExpensa.Core.Domain.Transactions;
 using Microsoft.Data.Sqlite;
@@ -28,7 +29,8 @@ public sealed class BudgetMonthForm : Form
     private readonly Panel _gridHost;
     private readonly DataGridView _grid;
     private readonly ContextMenuStrip _payeeContextMenu;
-    private readonly ToolStripMenuItem _fixEntryMenuItem;
+    private readonly ToolStripMenuItem _changeStatusMenuItem;
+    private readonly ToolStripMenuItem _viewStatusHistoryMenuItem;
 
     private BindingList<BudgetRow> _rows = new();
 
@@ -89,9 +91,15 @@ public sealed class BudgetMonthForm : Form
         _grid.ColumnWidthChanged += Grid_LayoutChanged;
 
         _payeeContextMenu = new ContextMenuStrip();
-        _fixEntryMenuItem = new ToolStripMenuItem("Fix Entry...");
-        _fixEntryMenuItem.Click += FixEntryMenuItem_Click;
-        _payeeContextMenu.Items.Add(_fixEntryMenuItem);
+
+        _changeStatusMenuItem = new ToolStripMenuItem("Change Status...");
+        _changeStatusMenuItem.Click += ChangeStatusMenuItem_Click;
+
+        _viewStatusHistoryMenuItem = new ToolStripMenuItem("View Status History...");
+        _viewStatusHistoryMenuItem.Click += ViewStatusHistoryMenuItem_Click;
+
+        _payeeContextMenu.Items.Add(_changeStatusMenuItem);
+        _payeeContextMenu.Items.Add(_viewStatusHistoryMenuItem);
 
         _gridHost.Controls.Add(_grid);
 
@@ -188,7 +196,7 @@ public sealed class BudgetMonthForm : Form
             UseColumnTextForLinkValue = false
         };
 
-        DataGridViewTextBoxColumn ConfirmationNumber = new()
+        DataGridViewTextBoxColumn confirmationNumber = new()
         {
             Name = "ConfirmationNumber",
             DataPropertyName = nameof(BudgetRow.ConfirmDisplay),
@@ -209,7 +217,7 @@ public sealed class BudgetMonthForm : Form
         _grid.Columns.Add(account);
         _grid.Columns.Add(amount);
         _grid.Columns.Add(status);
-        _grid.Columns.Add(ConfirmationNumber);
+        _grid.Columns.Add(confirmationNumber);
         _grid.Columns.Add(transactionId);
 
         _grid.Columns["PayeeName"]!.DisplayIndex = 0;
@@ -264,8 +272,8 @@ public sealed class BudgetMonthForm : Form
             if (table.Columns.Contains("ActualAmount") && r["ActualAmount"] != DBNull.Value)
                 row.ActualAmount = Convert.ToDecimal(r["ActualAmount"]);
 
-            if (!string.IsNullOrWhiteSpace(row.TransactionId) && int.TryParse(row.TransactionId, out int transactionId))
-                row.Transaction = CreateTransactionFromRow(row, transactionId);
+            if (!string.IsNullOrWhiteSpace(row.TransactionId) && int.TryParse(row.TransactionId, out int transactionIdValue))
+                row.Transaction = CreateTransactionFromRow(row, transactionIdValue);
 
             list.Add(row);
         }
@@ -479,32 +487,22 @@ public sealed class BudgetMonthForm : Form
             if (row.Transaction is null)
                 return;
 
-            Transaction transaction = new()
-            {
-                AccountId = row.Transaction.AccountId,
-                PayeeId = row.Transaction.PayeeId,
-                Status = TransactionStatus.Cleared,
-                Amount = row.Transaction.Amount,
-                StartDate = row.Transaction.StartDate,
-                ConfirmationNumber = $"UI dev cleared {DateTime.Now:g}",
-                Note = row.Transaction.Note
-            };
+            _transactions.ChangeStatus(
+                row.Transaction.TransactionId,
+                TransactionStatus.Cleared,
+                TransactionChangeReason.ManualCorrection,
+                "Marked cleared from BudgetMonthForm status link.",
+                "BudgetMonthForm");
 
-            if (row.Transaction.TransactionId > 0)
-                transaction.SetTransactionId(row.Transaction.TransactionId);
-
-            _transactions.Update(transaction);
-            ApplyTransactionToRow(row, transaction);
+            row.Transaction.Status = TransactionStatus.Cleared;
+            ApplyTransactionToRow(row, row.Transaction);
             return;
         }
 
-        if (string.Equals(status, "Cleared", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(status, "Cleared", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(status, "Invalid", StringComparison.OrdinalIgnoreCase))
         {
-            if (row.Transaction is null)
-                return;
-
-            _transactions.Delete(row.Transaction.TransactionId);
-            ClearTransactionFromRow(row);
+            ShowChangeStatusDialog(row);
         }
     }
 
@@ -514,7 +512,7 @@ public sealed class BudgetMonthForm : Form
             return;
 
         DataGridViewColumn? clickedColumn = _grid.Columns[e.ColumnIndex];
-        if (clickedColumn is null || clickedColumn.Name != "PayeeName")
+        if (clickedColumn is null || (clickedColumn.Name != "PayeeName" && clickedColumn.Name != "Status"))
             return;
 
         BudgetRow? row = _grid.Rows[e.RowIndex].DataBoundItem as BudgetRow;
@@ -524,31 +522,105 @@ public sealed class BudgetMonthForm : Form
         _contextTransactionId = row.TransactionId;
         _contextPayeeName = row.PayeeName;
 
-        _fixEntryMenuItem.Enabled = !string.IsNullOrWhiteSpace(_contextTransactionId);
+        bool hasTransaction = !string.IsNullOrWhiteSpace(_contextTransactionId);
+
+        _changeStatusMenuItem.Enabled = hasTransaction;
+        _viewStatusHistoryMenuItem.Enabled = hasTransaction;
 
         Point screenPoint = _grid.PointToScreen(new Point(e.X, e.Y));
         _payeeContextMenu.Show(screenPoint);
     }
 
-    private void FixEntryMenuItem_Click(object? sender, EventArgs e)
+    private void ChangeStatusMenuItem_Click(object? sender, EventArgs e)
     {
-        if (string.IsNullOrWhiteSpace(_contextTransactionId))
+        if (!TryGetContextRow(out BudgetRow? row))
+            return;
+
+        ShowChangeStatusDialog(row);
+    }
+
+    private void ViewStatusHistoryMenuItem_Click(object? sender, EventArgs e)
+    {
+        if (!TryGetContextRow(out BudgetRow? row))
+            return;
+
+        if (row.Transaction is null)
         {
             MessageBox.Show(
                 this,
                 "No transaction exists for this row.",
-                "Fix Entry",
+                "View Status History",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Information);
             return;
         }
 
-        MessageBox.Show(
-            this,
-            $"TODO: Fix entry for {_contextPayeeName}",
-            "Fix Entry",
-            MessageBoxButtons.OK,
-            MessageBoxIcon.Information);
+        IReadOnlyList<TxnStatusLog> history = _transactions.GetStatusHistory(row.Transaction.TransactionId);
+
+        using TransactionStatusHistoryForm form = new(
+            row.Transaction.TransactionId,
+            row.PayeeName,
+            history);
+
+        form.ShowDialog(this);
+    }
+
+    private bool TryGetContextRow(out BudgetRow? row)
+    {
+        row = null;
+
+        if (string.IsNullOrWhiteSpace(_contextTransactionId))
+        {
+            MessageBox.Show(
+                this,
+                "No transaction exists for this row.",
+                "Transaction",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
+            return false;
+        }
+
+        row = _rows.FirstOrDefault(r => string.Equals(r.TransactionId, _contextTransactionId, StringComparison.Ordinal));
+
+        if (row is null || row.Transaction is null)
+        {
+            MessageBox.Show(
+                this,
+                "The selected transaction could not be found.",
+                "Transaction",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Warning);
+            return false;
+        }
+
+        return true;
+    }
+
+    private void ShowChangeStatusDialog(BudgetRow row)
+    {
+        if (row.Transaction is null)
+            return;
+
+        using ChangeTransactionStatusForm form = new(row.Transaction.Status);
+
+        if (form.ShowDialog(this) != DialogResult.OK)
+            return;
+
+        _transactions.ChangeStatus(
+            row.Transaction.TransactionId,
+            form.SelectedStatus,
+            form.SelectedReason,
+            form.ReasonText,
+            "BudgetMonthForm");
+
+        row.Transaction.Status = form.SelectedStatus;
+        ApplyTransactionToRow(row, row.Transaction);
+
+        int rowIndex = _rows.IndexOf(row);
+        if (rowIndex >= 0)
+            _rows.ResetItem(rowIndex);
+
+        _grid.Invalidate();
     }
 
     private void Grid_CellPainting(object? sender, DataGridViewCellPaintingEventArgs e)
@@ -649,6 +721,12 @@ public sealed class BudgetMonthForm : Form
             return;
         }
 
+        if (string.Equals(status, "Invalid", StringComparison.OrdinalIgnoreCase))
+        {
+            gridRow.DefaultCellStyle.BackColor = Color.LightGray;
+            return;
+        }
+
         if (string.Equals(row.AccountId, "4", StringComparison.OrdinalIgnoreCase))
         {
             gridRow.DefaultCellStyle.BackColor = Color.LightCyan;
@@ -712,15 +790,6 @@ public sealed class BudgetMonthForm : Form
         row.ActualAmount = transaction.Amount;
         row.IsCleared = transaction.Status == TransactionStatus.Cleared;
         row.ConfirmationNumber = transaction.ConfirmationNumber ?? string.Empty;
-    }
-
-    private void ClearTransactionFromRow(BudgetRow row)
-    {
-        row.Transaction = null;
-        row.TransactionId = null;
-        row.ActualAmount = null;
-        row.IsCleared = false;
-        row.ConfirmationNumber = string.Empty;
     }
 
     private static int ParseTransactionId(string? transactionId)

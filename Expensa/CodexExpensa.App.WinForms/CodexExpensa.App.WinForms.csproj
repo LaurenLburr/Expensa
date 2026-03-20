@@ -11,6 +11,7 @@
 
 	<ItemGroup>
 	  <Compile Remove="Abstractions\IDatabaseSession.cs" />
+	  <Compile Remove="Services\DevTransactionRepository.cs" />
 	</ItemGroup>
 
 	<ItemGroup>
