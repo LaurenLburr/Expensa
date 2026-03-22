@@ -1,4 +1,3 @@
-﻿using System;
 using CodexExpensa.Core.Abstractions;
 using Microsoft.Data.Sqlite;
 
@@ -17,18 +16,15 @@ public sealed class SqliteCommandFactory : ISqliteCommandFactory
         _sqlQueryProvider = sqlQueryProvider ?? throw new ArgumentNullException(nameof(sqlQueryProvider));
     }
 
-    public SqliteCommand Create(string queryName, SqliteTransaction? transaction = null)
+    public SqliteCommand Create(string queryName)
     {
         if (string.IsNullOrWhiteSpace(queryName))
-        {
             throw new ArgumentException("Query name is required.", nameof(queryName));
-        }
 
         string sql = _sqlQueryProvider.GetSql(queryName);
 
         SqliteCommand command = _connection.CreateCommand();
         command.CommandText = sql;
-        command.Transaction = transaction;
 
         return command;
     }

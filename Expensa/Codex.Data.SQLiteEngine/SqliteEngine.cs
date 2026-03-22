@@ -1,417 +1,268 @@
-using Microsoft.Data.Sqlite;
 using System.Data;
+using Codex.Data.SQLiteEngine.Abstractions;
+using EngineConfig = Codex.Data.SQLiteEngine.Configuration;
+using Microsoft.Data.Sqlite;
 
 namespace Codex.Data.SQLiteEngine;
 
-public sealed class SqliteEngine : ISqliteEngine, IDisposable
+public sealed class SqliteEngine : IDisposable
 {
-    private readonly string? _connectionString;
-    private readonly SqliteEngineOptions _options;
-    private readonly object _syncRoot = new();
-    private readonly bool _ownsProvidedConnection;
-
-    private SqliteConnection? _sharedConnection;
+    private readonly SqliteConnection _connection;
+    private readonly bool _ownsConnection;
+    private readonly ISqlCatalog? _sqlCatalog;
+    private readonly ICommandLogger? _commandLogger;
+    private readonly EngineConfig.SqliteEngineOptions? _options;
     private bool _disposed;
 
-    public event EventHandler<SqliteCommandEventArgs>? CommandExecuting;
-
-    public event EventHandler<SqliteCommandEventArgs>? CommandExecuted;
-
-    public event EventHandler<SqliteCommandEventArgs>? CommandFailed;
-
-    public event EventHandler<SqliteTransactionEventArgs>? TransactionBegan;
-
-    public event EventHandler<SqliteTransactionEventArgs>? TransactionCommitted;
-
-    public event EventHandler<SqliteTransactionEventArgs>? TransactionRolledBack;
-
-    public event EventHandler<SqliteTransactionEventArgs>? TransactionFailed;
-
-    public SqliteEngine(string connectionString)
-        : this(connectionString, new SqliteEngineOptions())
+    public SqliteEngine(
+        SqliteConnection connection,
+        bool ownsConnection = false,
+        ISqlCatalog? sqlCatalog = null,
+        ICommandLogger? commandLogger = null,
+        EngineConfig.SqliteEngineOptions? options = null)
     {
+        _connection = connection ?? throw new ArgumentNullException(nameof(connection));
+        _ownsConnection = ownsConnection;
+        _sqlCatalog = sqlCatalog;
+        _commandLogger = commandLogger;
+        _options = options;
     }
 
-    public SqliteEngine(string connectionString, SqliteEngineOptions options)
-    {
-        if (string.IsNullOrWhiteSpace(connectionString))
-            throw new ArgumentException("connectionString is required.", nameof(connectionString));
-
-        _connectionString = connectionString;
-        _options = options ?? throw new ArgumentNullException(nameof(options));
-    }
-
-    public SqliteEngine(SqliteConnection connection, bool ownsConnection = false)
-    {
-        _sharedConnection = connection ?? throw new ArgumentNullException(nameof(connection));
-        _ownsProvidedConnection = ownsConnection;
-        _options = new SqliteEngineOptions
-        {
-            UseSingleSharedConnection = true
-        };
-
-        if (_sharedConnection.State != ConnectionState.Open)
-            _sharedConnection.Open();
-    }
-
-    public int ExecuteNonQuery(string sql, IReadOnlyList<SqliteParameter>? parameters = null, string? queryName = null)
+    public int ExecuteNonQuery(string sql, IEnumerable<SqliteParameter>? parameters = null, string? queryName = null)
     {
         ThrowIfDisposed();
-        ValidateSql(sql);
 
-        DateTime startedUtc = DateTime.UtcNow;
-        IReadOnlyList<SqliteParameterSnapshot> snapshot = CreateSnapshot(parameters);
+        if (string.IsNullOrWhiteSpace(sql))
+            throw new ArgumentException("sql is required.", nameof(sql));
 
-        RaiseCommandExecuting(queryName, sql, snapshot, startedUtc, false, null);
+        using SqliteCommand cmd = _connection.CreateCommand();
+        cmd.CommandText = sql;
+        AddParameters(cmd, parameters);
 
         try
         {
-            SqliteConnection connection = GetConnectionForCommand(out bool ownsConnection);
-
-            try
-            {
-                using SqliteCommand command = CreateCommand(connection, null, sql, parameters);
-                int rowsAffected = command.ExecuteNonQuery();
-                RaiseCommandExecuted(queryName, sql, snapshot, startedUtc, rowsAffected, null, false, null);
-                return rowsAffected;
-            }
-            finally
-            {
-                if (ownsConnection)
-                    connection.Dispose();
-            }
+            int rows = cmd.ExecuteNonQuery();
+            Log("ExecuteNonQuery", BuildDetails(queryName, sql, rows));
+            return rows;
         }
         catch (Exception ex)
         {
-            RaiseCommandFailed(queryName, sql, snapshot, startedUtc, ex, false, null);
+            Log("ExecuteNonQueryFailed", BuildDetails(queryName, sql, error: ex.Message));
             throw;
         }
     }
 
-    public T? ExecuteScalar<T>(string sql, IReadOnlyList<SqliteParameter>? parameters = null, string? queryName = null)
+    public int ExecuteNamedNonQuery(string queryName, IEnumerable<SqliteParameter>? parameters = null)
     {
         ThrowIfDisposed();
-        ValidateSql(sql);
 
-        DateTime startedUtc = DateTime.UtcNow;
-        IReadOnlyList<SqliteParameterSnapshot> snapshot = CreateSnapshot(parameters);
+        if (string.IsNullOrWhiteSpace(queryName))
+            throw new ArgumentException("queryName is required.", nameof(queryName));
 
-        RaiseCommandExecuting(queryName, sql, snapshot, startedUtc, false, null);
-
-        try
-        {
-            SqliteConnection connection = GetConnectionForCommand(out bool ownsConnection);
-
-            try
-            {
-                using SqliteCommand command = CreateCommand(connection, null, sql, parameters);
-                object? rawResult = command.ExecuteScalar();
-                T? result = ConvertScalar<T>(rawResult);
-
-                RaiseCommandExecuted(queryName, sql, snapshot, startedUtc, null, rawResult, false, null);
-                return result;
-            }
-            finally
-            {
-                if (ownsConnection)
-                    connection.Dispose();
-            }
-        }
-        catch (Exception ex)
-        {
-            RaiseCommandFailed(queryName, sql, snapshot, startedUtc, ex, false, null);
-            throw;
-        }
+        string sql = ResolveSql(queryName, tx: null);
+        return ExecuteNonQuery(sql, parameters, queryName);
     }
 
-    public IReadOnlyList<T> Query<T>(
-        string sql,
-        Func<SqliteDataReader, T> map,
-        IReadOnlyList<SqliteParameter>? parameters = null,
-        string? queryName = null)
+    public IReadOnlyList<T> Query<T>(string sql, Func<SqliteDataReader, T> map, IEnumerable<SqliteParameter>? parameters = null, string? queryName = null)
     {
         ThrowIfDisposed();
-        ValidateSql(sql);
 
+        if (string.IsNullOrWhiteSpace(sql))
+            throw new ArgumentException("sql is required.", nameof(sql));
         if (map is null)
             throw new ArgumentNullException(nameof(map));
 
-        DateTime startedUtc = DateTime.UtcNow;
-        IReadOnlyList<SqliteParameterSnapshot> snapshot = CreateSnapshot(parameters);
-
-        RaiseCommandExecuting(queryName, sql, snapshot, startedUtc, false, null);
-
-        try
-        {
-            SqliteConnection connection = GetConnectionForCommand(out bool ownsConnection);
-
-            try
-            {
-                using SqliteCommand command = CreateCommand(connection, null, sql, parameters);
-                using SqliteDataReader reader = command.ExecuteReader();
-
-                List<T> results = new();
-
-                while (reader.Read())
-                    results.Add(map(reader));
-
-                RaiseCommandExecuted(queryName, sql, snapshot, startedUtc, results.Count, null, false, null);
-                return results;
-            }
-            finally
-            {
-                if (ownsConnection)
-                    connection.Dispose();
-            }
-        }
-        catch (Exception ex)
-        {
-            RaiseCommandFailed(queryName, sql, snapshot, startedUtc, ex, false, null);
-            throw;
-        }
-    }
-
-    public DataTable QueryDataTable(
-        string sql,
-        IReadOnlyList<SqliteParameter>? parameters = null,
-        string? queryName = null)
-    {
-        ThrowIfDisposed();
-        ValidateSql(sql);
-
-        DateTime startedUtc = DateTime.UtcNow;
-        IReadOnlyList<SqliteParameterSnapshot> snapshot = CreateSnapshot(parameters);
-
-        RaiseCommandExecuting(queryName, sql, snapshot, startedUtc, false, null);
+        using SqliteCommand cmd = _connection.CreateCommand();
+        cmd.CommandText = sql;
+        AddParameters(cmd, parameters);
 
         try
         {
-            SqliteConnection connection = GetConnectionForCommand(out bool ownsConnection);
-
-            try
-            {
-                using SqliteCommand command = CreateCommand(connection, null, sql, parameters);
-                using SqliteDataReader reader = command.ExecuteReader();
-
-                DataTable table = new();
-                table.Load(reader);
-
-                RaiseCommandExecuted(queryName, sql, snapshot, startedUtc, table.Rows.Count, null, false, null);
-                return table;
-            }
-            finally
-            {
-                if (ownsConnection)
-                    connection.Dispose();
-            }
-        }
-        catch (Exception ex)
-        {
-            RaiseCommandFailed(queryName, sql, snapshot, startedUtc, ex, false, null);
-            throw;
-        }
-    }
-
-    public ISqliteTransactionScope BeginTransaction(IsolationLevel isolationLevel = IsolationLevel.Serializable)
-    {
-        ThrowIfDisposed();
-
-        DateTime startedUtc = DateTime.UtcNow;
-
-        try
-        {
-            SqliteConnection connection;
-            bool ownsConnection;
-
-            if (_options.UseSingleSharedConnection || _sharedConnection is not null)
-            {
-                connection = GetOrCreateSharedConnection();
-                ownsConnection = false;
-            }
-            else
-            {
-                connection = CreateOpenConnection();
-                ownsConnection = true;
-            }
-
-            SqliteTransaction transaction = connection.BeginTransaction(isolationLevel);
-            Guid transactionId = Guid.NewGuid();
-
-            RaiseTransactionBegan(transactionId, startedUtc);
-
-            return new SqliteTransactionScope(this, connection, transaction, transactionId, startedUtc, ownsConnection);
-        }
-        catch (Exception ex)
-        {
-            RaiseTransactionFailed(Guid.NewGuid(), startedUtc, ex);
-            throw;
-        }
-    }
-
-    internal int ExecuteNonQueryInTransaction(
-        SqliteConnection connection,
-        SqliteTransaction transaction,
-        Guid transactionId,
-        string sql,
-        IReadOnlyList<SqliteParameter>? parameters = null,
-        string? queryName = null)
-    {
-        ThrowIfDisposed();
-        ValidateSql(sql);
-
-        DateTime startedUtc = DateTime.UtcNow;
-        IReadOnlyList<SqliteParameterSnapshot> snapshot = CreateSnapshot(parameters);
-
-        RaiseCommandExecuting(queryName, sql, snapshot, startedUtc, true, transactionId);
-
-        try
-        {
-            using SqliteCommand command = CreateCommand(connection, transaction, sql, parameters);
-            int rowsAffected = command.ExecuteNonQuery();
-            RaiseCommandExecuted(queryName, sql, snapshot, startedUtc, rowsAffected, null, true, transactionId);
-            return rowsAffected;
-        }
-        catch (Exception ex)
-        {
-            RaiseCommandFailed(queryName, sql, snapshot, startedUtc, ex, true, transactionId);
-            throw;
-        }
-    }
-
-    internal T? ExecuteScalarInTransaction<T>(
-        SqliteConnection connection,
-        SqliteTransaction transaction,
-        Guid transactionId,
-        string sql,
-        IReadOnlyList<SqliteParameter>? parameters = null,
-        string? queryName = null)
-    {
-        ThrowIfDisposed();
-        ValidateSql(sql);
-
-        DateTime startedUtc = DateTime.UtcNow;
-        IReadOnlyList<SqliteParameterSnapshot> snapshot = CreateSnapshot(parameters);
-
-        RaiseCommandExecuting(queryName, sql, snapshot, startedUtc, true, transactionId);
-
-        try
-        {
-            using SqliteCommand command = CreateCommand(connection, transaction, sql, parameters);
-            object? rawResult = command.ExecuteScalar();
-            T? result = ConvertScalar<T>(rawResult);
-            RaiseCommandExecuted(queryName, sql, snapshot, startedUtc, null, rawResult, true, transactionId);
-            return result;
-        }
-        catch (Exception ex)
-        {
-            RaiseCommandFailed(queryName, sql, snapshot, startedUtc, ex, true, transactionId);
-            throw;
-        }
-    }
-
-    internal IReadOnlyList<T> QueryInTransaction<T>(
-        SqliteConnection connection,
-        SqliteTransaction transaction,
-        Guid transactionId,
-        string sql,
-        Func<SqliteDataReader, T> map,
-        IReadOnlyList<SqliteParameter>? parameters = null,
-        string? queryName = null)
-    {
-        ThrowIfDisposed();
-        ValidateSql(sql);
-
-        if (map is null)
-            throw new ArgumentNullException(nameof(map));
-
-        DateTime startedUtc = DateTime.UtcNow;
-        IReadOnlyList<SqliteParameterSnapshot> snapshot = CreateSnapshot(parameters);
-
-        RaiseCommandExecuting(queryName, sql, snapshot, startedUtc, true, transactionId);
-
-        try
-        {
-            using SqliteCommand command = CreateCommand(connection, transaction, sql, parameters);
-            using SqliteDataReader reader = command.ExecuteReader();
-
             List<T> results = new();
-
+            using SqliteDataReader reader = cmd.ExecuteReader();
             while (reader.Read())
                 results.Add(map(reader));
 
-            RaiseCommandExecuted(queryName, sql, snapshot, startedUtc, results.Count, null, true, transactionId);
+            Log("Query", BuildDetails(queryName, sql, results.Count));
             return results;
         }
         catch (Exception ex)
         {
-            RaiseCommandFailed(queryName, sql, snapshot, startedUtc, ex, true, transactionId);
+            Log("QueryFailed", BuildDetails(queryName, sql, error: ex.Message));
             throw;
         }
     }
 
-    internal DataTable QueryDataTableInTransaction(
-        SqliteConnection connection,
-        SqliteTransaction transaction,
-        Guid transactionId,
-        string sql,
-        IReadOnlyList<SqliteParameter>? parameters = null,
-        string? queryName = null)
+    public IReadOnlyList<T> QueryNamed<T>(string queryName, Func<SqliteDataReader, T> map, IEnumerable<SqliteParameter>? parameters = null)
     {
         ThrowIfDisposed();
-        ValidateSql(sql);
 
-        DateTime startedUtc = DateTime.UtcNow;
-        IReadOnlyList<SqliteParameterSnapshot> snapshot = CreateSnapshot(parameters);
+        if (string.IsNullOrWhiteSpace(queryName))
+            throw new ArgumentException("queryName is required.", nameof(queryName));
 
-        RaiseCommandExecuting(queryName, sql, snapshot, startedUtc, true, transactionId);
+        string sql = ResolveSql(queryName, tx: null);
+        return Query(sql, map, parameters, queryName);
+    }
+
+    public DataTable QueryDataTable(string sql, IEnumerable<SqliteParameter>? parameters = null, string? queryName = null)
+    {
+        ThrowIfDisposed();
+
+        if (string.IsNullOrWhiteSpace(sql))
+            throw new ArgumentException("sql is required.", nameof(sql));
+
+        using SqliteCommand cmd = _connection.CreateCommand();
+        cmd.CommandText = sql;
+        AddParameters(cmd, parameters);
 
         try
         {
-            using SqliteCommand command = CreateCommand(connection, transaction, sql, parameters);
-            using SqliteDataReader reader = command.ExecuteReader();
-
+            using SqliteDataReader reader = cmd.ExecuteReader();
             DataTable table = new();
             table.Load(reader);
 
-            RaiseCommandExecuted(queryName, sql, snapshot, startedUtc, table.Rows.Count, null, true, transactionId);
+            Log("QueryDataTable", BuildDetails(queryName, sql, table.Rows.Count));
             return table;
         }
         catch (Exception ex)
         {
-            RaiseCommandFailed(queryName, sql, snapshot, startedUtc, ex, true, transactionId);
+            Log("QueryDataTableFailed", BuildDetails(queryName, sql, error: ex.Message));
             throw;
         }
     }
 
-    internal void RaiseTransactionCommitted(Guid transactionId, DateTime startedUtc)
+    public DataTable QueryNamedDataTable(string queryName, IEnumerable<SqliteParameter>? parameters = null)
     {
-        TransactionCommitted?.Invoke(this, new SqliteTransactionEventArgs
-        {
-            TransactionId = transactionId,
-            StartedUtc = startedUtc,
-            Duration = DateTime.UtcNow - startedUtc
-        });
+        ThrowIfDisposed();
+
+        if (string.IsNullOrWhiteSpace(queryName))
+            throw new ArgumentException("queryName is required.", nameof(queryName));
+
+        string sql = ResolveSql(queryName, tx: null);
+        return QueryDataTable(sql, parameters, queryName);
     }
 
-    internal void RaiseTransactionRolledBack(Guid transactionId, DateTime startedUtc)
+    public void ExecuteInTransaction(Action<ISqliteTransactionScope> action)
     {
-        TransactionRolledBack?.Invoke(this, new SqliteTransactionEventArgs
+        ThrowIfDisposed();
+
+        if (action is null)
+            throw new ArgumentNullException(nameof(action));
+
+        using ISqliteTransactionScope tx = BeginTransaction();
+        try
         {
-            TransactionId = transactionId,
-            StartedUtc = startedUtc,
-            Duration = DateTime.UtcNow - startedUtc
-        });
+            action(tx);
+            tx.Commit();
+        }
+        catch
+        {
+            try { tx.Rollback(); } catch { }
+            throw;
+        }
     }
 
-    internal void RaiseTransactionFailed(Guid transactionId, DateTime startedUtc, Exception exception)
+    public T ExecuteInTransaction<T>(Func<ISqliteTransactionScope, T> func)
     {
-        TransactionFailed?.Invoke(this, new SqliteTransactionEventArgs
+        ThrowIfDisposed();
+
+        if (func is null)
+            throw new ArgumentNullException(nameof(func));
+
+        using ISqliteTransactionScope tx = BeginTransaction();
+        try
         {
-            TransactionId = transactionId,
-            StartedUtc = startedUtc,
-            Duration = DateTime.UtcNow - startedUtc,
-            Exception = exception
-        });
+            T result = func(tx);
+            tx.Commit();
+            return result;
+        }
+        catch
+        {
+            try { tx.Rollback(); } catch { }
+            throw;
+        }
+    }
+
+    public ISqliteTransactionScope BeginTransaction()
+    {
+        ThrowIfDisposed();
+        return new SqliteTransactionScope(_connection.BeginTransaction(), Log);
+    }
+
+    public string ResolveSql(string queryName, ISqliteTransactionScope? tx)
+    {
+        if (_sqlCatalog is null)
+            throw new InvalidOperationException("No SQL catalog is configured for named-query execution.");
+
+        EngineConfig.TransactionParticipationMode mode =
+            _options?.SqlCatalog?.TransactionParticipation
+            ?? EngineConfig.TransactionParticipationMode.UseTransactionWhenAvailable;
+
+        return mode switch
+        {
+            EngineConfig.TransactionParticipationMode.UseConnectionOnly => _sqlCatalog.GetSql(queryName),
+            EngineConfig.TransactionParticipationMode.UseTransactionWhenAvailable => tx is null
+                ? _sqlCatalog.GetSql(queryName)
+                : _sqlCatalog.GetSql(queryName, tx),
+            EngineConfig.TransactionParticipationMode.RequireTransaction => tx is null
+                ? throw new InvalidOperationException("A transaction is required for SQL catalog access.")
+                : _sqlCatalog.GetSql(queryName, tx),
+            _ => _sqlCatalog.GetSql(queryName)
+        };
+    }
+
+    private static void AddParameters(SqliteCommand command, IEnumerable<SqliteParameter>? parameters)
+    {
+        if (parameters is null)
+            return;
+
+        foreach (SqliteParameter p in parameters)
+            command.Parameters.Add(p);
+    }
+
+    private string BuildDetails(string? queryName, string sql, int? rowCount = null, string? error = null)
+    {
+        string namePart = string.IsNullOrWhiteSpace(queryName) ? "(ad hoc)" : queryName;
+        string details = $"Name={namePart}; SQL={sql}";
+        if (rowCount is not null)
+            details += $"; Rows={rowCount.Value}";
+        if (!string.IsNullOrWhiteSpace(error))
+            details += $"; Error={error}";
+        return details;
+    }
+
+    internal void Log(string action, string? details, ISqliteTransactionScope? tx = null)
+    {
+        if (_commandLogger is null)
+            return;
+
+        EngineConfig.TransactionParticipationMode mode =
+            _options?.Logging?.TransactionParticipation
+            ?? EngineConfig.TransactionParticipationMode.UseConnectionOnly;
+
+        switch (mode)
+        {
+            case EngineConfig.TransactionParticipationMode.UseConnectionOnly:
+                _commandLogger.Log(action, details);
+                break;
+
+            case EngineConfig.TransactionParticipationMode.UseTransactionWhenAvailable:
+                if (tx is null)
+                    _commandLogger.Log(action, details);
+                else
+                    _commandLogger.Log(action, details, tx);
+                break;
+
+            case EngineConfig.TransactionParticipationMode.RequireTransaction:
+                if (tx is null)
+                    throw new InvalidOperationException("A transaction is required for command logging.");
+                _commandLogger.Log(action, details, tx);
+                break;
+
+            default:
+                _commandLogger.Log(action, details);
+                break;
+        }
     }
 
     public void Dispose()
@@ -419,199 +270,15 @@ public sealed class SqliteEngine : ISqliteEngine, IDisposable
         if (_disposed)
             return;
 
-        lock (_syncRoot)
-        {
-            if (_disposed)
-                return;
+        _disposed = true;
 
-            if (_ownsProvidedConnection || _connectionString is not null)
-            {
-                _sharedConnection?.Dispose();
-            }
-
-            _sharedConnection = null;
-            _disposed = true;
-        }
-    }
-
-    private SqliteConnection GetConnectionForCommand(out bool ownsConnection)
-    {
-        if (_sharedConnection is not null || _options.UseSingleSharedConnection)
-        {
-            ownsConnection = false;
-            return GetOrCreateSharedConnection();
-        }
-
-        ownsConnection = true;
-        return CreateOpenConnection();
-    }
-
-    private SqliteConnection GetOrCreateSharedConnection()
-    {
-        lock (_syncRoot)
-        {
-            ThrowIfDisposed();
-
-            if (_sharedConnection is null)
-            {
-                _sharedConnection = CreateOpenConnection();
-            }
-            else if (_sharedConnection.State != ConnectionState.Open)
-            {
-                _sharedConnection.Open();
-            }
-
-            return _sharedConnection;
-        }
-    }
-
-    private SqliteConnection CreateOpenConnection()
-    {
-        if (string.IsNullOrWhiteSpace(_connectionString))
-            throw new InvalidOperationException("A connection string is not available for this engine instance.");
-
-        SqliteConnection connection = new(_connectionString);
-        connection.Open();
-        return connection;
-    }
-
-    private static SqliteCommand CreateCommand(
-        SqliteConnection connection,
-        SqliteTransaction? transaction,
-        string sql,
-        IReadOnlyList<SqliteParameter>? parameters)
-    {
-        SqliteCommand command = connection.CreateCommand();
-        command.CommandText = sql;
-        command.Transaction = transaction;
-
-        if (parameters is not null)
-        {
-            foreach (SqliteParameter parameter in parameters)
-                command.Parameters.Add(parameter);
-        }
-
-        return command;
-    }
-
-    private static void ValidateSql(string sql)
-    {
-        if (string.IsNullOrWhiteSpace(sql))
-            throw new ArgumentException("sql is required.", nameof(sql));
+        if (_ownsConnection)
+            _connection.Dispose();
     }
 
     private void ThrowIfDisposed()
     {
         if (_disposed)
             throw new ObjectDisposedException(nameof(SqliteEngine));
-    }
-
-    private void RaiseCommandExecuting(
-        string? queryName,
-        string sql,
-        IReadOnlyList<SqliteParameterSnapshot> parameters,
-        DateTime startedUtc,
-        bool isInTransaction,
-        Guid? transactionId)
-    {
-        CommandExecuting?.Invoke(this, new SqliteCommandEventArgs
-        {
-            QueryName = queryName,
-            Sql = sql,
-            Parameters = parameters,
-            StartedUtc = startedUtc,
-            Duration = TimeSpan.Zero,
-            IsInTransaction = isInTransaction,
-            TransactionId = transactionId
-        });
-    }
-
-    private void RaiseCommandExecuted(
-        string? queryName,
-        string sql,
-        IReadOnlyList<SqliteParameterSnapshot> parameters,
-        DateTime startedUtc,
-        int? rowsAffected,
-        object? scalarResult,
-        bool isInTransaction,
-        Guid? transactionId)
-    {
-        CommandExecuted?.Invoke(this, new SqliteCommandEventArgs
-        {
-            QueryName = queryName,
-            Sql = sql,
-            Parameters = parameters,
-            StartedUtc = startedUtc,
-            Duration = DateTime.UtcNow - startedUtc,
-            RowsAffected = rowsAffected,
-            ScalarResult = scalarResult,
-            IsInTransaction = isInTransaction,
-            TransactionId = transactionId
-        });
-    }
-
-    private void RaiseCommandFailed(
-        string? queryName,
-        string sql,
-        IReadOnlyList<SqliteParameterSnapshot> parameters,
-        DateTime startedUtc,
-        Exception exception,
-        bool isInTransaction,
-        Guid? transactionId)
-    {
-        CommandFailed?.Invoke(this, new SqliteCommandEventArgs
-        {
-            QueryName = queryName,
-            Sql = sql,
-            Parameters = parameters,
-            StartedUtc = startedUtc,
-            Duration = DateTime.UtcNow - startedUtc,
-            Exception = exception,
-            IsInTransaction = isInTransaction,
-            TransactionId = transactionId
-        });
-    }
-
-    private void RaiseTransactionBegan(Guid transactionId, DateTime startedUtc)
-    {
-        TransactionBegan?.Invoke(this, new SqliteTransactionEventArgs
-        {
-            TransactionId = transactionId,
-            StartedUtc = startedUtc,
-            Duration = TimeSpan.Zero
-        });
-    }
-
-    private static IReadOnlyList<SqliteParameterSnapshot> CreateSnapshot(IReadOnlyList<SqliteParameter>? parameters)
-    {
-        if (parameters is null || parameters.Count == 0)
-            return [];
-
-        List<SqliteParameterSnapshot> snapshots = new(parameters.Count);
-
-        foreach (SqliteParameter parameter in parameters)
-        {
-            snapshots.Add(new SqliteParameterSnapshot
-            {
-                Name = parameter.ParameterName,
-                Value = parameter.Value,
-                DbType = parameter.SqliteType.ToString()
-            });
-        }
-
-        return snapshots;
-    }
-
-    private static T? ConvertScalar<T>(object? rawResult)
-    {
-        if (rawResult is null || rawResult is DBNull)
-            return default;
-
-        if (rawResult is T direct)
-            return direct;
-
-        Type targetType = Nullable.GetUnderlyingType(typeof(T)) ?? typeof(T);
-        object converted = Convert.ChangeType(rawResult, targetType);
-        return (T)converted;
     }
 }

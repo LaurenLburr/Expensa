@@ -1,38 +1,48 @@
 using System.Data;
 using System.Data.Common;
 using Codex.Data.SQLiteEngine;
+using Codex.Data.SQLiteEngine.Abstractions;
+using Codex.Data.SQLiteEngine.Implementations;
 using CodexExpensa.Core.Abstractions;
-using CodexExpensa.Data.Sqlite.SqlQueries;
 using Microsoft.Data.Sqlite;
+using EngineConfig = Codex.Data.SQLiteEngine.Configuration;
 
 namespace CodexExpensa.Data.Sqlite.Db;
 
-/// <summary>
-/// SQLite database session used by the app.
-/// Supports:
-/// - File-backed DB (direct)
-/// - In-memory DB seeded from a file DB, with Save() flushing memory back to disk.
-/// </summary>
 public sealed class SqliteDatabase : IDatabaseSession, IDisposable
 {
     private readonly SqliteConnection _connection;
     private readonly SqliteEngine _engine;
-    private readonly SqliteQueryCatalog _queryCatalog;
     private readonly string? _persistedFilePath;
     private bool _disposed;
 
-    private SqliteDatabase(SqliteConnection connection, string? persistedFilePath)
+    private SqliteDatabase(
+        SqliteConnection connection,
+        string? persistedFilePath,
+        EngineConfig.SqliteEngineOptions? options = null)
     {
         _connection = connection ?? throw new ArgumentNullException(nameof(connection));
         _persistedFilePath = persistedFilePath;
-        _queryCatalog = new SqliteQueryCatalog(_connection);
-        _engine = new SqliteEngine(_connection);
+
+        ISqlCatalog? sqlCatalog = null;
+        ICommandLogger? commandLogger = null;
+
+        if (options?.SqlCatalog is not null)
+            sqlCatalog = new TableSqlCatalog(_connection, options.SqlCatalog);
+
+        if (options?.Logging is not null)
+            commandLogger = new TableCommandLogger(_connection, options.Logging);
+
+        _engine = new SqliteEngine(
+            _connection,
+            sqlCatalog: sqlCatalog,
+            commandLogger: commandLogger,
+            options: options);
     }
 
-    /// <summary>
-    /// Opens a file-backed SQLite database and keeps a single open connection for the lifetime of this instance.
-    /// </summary>
-    public static SqliteDatabase OpenFile(string dbPath)
+    public static SqliteDatabase OpenFile(
+        string dbPath,
+        EngineConfig.SqliteEngineOptions? options = null)
     {
         if (string.IsNullOrWhiteSpace(dbPath))
             throw new ArgumentException("dbPath is required.", nameof(dbPath));
@@ -52,19 +62,17 @@ public sealed class SqliteDatabase : IDatabaseSession, IDisposable
         SqliteConnection conn = new(builder.ToString());
         conn.Open();
 
-        return new SqliteDatabase(conn, persistedFilePath: null);
+        return new SqliteDatabase(conn, persistedFilePath: null, options: options);
     }
 
-    /// <summary>
-    /// Opens an in-memory database seeded from the file database at dbPath (created if missing).
-    /// Save() flushes the in-memory DB back to that file.
-    /// </summary>
-    public static SqliteDatabase OpenMemorySeededFromFile(string dbPath)
+    public static SqliteDatabase OpenMemorySeededFromFile(
+        string dbPath,
+        EngineConfig.SqliteEngineOptions? options = null)
     {
         if (string.IsNullOrWhiteSpace(dbPath))
             throw new ArgumentException("dbPath is required.", nameof(dbPath));
 
-        using SqliteDatabase fileDb = OpenFile(dbPath);
+        using SqliteDatabase fileDb = OpenFile(dbPath, options);
 
         SqliteConnectionStringBuilder memBuilder = new()
         {
@@ -78,7 +86,7 @@ public sealed class SqliteDatabase : IDatabaseSession, IDisposable
 
         fileDb._connection.BackupDatabase(memConn);
 
-        return new SqliteDatabase(memConn, persistedFilePath: dbPath);
+        return new SqliteDatabase(memConn, persistedFilePath: dbPath, options: options);
     }
 
     public void Save()
@@ -96,161 +104,102 @@ public sealed class SqliteDatabase : IDatabaseSession, IDisposable
 
     public string? PersistedFilePath => _persistedFilePath;
 
-    public int ExecuteNonQuery(
-        string sql,
-        IEnumerable<SqliteParameter>? parameters = null,
-        SqliteTransaction? tx = null)
+    public int ExecuteNonQuery(string sql, IEnumerable<SqliteParameter>? parameters = null)
     {
         ThrowIfDisposed();
-
-        if (string.IsNullOrWhiteSpace(sql))
-            throw new ArgumentException("sql is required.", nameof(sql));
-
-        IReadOnlyList<SqliteParameter> sqliteParameters = MaterializeSqliteParameters(parameters);
-
-        if (tx is not null)
-        {
-            using SqliteCommand cmd = tx.Connection!.CreateCommand();
-            cmd.Transaction = tx;
-            cmd.CommandText = sql;
-
-            foreach (SqliteParameter p in sqliteParameters)
-                cmd.Parameters.Add(p);
-
-            return cmd.ExecuteNonQuery();
-        }
-
-        return _engine.ExecuteNonQuery(sql, sqliteParameters);
+        return _engine.ExecuteNonQuery(sql, parameters);
     }
 
-    public void Execute(
-        string queryName,
-        IEnumerable<DbParameter>? parameters = null)
+    public int ExecuteNonQuery(
+        string sql,
+        IEnumerable<SqliteParameter>? parameters,
+        ISqliteTransactionScope tx)
     {
         ThrowIfDisposed();
+        return tx.ExecuteNonQuery(sql, parameters is null ? null : parameters.ToList());
+    }
 
-        if (string.IsNullOrWhiteSpace(queryName))
-            throw new ArgumentException("queryName is required.", nameof(queryName));
-
-        string sql = _queryCatalog.GetSql(queryName);
+    public void Execute(string queryName, IEnumerable<DbParameter>? parameters = null)
+    {
+        ThrowIfDisposed();
         IReadOnlyList<SqliteParameter> sqliteParameters = MaterializeSqliteParameters(parameters);
+        _engine.ExecuteNamedNonQuery(queryName, sqliteParameters);
+    }
 
-        _engine.ExecuteNonQuery(sql, sqliteParameters, queryName);
+    public int ExecuteNamedNonQuery(string queryName, IEnumerable<SqliteParameter>? parameters = null)
+    {
+        ThrowIfDisposed();
+        return _engine.ExecuteNamedNonQuery(queryName, parameters);
     }
 
     public int ExecuteNamedNonQuery(
         string queryName,
-        IEnumerable<SqliteParameter>? parameters = null,
-        SqliteTransaction? tx = null)
+        IEnumerable<SqliteParameter>? parameters,
+        ISqliteTransactionScope tx)
     {
         ThrowIfDisposed();
 
-        if (string.IsNullOrWhiteSpace(queryName))
-            throw new ArgumentException("queryName is required.", nameof(queryName));
-
-        string sql = _queryCatalog.GetSql(queryName);
-
-        return ExecuteNonQuery(sql, parameters, tx);
+        string sql = _engine.ResolveSql(queryName, tx);
+        return tx.ExecuteNonQuery(sql, parameters is null ? null : parameters.ToList(), queryName);
     }
 
     public IReadOnlyList<T> Query<T>(
         string sql,
         Func<SqliteDataReader, T> map,
-        IEnumerable<SqliteParameter>? parameters = null,
-        SqliteTransaction? tx = null)
+        IEnumerable<SqliteParameter>? parameters = null)
     {
         ThrowIfDisposed();
+        return _engine.Query(sql, map, parameters);
+    }
 
-        if (string.IsNullOrWhiteSpace(sql))
-            throw new ArgumentException("sql is required.", nameof(sql));
-        if (map is null)
-            throw new ArgumentNullException(nameof(map));
-
-        IReadOnlyList<SqliteParameter> sqliteParameters = MaterializeSqliteParameters(parameters);
-
-        if (tx is not null)
-        {
-            List<T> results = new();
-
-            using SqliteCommand cmd = tx.Connection!.CreateCommand();
-            cmd.Transaction = tx;
-            cmd.CommandText = sql;
-
-            foreach (SqliteParameter p in sqliteParameters)
-                cmd.Parameters.Add(p);
-
-            using SqliteDataReader reader = cmd.ExecuteReader();
-            while (reader.Read())
-                results.Add(map(reader));
-
-            return results;
-        }
-
-        return _engine.Query(sql, map, sqliteParameters);
+    public IReadOnlyList<T> Query<T>(
+        string sql,
+        Func<SqliteDataReader, T> map,
+        IEnumerable<SqliteParameter>? parameters,
+        ISqliteTransactionScope tx)
+    {
+        ThrowIfDisposed();
+        return tx.Query(sql, map, parameters is null ? null : parameters.ToList());
     }
 
     public IReadOnlyList<T> QueryNamed<T>(
         string queryName,
         Func<SqliteDataReader, T> map,
-        IEnumerable<SqliteParameter>? parameters = null,
-        SqliteTransaction? tx = null)
+        IEnumerable<SqliteParameter>? parameters = null)
     {
         ThrowIfDisposed();
-
-        if (string.IsNullOrWhiteSpace(queryName))
-            throw new ArgumentException("queryName is required.", nameof(queryName));
-        if (map is null)
-            throw new ArgumentNullException(nameof(map));
-
-        string sql = _queryCatalog.GetSql(queryName);
-        IReadOnlyList<SqliteParameter> sqliteParameters = MaterializeSqliteParameters(parameters);
-
-        if (tx is not null)
-            return Query(sql, map, sqliteParameters, tx);
-
-        return _engine.Query(sql, map, sqliteParameters, queryName);
+        return _engine.QueryNamed(queryName, map, parameters);
     }
 
-    public DataTable QueryDataTable(
+    public IReadOnlyList<T> QueryNamed<T>(
         string queryName,
-        IEnumerable<DbParameter>? parameters = null)
+        Func<SqliteDataReader, T> map,
+        IEnumerable<SqliteParameter>? parameters,
+        ISqliteTransactionScope tx)
     {
         ThrowIfDisposed();
 
-        if (string.IsNullOrWhiteSpace(queryName))
-            throw new ArgumentException("queryName is required.", nameof(queryName));
-
-        string sql = _queryCatalog.GetSql(queryName);
-        IReadOnlyList<SqliteParameter> sqliteParameters = MaterializeSqliteParameters(parameters);
-
-        return _engine.QueryDataTable(sql, sqliteParameters, queryName);
+        string sql = _engine.ResolveSql(queryName, tx);
+        return tx.Query(sql, map, parameters is null ? null : parameters.ToList(), queryName);
     }
 
-    public void ExecuteInTransaction(Action<SqliteTransaction> action)
+    public DataTable QueryDataTable(string queryName, IEnumerable<DbParameter>? parameters = null)
     {
         ThrowIfDisposed();
+        IReadOnlyList<SqliteParameter> sqliteParameters = MaterializeSqliteParameters(parameters);
+        return _engine.QueryNamedDataTable(queryName, sqliteParameters);
+    }
 
-        if (action is null)
-            throw new ArgumentNullException(nameof(action));
+    public void ExecuteInTransaction(Action<ISqliteTransactionScope> action)
+    {
+        ThrowIfDisposed();
+        _engine.ExecuteInTransaction(action);
+    }
 
-        using SqliteTransaction tx = _connection.BeginTransaction();
-        try
-        {
-            action(tx);
-            tx.Commit();
-        }
-        catch
-        {
-            try
-            {
-                tx.Rollback();
-            }
-            catch
-            {
-            }
-
-            throw;
-        }
+    public T ExecuteInTransaction<T>(Func<ISqliteTransactionScope, T> func)
+    {
+        ThrowIfDisposed();
+        return _engine.ExecuteInTransaction(func);
     }
 
     public void Dispose()
@@ -269,7 +218,6 @@ public sealed class SqliteDatabase : IDatabaseSession, IDisposable
             return [];
 
         List<SqliteParameter> list = new();
-
         foreach (DbParameter parameter in parameters)
         {
             if (parameter is SqliteParameter sqliteParameter)
@@ -283,14 +231,6 @@ public sealed class SqliteDatabase : IDatabaseSession, IDisposable
         }
 
         return list;
-    }
-
-    private static IReadOnlyList<SqliteParameter> MaterializeSqliteParameters(IEnumerable<SqliteParameter>? parameters)
-    {
-        if (parameters is null)
-            return [];
-
-        return parameters.ToList();
     }
 
     private void ThrowIfDisposed()

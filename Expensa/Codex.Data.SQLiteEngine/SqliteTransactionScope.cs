@@ -1,47 +1,120 @@
-using Microsoft.Data.Sqlite;
 using System.Data;
+using Microsoft.Data.Sqlite;
 
 namespace Codex.Data.SQLiteEngine;
 
-internal sealed class SqliteTransactionScope : ISqliteTransactionScope
+public sealed class SqliteTransactionScope : ISqliteTransactionScope
 {
-    private readonly SqliteEngine _engine;
-    private readonly SqliteConnection _connection;
     private readonly SqliteTransaction _transaction;
-    private readonly DateTime _startedUtc;
-    private readonly bool _ownsConnection;
-
+    private readonly Action<string, string?, ISqliteTransactionScope?>? _logger;
     private bool _completed;
     private bool _disposed;
 
+    public SqliteTransactionScope(
+        SqliteTransaction transaction,
+        Action<string, string?, ISqliteTransactionScope?>? logger = null)
+    {
+        _transaction = transaction ?? throw new ArgumentNullException(nameof(transaction));
+        _logger = logger;
+        TransactionId = Guid.NewGuid();
+        _logger?.Invoke("TransactionBegin", null, this);
+    }
+
     public Guid TransactionId { get; }
 
-    public SqliteTransactionScope(
-        SqliteEngine engine,
-        SqliteConnection connection,
-        SqliteTransaction transaction,
-        Guid transactionId,
-        DateTime startedUtc,
-        bool ownsConnection)
+    public int ExecuteNonQuery(
+        string sql,
+        IReadOnlyList<SqliteParameter>? parameters = null,
+        string? queryName = null)
     {
-        _engine = engine ?? throw new ArgumentNullException(nameof(engine));
-        _connection = connection ?? throw new ArgumentNullException(nameof(connection));
-        _transaction = transaction ?? throw new ArgumentNullException(nameof(transaction));
-        TransactionId = transactionId;
-        _startedUtc = startedUtc;
-        _ownsConnection = ownsConnection;
+        ThrowIfCompleted();
+
+        using SqliteCommand cmd = _transaction.Connection!.CreateCommand();
+        cmd.Transaction = _transaction;
+        cmd.CommandText = sql;
+
+        if (parameters is not null)
+        {
+            foreach (SqliteParameter p in parameters)
+                cmd.Parameters.Add(p);
+        }
+
+        try
+        {
+            int rows = cmd.ExecuteNonQuery();
+            _logger?.Invoke(
+                "TransactionExecuteNonQuery",
+                $"TransactionId={TransactionId}; Name={queryName ?? "(ad hoc)"}; Rows={rows}; SQL={sql}",
+                this);
+            return rows;
+        }
+        catch (Exception ex)
+        {
+            _logger?.Invoke(
+                "TransactionExecuteNonQueryFailed",
+                $"TransactionId={TransactionId}; Name={queryName ?? "(ad hoc)"}; Error={ex.Message}; SQL={sql}",
+                this);
+            throw;
+        }
     }
 
-    public int ExecuteNonQuery(string sql, IReadOnlyList<SqliteParameter>? parameters = null, string? queryName = null)
+    public T ExecuteScalar<T>(
+        string sql,
+        IReadOnlyList<SqliteParameter>? parameters = null,
+        string? queryName = null)
     {
-        ThrowIfDisposed();
-        return _engine.ExecuteNonQueryInTransaction(_connection, _transaction, TransactionId, sql, parameters, queryName);
-    }
+        ThrowIfCompleted();
 
-    public T? ExecuteScalar<T>(string sql, IReadOnlyList<SqliteParameter>? parameters = null, string? queryName = null)
-    {
-        ThrowIfDisposed();
-        return _engine.ExecuteScalarInTransaction<T>(_connection, _transaction, TransactionId, sql, parameters, queryName);
+        using SqliteCommand cmd = _transaction.Connection!.CreateCommand();
+        cmd.Transaction = _transaction;
+        cmd.CommandText = sql;
+
+        if (parameters is not null)
+        {
+            foreach (SqliteParameter p in parameters)
+                cmd.Parameters.Add(p);
+        }
+
+        try
+        {
+            object? result = cmd.ExecuteScalar();
+
+            if (result is null || result is DBNull)
+            {
+                _logger?.Invoke(
+                    "TransactionExecuteScalar",
+                    $"TransactionId={TransactionId}; Name={queryName ?? "(ad hoc)"}; Result=NULL; SQL={sql}",
+                    this);
+
+                return default!;
+            }
+
+            T typedResult;
+
+            if (result is T alreadyTyped)
+            {
+                typedResult = alreadyTyped;
+            }
+            else
+            {
+                typedResult = (T)Convert.ChangeType(result, typeof(T));
+            }
+
+            _logger?.Invoke(
+                "TransactionExecuteScalar",
+                $"TransactionId={TransactionId}; Name={queryName ?? "(ad hoc)"}; SQL={sql}",
+                this);
+
+            return typedResult;
+        }
+        catch (Exception ex)
+        {
+            _logger?.Invoke(
+                "TransactionExecuteScalarFailed",
+                $"TransactionId={TransactionId}; Name={queryName ?? "(ad hoc)"}; Error={ex.Message}; SQL={sql}",
+                this);
+            throw;
+        }
     }
 
     public IReadOnlyList<T> Query<T>(
@@ -50,54 +123,101 @@ internal sealed class SqliteTransactionScope : ISqliteTransactionScope
         IReadOnlyList<SqliteParameter>? parameters = null,
         string? queryName = null)
     {
-        ThrowIfDisposed();
-        return _engine.QueryInTransaction(_connection, _transaction, TransactionId, sql, map, parameters, queryName);
+        ThrowIfCompleted();
+
+        if (map is null)
+            throw new ArgumentNullException(nameof(map));
+
+        using SqliteCommand cmd = _transaction.Connection!.CreateCommand();
+        cmd.Transaction = _transaction;
+        cmd.CommandText = sql;
+
+        if (parameters is not null)
+        {
+            foreach (SqliteParameter p in parameters)
+                cmd.Parameters.Add(p);
+        }
+
+        try
+        {
+            List<T> results = new();
+
+            using SqliteDataReader reader = cmd.ExecuteReader();
+            while (reader.Read())
+                results.Add(map(reader));
+
+            _logger?.Invoke(
+                "TransactionQuery",
+                $"TransactionId={TransactionId}; Name={queryName ?? "(ad hoc)"}; Rows={results.Count}; SQL={sql}",
+                this);
+
+            return results;
+        }
+        catch (Exception ex)
+        {
+            _logger?.Invoke(
+                "TransactionQueryFailed",
+                $"TransactionId={TransactionId}; Name={queryName ?? "(ad hoc)"}; Error={ex.Message}; SQL={sql}",
+                this);
+            throw;
+        }
     }
 
-    public DataTable QueryDataTable(string sql, IReadOnlyList<SqliteParameter>? parameters = null, string? queryName = null)
+    public DataTable QueryDataTable(
+        string sql,
+        IReadOnlyList<SqliteParameter>? parameters = null,
+        string? queryName = null)
     {
-        ThrowIfDisposed();
-        return _engine.QueryDataTableInTransaction(_connection, _transaction, TransactionId, sql, parameters, queryName);
+        ThrowIfCompleted();
+
+        using SqliteCommand cmd = _transaction.Connection!.CreateCommand();
+        cmd.Transaction = _transaction;
+        cmd.CommandText = sql;
+
+        if (parameters is not null)
+        {
+            foreach (SqliteParameter p in parameters)
+                cmd.Parameters.Add(p);
+        }
+
+        try
+        {
+            using SqliteDataReader reader = cmd.ExecuteReader();
+
+            DataTable table = new();
+            table.Load(reader);
+
+            _logger?.Invoke(
+                "TransactionQueryDataTable",
+                $"TransactionId={TransactionId}; Name={queryName ?? "(ad hoc)"}; Rows={table.Rows.Count}; SQL={sql}",
+                this);
+
+            return table;
+        }
+        catch (Exception ex)
+        {
+            _logger?.Invoke(
+                "TransactionQueryDataTableFailed",
+                $"TransactionId={TransactionId}; Name={queryName ?? "(ad hoc)"}; Error={ex.Message}; SQL={sql}",
+                this);
+            throw;
+        }
     }
 
     public void Commit()
     {
-        ThrowIfDisposed();
-
-        if (_completed)
-            throw new InvalidOperationException("Transaction has already been completed.");
-
-        try
-        {
-            _transaction.Commit();
-            _completed = true;
-            _engine.RaiseTransactionCommitted(TransactionId, _startedUtc);
-        }
-        catch (Exception ex)
-        {
-            _engine.RaiseTransactionFailed(TransactionId, _startedUtc, ex);
-            throw;
-        }
+        ThrowIfCompleted();
+        _transaction.Commit();
+        _completed = true;
+        _logger?.Invoke("TransactionCommit", $"TransactionId={TransactionId}", this);
     }
 
     public void Rollback()
     {
-        ThrowIfDisposed();
-
-        if (_completed)
-            throw new InvalidOperationException("Transaction has already been completed.");
-
-        try
-        {
-            _transaction.Rollback();
-            _completed = true;
-            _engine.RaiseTransactionRolledBack(TransactionId, _startedUtc);
-        }
-        catch (Exception ex)
-        {
-            _engine.RaiseTransactionFailed(TransactionId, _startedUtc, ex);
-            throw;
-        }
+        ThrowIfCompleted();
+        _transaction.Rollback();
+        _completed = true;
+        _logger?.Invoke("TransactionRollback", $"TransactionId={TransactionId}", this);
     }
 
     public void Dispose()
@@ -105,29 +225,30 @@ internal sealed class SqliteTransactionScope : ISqliteTransactionScope
         if (_disposed)
             return;
 
-        try
+        _disposed = true;
+
+        if (!_completed)
         {
-            if (!_completed)
+            try
             {
                 _transaction.Rollback();
-                _engine.RaiseTransactionRolledBack(TransactionId, _startedUtc);
-                _completed = true;
+                _logger?.Invoke("TransactionRollback", $"TransactionId={TransactionId}; DisposeRollback", this);
+            }
+            catch (Exception ex)
+            {
+                _logger?.Invoke("TransactionRollbackFailed", $"TransactionId={TransactionId}; {ex.Message}", this);
             }
         }
-        finally
-        {
-            _transaction.Dispose();
 
-            if (_ownsConnection)
-                _connection.Dispose();
-
-            _disposed = true;
-        }
+        _transaction.Dispose();
     }
 
-    private void ThrowIfDisposed()
+    private void ThrowIfCompleted()
     {
         if (_disposed)
             throw new ObjectDisposedException(nameof(SqliteTransactionScope));
+
+        if (_completed)
+            throw new InvalidOperationException("Transaction scope has already completed.");
     }
 }

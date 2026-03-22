@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 18
+VisualStudioVersion = 18.4.11519.219 insiders
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Codex.Data.SQLiteEngine", "Codex.Data.SQLiteEngine\Codex.Data.SQLiteEngine.csproj", "{30615574-9219-01D5-18FF-65BD8903D194}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Codex.Data.SQLiteEngine.Tests", "Codex.Data.SQLiteEngine.Tests\Codex.Data.SQLiteEngine.Tests.csproj", "{6D7244CE-DE1F-7BA5-9E6A-A871AB0F70CA}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{30615574-9219-01D5-18FF-65BD8903D194}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{30615574-9219-01D5-18FF-65BD8903D194}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{30615574-9219-01D5-18FF-65BD8903D194}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{30615574-9219-01D5-18FF-65BD8903D194}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6D7244CE-DE1F-7BA5-9E6A-A871AB0F70CA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6D7244CE-DE1F-7BA5-9E6A-A871AB0F70CA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6D7244CE-DE1F-7BA5-9E6A-A871AB0F70CA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6D7244CE-DE1F-7BA5-9E6A-A871AB0F70CA}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {15078062-7C7E-4FCB-8CC4-DA9A35AC4B8A}
+	EndGlobalSection
+EndGlobal

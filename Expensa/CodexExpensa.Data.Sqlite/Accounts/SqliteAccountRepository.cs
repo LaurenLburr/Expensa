@@ -1,5 +1,6 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
+using Codex.Data.SQLiteEngine;
 using CodexExpensa.Core.Domain.Accounts;
 using CodexExpensa.Data.Sqlite.Db;
 using Microsoft.Data.Sqlite;
@@ -79,7 +80,7 @@ public sealed class SqliteAccountRepository : IAccountRepository
         if (account is null) throw new ArgumentNullException(nameof(account));
         ValidateForWrite(account);
 
-        _db.ExecuteInTransaction(tx =>
+        _db.ExecuteInTransaction((ISqliteTransactionScope tx) =>
         {
             var bankId = GetOrCreateBankId(
                 bankName: account.BankName,
@@ -132,7 +133,7 @@ public sealed class SqliteAccountRepository : IAccountRepository
         if (account is null) throw new ArgumentNullException(nameof(account));
         ValidateForWrite(account);
 
-        _db.ExecuteInTransaction(tx =>
+        _db.ExecuteInTransaction((ISqliteTransactionScope tx) =>
         {
             var bankId = GetOrCreateBankId(
                 bankName: account.BankName,
@@ -201,7 +202,7 @@ public sealed class SqliteAccountRepository : IAccountRepository
             throw new ArgumentException("AccountNumber is required.", nameof(account));
     }
 
-    private string GetOrCreateBankId(string bankName, string routingNumber, string? url, SqliteTransaction tx)
+    private string GetOrCreateBankId(string bankName, string routingNumber, string? url, ISqliteTransactionScope tx)
     {
         const string select =
             """
@@ -229,7 +230,6 @@ public sealed class SqliteAccountRepository : IAccountRepository
 
         if (existing.Count > 0)
         {
-            // Optional: fill in URL if it was missing in DB
             if (!string.IsNullOrWhiteSpace(url) && string.IsNullOrWhiteSpace(existing[0].Url))
             {
                 const string updateUrl =

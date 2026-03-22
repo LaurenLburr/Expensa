@@ -1,6 +1,7 @@
-﻿using System.Reflection;
+using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
+using Codex.Data.SQLiteEngine;
 using CodexExpensa.Db.Schema;
 using Microsoft.Data.Sqlite;
 
@@ -87,7 +88,6 @@ ORDER BY MigrationId;
                     continue;
                 }
 
-                // Exists in assembly but not applied. If it's blank, call it out.
                 var sql = ReadEmbeddedText(typeof(SchemaMarker).Assembly, info.ResourceName);
                 var isBlank = string.IsNullOrWhiteSpace(sql);
 
@@ -100,7 +100,6 @@ ORDER BY MigrationId;
                 continue;
             }
 
-            // Fallback (shouldn't happen): treat as NonExistent
             result.Add(new MigrationStatusRow
             {
                 MigrationId = id,
@@ -148,14 +147,12 @@ ORDER BY MigrationId;
         var asm = typeof(SchemaMarker).Assembly;
         var sql = ReadEmbeddedText(asm, mig.ResourceName);
 
-        // Blank migration = no-op.
-        // Important: do NOT record as applied, so it stays Pending/Blank until fixed.
         if (string.IsNullOrWhiteSpace(sql))
             return false;
 
-        db.ExecuteInTransaction(tx =>
+        db.ExecuteInTransaction((ISqliteTransactionScope tx) =>
         {
-            db.ExecuteNonQuery(sql, tx: tx);
+            db.ExecuteNonQuery(sql, parameters: null, tx);
 
             const string insert = """
 INSERT INTO SchemaMigrations (MigrationId, AppliedUtc, Checksum)
@@ -190,8 +187,6 @@ CREATE TABLE IF NOT EXISTS SchemaMigrations (
 
     private static string ExtractFileName(string resourceName)
     {
-        // Example:
-        // CodexExpensa.Db.Schema.Migrations.0001_SchemaMigrations.mig
         var markerIndex = resourceName.LastIndexOf(MigrationsFolderToken, StringComparison.OrdinalIgnoreCase);
         if (markerIndex >= 0)
         {

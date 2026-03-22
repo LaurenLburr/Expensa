@@ -1,4 +1,5 @@
 using Microsoft.Data.Sqlite;
+using System.Data;
 using Xunit;
 
 namespace Codex.Data.SQLiteEngine.Tests;
@@ -21,6 +22,36 @@ public sealed class SqliteEngineExistingConnectionTests
         Assert.Equal(1, count);
         Assert.Equal(System.Data.ConnectionState.Open, connection.State);
     }
+
+    [Fact]
+    public void ExistingConnectionMode_Dispose_DoesNotCloseExternalConnection_ByDefault()
+    {
+        using SqliteEngineInMemoryTestDatabase database = new();
+        using SqliteConnection connection = new(database.ConnectionString);
+        connection.Open();
+
+        var engine = new SqliteEngine(connection);
+
+        engine.Dispose();
+
+        Assert.Equal(ConnectionState.Open, connection.State);
+    }
+
+
+    [Fact]
+    public void ExistingConnectionMode_Dispose_CanOwnAndCloseConnection()
+    {
+        using SqliteEngineInMemoryTestDatabase database = new();
+        using SqliteConnection connection = new(database.ConnectionString);
+        connection.Open();
+
+        var engine = new SqliteEngine(connection, ownsConnection: true);
+
+        engine.Dispose();
+
+        Assert.Equal(ConnectionState.Closed, connection.State);
+    }
+
 
     [Fact]
     public void ExistingConnectionMode_WithQueryName_RaisesEventsWithQueryName()

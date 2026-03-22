@@ -209,4 +209,80 @@ public sealed class SqliteEngineTransactionTests
         Assert.Equal(tx.TransactionId, failedArgs.TransactionId);
         Assert.Equal("Sample.TxBadInsert", failedArgs.QueryName);
     }
+
+    [Fact]
+    public void ExecuteInTransaction_Action_CommitsWhenActionSucceeds()
+    {
+        using SqliteEngineInMemoryTestDatabase database = new();
+        SqliteEngine engine = new(database.ConnectionString);
+
+        engine.ExecuteInTransaction(tx =>
+        {
+            tx.ExecuteNonQuery(
+                "INSERT INTO [Sample] ([Name], [Amount]) VALUES (@Name, @Amount);",
+                new[]
+                {
+                    new SqliteParameter("@Name", "wrapper-action"),
+                    new SqliteParameter("@Amount", 12.5m)
+                });
+        });
+
+        long? count = engine.ExecuteScalar<long>("SELECT COUNT(*) FROM [Sample] WHERE [Name] = 'wrapper-action';");
+
+        Assert.Equal(1, count);
+    }
+
+    [Fact]
+    public void ExecuteInTransaction_Action_RollsBackWhenActionThrows()
+    {
+        using SqliteEngineInMemoryTestDatabase database = new();
+        SqliteEngine engine = new(database.ConnectionString);
+
+        int rolledBackCount = 0;
+        engine.TransactionRolledBack += (_, _) => rolledBackCount++;
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            engine.ExecuteInTransaction(tx =>
+            {
+                tx.ExecuteNonQuery(
+                    "INSERT INTO [Sample] ([Name], [Amount]) VALUES (@Name, @Amount);",
+                    new[]
+                    {
+                        new SqliteParameter("@Name", "wrapper-rollback"),
+                        new SqliteParameter("@Amount", 13.5m)
+                    });
+
+                throw new InvalidOperationException("boom");
+            }));
+
+        long? count = engine.ExecuteScalar<long>("SELECT COUNT(*) FROM [Sample] WHERE [Name] = 'wrapper-rollback';");
+
+        Assert.Equal("boom", ex.Message);
+        Assert.Equal(0, count);
+        Assert.Equal(1, rolledBackCount);
+    }
+
+    [Fact]
+    public void ExecuteInTransaction_Func_CommitsAndReturnsValue()
+    {
+        using SqliteEngineInMemoryTestDatabase database = new();
+        SqliteEngine engine = new(database.ConnectionString);
+
+        string result = engine.ExecuteInTransaction(tx =>
+        {
+            tx.ExecuteNonQuery(
+                "INSERT INTO [Sample] ([Name], [Amount]) VALUES (@Name, @Amount);",
+                new[]
+                {
+                    new SqliteParameter("@Name", "wrapper-func"),
+                    new SqliteParameter("@Amount", 14.5m)
+                });
+
+            long? count = tx.ExecuteScalar<long>("SELECT COUNT(*) FROM [Sample] WHERE [Name] = 'wrapper-func';");
+            return $"count={count}";
+        });
+
+        Assert.Equal("count=1", result);
+    }
+
 }

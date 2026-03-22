@@ -35,4 +35,12 @@ public interface ISqliteEngine
         string? queryName = null);
 
     ISqliteTransactionScope BeginTransaction(IsolationLevel isolationLevel = IsolationLevel.Serializable);
+
+    void ExecuteInTransaction(
+        Action<ISqliteTransactionScope> action,
+        IsolationLevel isolationLevel = IsolationLevel.Serializable);
+
+    T ExecuteInTransaction<T>(
+        Func<ISqliteTransactionScope, T> func,
+        IsolationLevel isolationLevel = IsolationLevel.Serializable);
 }
