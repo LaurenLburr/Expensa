@@ -1,0 +1,20 @@
+Update the AccountDetailsForm construction in MainForm.ShowAccountDetails(...) to pass _db as the first constructor argument:
+
+OLD:
+    AccountDetailsForm form = new(
+        repo: _accounts,
+        banks: _bankCache,
+        creds: _creds,
+        txns: _transactions,
+        payees: _payees,
+        onSaved: () => { ... });
+
+NEW:
+    AccountDetailsForm form = new(
+        db: _dbSession,
+        repo: _accounts,
+        banks: _bankCache,
+        creds: _creds,
+        txns: _transactions,
+        payees: _payees,
+        onSaved: () => { ... });

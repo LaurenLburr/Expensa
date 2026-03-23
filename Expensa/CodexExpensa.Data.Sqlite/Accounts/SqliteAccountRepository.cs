@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Codex.Data.SQLiteEngine;
 using CodexExpensa.Core.Domain.Accounts;
+using CodexExpensa.Core.Events;
 using CodexExpensa.Data.Sqlite.Db;
 using Microsoft.Data.Sqlite;
 
@@ -10,10 +11,14 @@ namespace CodexExpensa.Data.Sqlite.Accounts;
 public sealed class SqliteAccountRepository : IAccountRepository
 {
     private readonly SqliteDatabase _db;
+    private readonly ITableChangePublisher? _tableChangePublisher;
 
-    public SqliteAccountRepository(SqliteDatabase db)
+    public SqliteAccountRepository(
+        SqliteDatabase db,
+        ITableChangePublisher? tableChangePublisher = null)
     {
         _db = db ?? throw new ArgumentNullException(nameof(db));
+        _tableChangePublisher = tableChangePublisher;
     }
 
     public IReadOnlyList<Account> GetAll()
@@ -126,6 +131,11 @@ public sealed class SqliteAccountRepository : IAccountRepository
                 },
                 tx);
         });
+
+        RaiseTableChanged(
+            operation: TableChangeOperation.Insert,
+            keyValue: account.AccountId,
+            summary: $"Account '{account.AccountNickname}' added.");
     }
 
     public void Update(Account account)
@@ -168,6 +178,11 @@ public sealed class SqliteAccountRepository : IAccountRepository
                 },
                 tx);
         });
+
+        RaiseTableChanged(
+            operation: TableChangeOperation.Update,
+            keyValue: account.AccountId,
+            summary: $"Account '{account.AccountNickname}' updated.");
     }
 
     public void Delete(string accountId)
@@ -182,6 +197,27 @@ public sealed class SqliteAccountRepository : IAccountRepository
             """;
 
         _db.ExecuteNonQuery(sql, new[] { new SqliteParameter("@AccountId", accountId) });
+
+        RaiseTableChanged(
+            operation: TableChangeOperation.Delete,
+            keyValue: accountId,
+            summary: $"Account '{accountId}' deleted.");
+    }
+
+    private void RaiseTableChanged(
+        TableChangeOperation operation,
+        string keyValue,
+        string summary)
+    {
+        _tableChangePublisher?.Raise(new TableChangedEventArgs
+        {
+            TableName = "Account",
+            Operation = operation,
+            OccurredUtc = DateTime.UtcNow,
+            KeyValue = keyValue,
+            Source = nameof(SqliteAccountRepository),
+            Summary = summary
+        });
     }
 
     private static void ValidateForWrite(Account account)

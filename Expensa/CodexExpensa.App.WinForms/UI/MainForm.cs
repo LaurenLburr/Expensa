@@ -1,4 +1,4 @@
-﻿using CodexExpensa.App.WinForms.Infrastructure;
+using CodexExpensa.App.WinForms.Infrastructure;
 using CodexExpensa.App.WinForms.UI.Accounts;
 using CodexExpensa.App.WinForms.UI.Banks;
 using CodexExpensa.App.WinForms.UI.Budgets;
@@ -9,6 +9,7 @@ using CodexExpensa.Core.Domain.Accounts;
 using CodexExpensa.Core.Domain.Banks;
 using CodexExpensa.Core.Domain.Payees;
 using CodexExpensa.Core.Domain.Transactions;
+using CodexExpensa.Core.Events;
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -24,6 +25,8 @@ public partial class MainForm : Form
     private readonly IBankRepository _banks;
     private readonly ITransactionRepository _transactions;
     private readonly IPayeeRepository _payees;
+    private readonly ITableChangePublisher _tableChangePublisher;
+
     private readonly Func<Form> _createDbStatusForm;
 
     private readonly ICredentialStore _creds = new WindowsCredentialStore();
@@ -56,30 +59,18 @@ public partial class MainForm : Form
     private static class BudgetNav
     {
         public const string Template = "Budget.Template";
-
         public static string Current(int year, int month) => $"Budget.Current.{year:D4}.{month:D2}";
-
         public static string Year(int year) => $"Budget.Year.{year}";
-
         public static string Month(int year, int month) => $"Budget.Month.{year:D4}.{month:D2}";
 
         public static bool TryParseYear(string id, out int year)
         {
             year = 0;
-
-            if (string.IsNullOrWhiteSpace(id))
-                return false;
-
+            if (string.IsNullOrWhiteSpace(id)) return false;
             string[] parts = id.Split('.');
-            if (parts.Length != 3)
-                return false;
-
-            if (!string.Equals(parts[0], "Budget", StringComparison.OrdinalIgnoreCase))
-                return false;
-
-            if (!string.Equals(parts[1], "Year", StringComparison.OrdinalIgnoreCase))
-                return false;
-
+            if (parts.Length != 3) return false;
+            if (!string.Equals(parts[0], "Budget", StringComparison.OrdinalIgnoreCase)) return false;
+            if (!string.Equals(parts[1], "Year", StringComparison.OrdinalIgnoreCase)) return false;
             return int.TryParse(parts[2], out year);
         }
 
@@ -87,26 +78,13 @@ public partial class MainForm : Form
         {
             year = 0;
             month = 0;
-
-            if (string.IsNullOrWhiteSpace(id))
-                return false;
-
+            if (string.IsNullOrWhiteSpace(id)) return false;
             string[] parts = id.Split('.');
-            if (parts.Length != 4)
-                return false;
-
-            if (!string.Equals(parts[0], "Budget", StringComparison.OrdinalIgnoreCase))
-                return false;
-
-            if (!string.Equals(parts[1], "Month", StringComparison.OrdinalIgnoreCase))
-                return false;
-
-            if (!int.TryParse(parts[2], out year))
-                return false;
-
-            if (!int.TryParse(parts[3], out month))
-                return false;
-
+            if (parts.Length != 4) return false;
+            if (!string.Equals(parts[0], "Budget", StringComparison.OrdinalIgnoreCase)) return false;
+            if (!string.Equals(parts[1], "Month", StringComparison.OrdinalIgnoreCase)) return false;
+            if (!int.TryParse(parts[2], out year)) return false;
+            if (!int.TryParse(parts[3], out month)) return false;
             return month is >= 1 and <= 12;
         }
 
@@ -114,26 +92,13 @@ public partial class MainForm : Form
         {
             year = 0;
             month = 0;
-
-            if (string.IsNullOrWhiteSpace(id))
-                return false;
-
+            if (string.IsNullOrWhiteSpace(id)) return false;
             string[] parts = id.Split('.');
-            if (parts.Length != 4)
-                return false;
-
-            if (!string.Equals(parts[0], "Budget", StringComparison.OrdinalIgnoreCase))
-                return false;
-
-            if (!string.Equals(parts[1], "Current", StringComparison.OrdinalIgnoreCase))
-                return false;
-
-            if (!int.TryParse(parts[2], out year))
-                return false;
-
-            if (!int.TryParse(parts[3], out month))
-                return false;
-
+            if (parts.Length != 4) return false;
+            if (!string.Equals(parts[0], "Budget", StringComparison.OrdinalIgnoreCase)) return false;
+            if (!string.Equals(parts[1], "Current", StringComparison.OrdinalIgnoreCase)) return false;
+            if (!int.TryParse(parts[2], out year)) return false;
+            if (!int.TryParse(parts[3], out month)) return false;
             return month is >= 1 and <= 12;
         }
     }
@@ -143,14 +108,12 @@ public partial class MainForm : Form
         public const string NameView = "Payee.NameView";
         public const string TagView = "Payee.TagView";
         public const string TagGroupNone = "Payee.TagGroup.None";
-
         public static string TagGroup(string tagId) => $"Payee.TagGroup.{tagId}";
         public static string Item(string payeeId) => $"Payee.{payeeId}";
 
         public static bool TryParseItem(string id, out string payeeId)
         {
             payeeId = string.Empty;
-
             if (string.IsNullOrWhiteSpace(id))
                 return false;
 
@@ -170,6 +133,13 @@ public partial class MainForm : Form
         }
     }
 
+    private static class AccountNav
+    {
+        public const string TagView = "Account.TagView";
+        public const string TagGroupNone = "Account.TagGroup.None";
+        public static string TagGroup(string tagName) => $"Account.TagGroup.{tagName}";
+    }
+
     private static Form WrapControlInForm(Control control, string title)
     {
         Form form = new()
@@ -182,7 +152,6 @@ public partial class MainForm : Form
 
         control.Dock = DockStyle.Fill;
         form.Controls.Add(control);
-
         return form;
     }
 
@@ -192,7 +161,8 @@ public partial class MainForm : Form
         IBankRepository banks,
         ITransactionRepository transactions,
         IPayeeRepository payees,
-        Func<Form> createDbStatusForm)
+        Func<Form> createDbStatusForm,
+        ITableChangePublisher tableChangePublisher)
     {
         _dbSession = dbSession ?? throw new ArgumentNullException(nameof(dbSession));
         _accounts = accounts ?? throw new ArgumentNullException(nameof(accounts));
@@ -200,6 +170,7 @@ public partial class MainForm : Form
         _transactions = transactions ?? throw new ArgumentNullException(nameof(transactions));
         _payees = payees ?? throw new ArgumentNullException(nameof(payees));
         _createDbStatusForm = createDbStatusForm ?? throw new ArgumentNullException(nameof(createDbStatusForm));
+        _tableChangePublisher = tableChangePublisher ?? throw new ArgumentNullException(nameof(tableChangePublisher));
 
         InitializeComponent();
 
@@ -213,6 +184,7 @@ public partial class MainForm : Form
         _ctxPayeeNode = BuildPayeeNodeMenu();
 
         Load += MainForm_Load;
+        FormClosed += MainForm_FormClosed;
 
         treeNav.AfterSelect += TreeNav_AfterSelect;
         treeNav.NodeMouseClick += TreeNav_NodeMouseClick;
@@ -221,11 +193,162 @@ public partial class MainForm : Form
         menuFileExit.Click += (_, _) => Close();
         menuViewRefresh.Click += MenuViewRefresh_Click;
         menuToolsDbStatus.Click += MenuToolsDbStatus_Click;
-
         menuHelpAbout.Click += MenuHelpAbout_Click;
+
+        _tableChangePublisher.TableChanged += OnTableChanged;
 
         UpdateDbStatus();
         SetStatus("Ready");
+    }
+
+    private void MainForm_FormClosed(object? sender, FormClosedEventArgs e)
+    {
+        _tableChangePublisher.TableChanged -= OnTableChanged;
+    }
+
+    private void OnTableChanged(object? sender, TableChangedEventArgs e)
+    {
+        if (!string.Equals(e.TableName, "Account", StringComparison.OrdinalIgnoreCase))
+            return;
+
+        if (InvokeRequired)
+        {
+            BeginInvoke(new Action(() => HandleAccountChanged(e)));
+            return;
+        }
+
+        HandleAccountChanged(e);
+    }
+
+    private void HandleAccountChanged(TableChangedEventArgs e)
+    {
+        try
+        {
+            string? selectedTag = treeNav.SelectedNode?.Tag?.ToString();
+            HashSet<string> expandedTags = CaptureExpandedNodeTags();
+
+            RefreshCaches();
+            BuildNavigationTree();
+            RestoreExpandedNodeTags(expandedTags);
+            TryRestoreSelection(selectedTag, e.KeyValue);
+
+            if (_activeChildForm is AccountsListForm)
+            {
+                ShowAccountsList();
+            }
+            else if (_activeChildForm is AccountDetailsForm && !string.IsNullOrWhiteSpace(e.KeyValue))
+            {
+                Account? refreshed = _accountCache.FirstOrDefault(a => a.AccountId == e.KeyValue);
+                if (refreshed is not null)
+                    ShowAccountDetails(e.KeyValue);
+                else
+                    ShowAccountsList();
+            }
+
+            SetStatus($"Account {e.Operation}");
+        }
+        catch (Exception ex)
+        {
+            ShowError("Account refresh failed", ex);
+        }
+    }
+
+    private HashSet<string> CaptureExpandedNodeTags()
+    {
+        HashSet<string> expanded = new(StringComparer.Ordinal);
+        CaptureExpandedNodeTags(treeNav.Nodes, expanded);
+        return expanded;
+    }
+
+    private static void CaptureExpandedNodeTags(TreeNodeCollection nodes, HashSet<string> expanded)
+    {
+        foreach (TreeNode node in nodes)
+        {
+            if (node.IsExpanded && node.Tag is not null)
+            {
+                string key = node.Tag.ToString() ?? string.Empty;
+                if (!string.IsNullOrWhiteSpace(key))
+                    expanded.Add(key);
+            }
+
+            if (node.Nodes.Count > 0)
+                CaptureExpandedNodeTags(node.Nodes, expanded);
+        }
+    }
+
+    private void RestoreExpandedNodeTags(HashSet<string> expandedTags)
+    {
+        if (expandedTags.Count == 0)
+            return;
+
+        RestoreExpandedNodeTags(treeNav.Nodes, expandedTags);
+    }
+
+    private static void RestoreExpandedNodeTags(TreeNodeCollection nodes, HashSet<string> expandedTags)
+    {
+        foreach (TreeNode node in nodes)
+        {
+            string key = node.Tag?.ToString() ?? string.Empty;
+            if (!string.IsNullOrWhiteSpace(key) && expandedTags.Contains(key))
+                node.Expand();
+
+            if (node.Nodes.Count > 0)
+                RestoreExpandedNodeTags(node.Nodes, expandedTags);
+        }
+    }
+
+    private void TryRestoreSelection(string? previousTagValue, string? preferredAccountId)
+    {
+        if (!string.IsNullOrWhiteSpace(preferredAccountId))
+        {
+            TreeNode? preferredNode = FindNodeByTag(treeNav.Nodes, preferredAccountId);
+            if (preferredNode is not null)
+            {
+                ExpandParentChain(preferredNode);
+                treeNav.SelectedNode = preferredNode;
+                preferredNode.EnsureVisible();
+                return;
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(previousTagValue))
+        {
+            TreeNode? previousNode = FindNodeByTag(treeNav.Nodes, previousTagValue);
+            if (previousNode is not null)
+            {
+                ExpandParentChain(previousNode);
+                treeNav.SelectedNode = previousNode;
+                previousNode.EnsureVisible();
+                return;
+            }
+        }
+
+        SelectFirstNode();
+    }
+
+    private static TreeNode? FindNodeByTag(TreeNodeCollection nodes, string tagValue)
+    {
+        foreach (TreeNode node in nodes)
+        {
+            if (string.Equals(node.Tag?.ToString(), tagValue, StringComparison.Ordinal))
+                return node;
+
+            TreeNode? child = FindNodeByTag(node.Nodes, tagValue);
+            if (child is not null)
+                return child;
+        }
+
+        return null;
+    }
+
+    private static void ExpandParentChain(TreeNode node)
+    {
+        TreeNode? current = node.Parent;
+        while (current is not null)
+        {
+            current.Expand();
+            current = current.Parent;
+        }
     }
 
     private void MainForm_Load(object? sender, EventArgs e)
@@ -349,10 +472,7 @@ public partial class MainForm : Form
                 string bankDisplay = GetBankDisplayName(bankId);
                 TreeNode bankNode = new(bankDisplay) { Tag = bankId };
 
-                foreach (Account acct in accountsForBank
-                             .OrderBy(a => a.SortIndex)
-                             .ThenBy(a => a.AccountNickname)
-                             .ThenBy(a => a.AccountNumber))
+                foreach (Account acct in accountsForBank.OrderBy(a => a.SortIndex).ThenBy(a => a.AccountNickname).ThenBy(a => a.AccountNumber))
                 {
                     string last4 = Last4(acct.AccountNumber);
                     string label = $"{acct.AccountNickname} - {last4}";
@@ -361,6 +481,10 @@ public partial class MainForm : Form
 
                 accountsRoot.Nodes.Add(bankNode);
             }
+
+            TreeNode accountTagNode = new("Tags") { Tag = AccountNav.TagView };
+            BuildAccountTagNodes(accountTagNode);
+            accountsRoot.Nodes.Add(accountTagNode);
 
             treeNav.Nodes.Add(accountsRoot);
 
@@ -372,9 +496,7 @@ public partial class MainForm : Form
             payeesRoot.Nodes.Add(payeeNameNode);
             payeesRoot.Nodes.Add(payeeTagNode);
 
-            foreach (Payee p in _payeeCache
-                         .OrderByDescending(p => p.IncludeInBudgetTemplate)
-                         .ThenBy(p => p.PayeeName))
+            foreach (Payee p in _payeeCache.OrderByDescending(p => p.IncludeInBudgetTemplate).ThenBy(p => p.PayeeName))
             {
                 string label = p.IncludeInBudgetTemplate ? $"{p.PayeeName}  ✓" : p.PayeeName;
                 payeesRoot.Nodes.Add(new TreeNode(label) { Tag = PayeeNav.Item(p.PayeeId) });
@@ -383,7 +505,6 @@ public partial class MainForm : Form
             treeNav.Nodes.Add(payeesRoot);
 
             TreeNode budgetsRoot = new("Budgets") { Tag = NavTag.BudgetsRoot };
-
             budgetsRoot.Nodes.Add(new TreeNode("Template") { Tag = BudgetNav.Template });
 
             DateTime today = DateTime.Today;
@@ -394,7 +515,6 @@ public partial class MainForm : Form
 
             int currentYear = today.Year;
             int currentMonth = today.Month;
-
             List<int> years = Enumerable.Range(currentYear - 4, 5).Reverse().ToList();
 
             foreach (int year in years)
@@ -430,6 +550,72 @@ public partial class MainForm : Form
         }
     }
 
+    private void BuildAccountTagNodes(TreeNode accountTagNode)
+    {
+        if (accountTagNode is null)
+            return;
+
+        accountTagNode.Nodes.Clear();
+
+        DataTable tagRows = _dbSession.QueryDataTable("AccountTag.SelectAllForNavigation");
+
+        Dictionary<string, List<(string AccountId, string Label)>> grouped = new(StringComparer.OrdinalIgnoreCase);
+        HashSet<string> taggedAccountIds = new(StringComparer.Ordinal);
+
+        foreach (DataRow row in tagRows.Rows)
+        {
+            string accountId = row["AccountId"]?.ToString() ?? string.Empty;
+            string tagName = row["TagName"]?.ToString() ?? string.Empty;
+            string accountNickname = row["AccountNickname"]?.ToString() ?? string.Empty;
+            string accountNumber = row["AccountNumber"]?.ToString() ?? string.Empty;
+
+            if (string.IsNullOrWhiteSpace(accountId) || string.IsNullOrWhiteSpace(tagName))
+                continue;
+
+            string label = string.IsNullOrWhiteSpace(accountNickname)
+                ? accountId
+                : $"{accountNickname} - {Last4(accountNumber)}";
+
+            taggedAccountIds.Add(accountId);
+
+            if (!grouped.TryGetValue(tagName, out List<(string AccountId, string Label)>? list))
+            {
+                list = new List<(string AccountId, string Label)>();
+                grouped[tagName] = list;
+            }
+
+            if (!list.Any(x => string.Equals(x.AccountId, accountId, StringComparison.Ordinal)))
+                list.Add((accountId, label));
+        }
+
+        TreeNode noneNode = new("None") { Tag = AccountNav.TagGroupNone };
+
+        foreach (Account account in _accountCache
+                     .Where(a => !taggedAccountIds.Contains(a.AccountId))
+                     .OrderBy(a => a.AccountNickname)
+                     .ThenBy(a => a.AccountNumber))
+        {
+            noneNode.Nodes.Add(new TreeNode($"{account.AccountNickname} - {Last4(account.AccountNumber)}")
+            {
+                Tag = account.AccountId
+            });
+        }
+
+        accountTagNode.Nodes.Add(noneNode);
+
+        foreach (KeyValuePair<string, List<(string AccountId, string Label)>> kvp in grouped.OrderBy(x => x.Key, StringComparer.OrdinalIgnoreCase))
+        {
+            TreeNode tagNode = new(kvp.Key) { Tag = AccountNav.TagGroup(kvp.Key) };
+
+            foreach ((string accountId, string label) in kvp.Value.OrderBy(x => x.Label, StringComparer.OrdinalIgnoreCase))
+            {
+                tagNode.Nodes.Add(new TreeNode(label) { Tag = accountId });
+            }
+
+            accountTagNode.Nodes.Add(tagNode);
+        }
+    }
+
     private void BuildPayeeTagNodes(TreeNode payeeTagNode)
     {
         if (payeeTagNode is null)
@@ -438,7 +624,6 @@ public partial class MainForm : Form
         payeeTagNode.Nodes.Clear();
 
         Dictionary<string, Payee> payeesById = _payeeCache.ToDictionary(p => p.PayeeId, StringComparer.Ordinal);
-
         DataTable tagRows = _dbSession.QueryDataTable("PayeeTag.SelectAllForNavigation");
 
         Dictionary<string, List<Payee>> grouped = new(StringComparer.OrdinalIgnoreCase);
@@ -471,9 +656,7 @@ public partial class MainForm : Form
 
         TreeNode noneNode = new("None") { Tag = PayeeNav.TagGroupNone };
 
-        foreach (Payee payee in _payeeCache
-                     .Where(p => !taggedPayeeIds.Contains(p.PayeeId))
-                     .OrderBy(p => p.PayeeName))
+        foreach (Payee payee in _payeeCache.Where(p => !taggedPayeeIds.Contains(p.PayeeId)).OrderBy(p => p.PayeeName))
         {
             noneNode.Nodes.Add(new TreeNode(payee.PayeeName)
             {
@@ -509,6 +692,20 @@ public partial class MainForm : Form
         }
     }
 
+    private void ShowAccountTagView()
+    {
+        Label label = new()
+        {
+            Dock = DockStyle.Fill,
+            Text = "Accounts are grouped in the tree under each tag.\r\nSelect an account under a tag group to open it.",
+            TextAlign = System.Drawing.ContentAlignment.MiddleCenter
+        };
+
+        Panel panel = new() { Dock = DockStyle.Fill };
+        panel.Controls.Add(label);
+        ShowChildForm(WrapControlInForm(panel, "Account Tags"));
+    }
+
     private void ShowPayeeTagView()
     {
         Label label = new()
@@ -518,13 +715,8 @@ public partial class MainForm : Form
             TextAlign = System.Drawing.ContentAlignment.MiddleCenter
         };
 
-        Panel panel = new()
-        {
-            Dock = DockStyle.Fill
-        };
-
+        Panel panel = new() { Dock = DockStyle.Fill };
         panel.Controls.Add(label);
-
         ShowChildForm(WrapControlInForm(panel, "Payee Tags"));
     }
 
@@ -537,19 +729,14 @@ public partial class MainForm : Form
             payeesRoot.Nodes.RemoveAt(2);
 
         IEnumerable<Payee> filtered = _payeeCache;
-
         if (!string.IsNullOrWhiteSpace(_payeeNameFilter))
         {
-            filtered = filtered.Where(p =>
-                p.PayeeName.Contains(_payeeNameFilter, StringComparison.OrdinalIgnoreCase));
+            filtered = filtered.Where(p => p.PayeeName.Contains(_payeeNameFilter, StringComparison.OrdinalIgnoreCase));
         }
 
-        foreach (Payee p in filtered
-                     .OrderByDescending(p => p.IncludeInBudgetTemplate)
-                     .ThenBy(p => p.PayeeName))
+        foreach (Payee p in filtered.OrderByDescending(p => p.IncludeInBudgetTemplate).ThenBy(p => p.PayeeName))
         {
             string label = p.IncludeInBudgetTemplate ? $"{p.PayeeName}  ✓" : p.PayeeName;
-
             payeesRoot.Nodes.Add(new TreeNode(label)
             {
                 Tag = PayeeNav.Item(p.PayeeId)
@@ -591,33 +778,19 @@ public partial class MainForm : Form
 
     private void TreeNav_AfterSelect(object? sender, TreeViewEventArgs e)
     {
-        if (e.Node is null)
-            return;
-
-        if (TryHandleBudgetNodeSelection(e.Node))
-            return;
-
-        if (TryHandlePayeeViewNodeSelection(e.Node))
-            return;
-
-        if (TryHandleRootNodeSelection(e.Node))
-            return;
-
-        if (TryHandlePayeeNodeSelection(e.Node))
-            return;
-
-        if (TryHandleBankNodeSelection(e.Node))
-            return;
-
-        if (TryHandleAccountNodeSelection(e.Node))
-            return;
+        if (e.Node is null) return;
+        if (TryHandleBudgetNodeSelection(e.Node)) return;
+        if (TryHandlePayeeViewNodeSelection(e.Node)) return;
+        if (TryHandleAccountViewNodeSelection(e.Node)) return;
+        if (TryHandleRootNodeSelection(e.Node)) return;
+        if (TryHandlePayeeNodeSelection(e.Node)) return;
+        if (TryHandleBankNodeSelection(e.Node)) return;
+        if (TryHandleAccountNodeSelection(e.Node)) return;
     }
 
     private bool TryHandleBudgetNodeSelection(TreeNode node)
     {
-        if (node.Tag is not string tag)
-            return false;
-
+        if (node.Tag is not string tag) return false;
         if (string.Equals(tag, BudgetNav.Template, StringComparison.OrdinalIgnoreCase))
         {
             ShowBudgetTemplate();
@@ -651,8 +824,7 @@ public partial class MainForm : Form
 
     private bool TryHandlePayeeViewNodeSelection(TreeNode node)
     {
-        if (node.Tag is not string tag)
-            return false;
+        if (node.Tag is not string tag) return false;
 
         if (string.Equals(tag, PayeeNav.NameView, StringComparison.OrdinalIgnoreCase))
         {
@@ -663,8 +835,6 @@ public partial class MainForm : Form
 
         if (string.Equals(tag, PayeeNav.TagView, StringComparison.OrdinalIgnoreCase))
         {
-            BuildPayeeTagNodes(node);
-            node.Expand();
             ShowPayeeTagView();
             SetStatus("Payees: Tags");
             return true;
@@ -673,10 +843,24 @@ public partial class MainForm : Form
         return false;
     }
 
+    private bool TryHandleAccountViewNodeSelection(TreeNode node)
+    {
+        if (node.Tag is not string tag)
+            return false;
+
+        if (string.Equals(tag, AccountNav.TagView, StringComparison.OrdinalIgnoreCase))
+        {
+            ShowAccountTagView();
+            SetStatus("Accounts: Tags");
+            return true;
+        }
+
+        return false;
+    }
+
     private bool TryHandleRootNodeSelection(TreeNode node)
     {
-        if (node.Tag is not NavTag rootTag)
-            return false;
+        if (node.Tag is not NavTag rootTag) return false;
 
         switch (rootTag)
         {
@@ -684,22 +868,18 @@ public partial class MainForm : Form
                 SetStatus("Banks");
                 ShowBanksLanding();
                 return true;
-
             case NavTag.AccountsRoot:
                 SetStatus("Accounts");
                 ShowAccountsList();
                 return true;
-
             case NavTag.PayeesRoot:
                 SetStatus("Payees");
                 ShowPayeesLanding();
                 return true;
-
             case NavTag.BudgetsRoot:
                 SetStatus("Budgets");
                 ShowBudgetsLanding();
                 return true;
-
             default:
                 return false;
         }
@@ -707,17 +887,14 @@ public partial class MainForm : Form
 
     private bool TryHandlePayeeNodeSelection(TreeNode node)
     {
-        if (node.Tag is string taggedNode &&
-            PayeeNav.TryParseItem(taggedNode, out string parsedPayeeId))
+        if (node.Tag is string taggedNode && PayeeNav.TryParseItem(taggedNode, out string parsedPayeeId))
         {
             ShowPayeeDetails(parsedPayeeId);
             SetStatus($"Payee: {node.Text}");
             return true;
         }
 
-        if (node.Tag is string payeeId &&
-            node.Parent?.Tag is NavTag payeeRootTag &&
-            payeeRootTag == NavTag.PayeesRoot)
+        if (node.Tag is string payeeId && node.Parent?.Tag is NavTag payeeRootTag && payeeRootTag == NavTag.PayeesRoot)
         {
             ShowPayeeDetails(payeeId);
             SetStatus($"Payee: {node.Text}");
@@ -752,9 +929,27 @@ public partial class MainForm : Form
 
     private bool TryHandleAccountNodeSelection(TreeNode node)
     {
-        if (node.Tag is string accountId &&
-            node.Parent?.Parent?.Tag is NavTag accountsRootTag &&
+        if (node.Tag is not string accountId)
+            return false;
+
+        if (node.Parent?.Parent?.Tag is NavTag accountsRootTag &&
             accountsRootTag == NavTag.AccountsRoot)
+        {
+            ShowAccountDetails(accountId);
+            SetStatus($"Account: {node.Text}");
+            return true;
+        }
+
+        if (node.Parent?.Parent?.Tag is string tagGroup &&
+            tagGroup.StartsWith("Account.TagGroup.", StringComparison.OrdinalIgnoreCase))
+        {
+            ShowAccountDetails(accountId);
+            SetStatus($"Account: {node.Text}");
+            return true;
+        }
+
+        if (node.Parent?.Tag is string parentTag &&
+            string.Equals(parentTag, AccountNav.TagGroupNone, StringComparison.OrdinalIgnoreCase))
         {
             ShowAccountDetails(accountId);
             SetStatus($"Account: {node.Text}");
@@ -766,11 +961,7 @@ public partial class MainForm : Form
 
     private void TreeNav_NodeMouseClick(object? sender, TreeNodeMouseClickEventArgs e)
     {
-        if (e.Node is null)
-            return;
-
-        if (e.Button != MouseButtons.Right)
-            return;
+        if (e.Node is null || e.Button != MouseButtons.Right) return;
 
         treeNav.SelectedNode = e.Node;
 
@@ -778,21 +969,10 @@ public partial class MainForm : Form
         {
             switch (rootTag)
             {
-                case NavTag.BanksRoot:
-                    _ctxBanksRoot.Show(treeNav, e.Location);
-                    return;
-
-                case NavTag.AccountsRoot:
-                    _ctxAccountsRoot.Show(treeNav, e.Location);
-                    return;
-
-                case NavTag.PayeesRoot:
-                    _ctxPayeesRoot.Show(treeNav, e.Location);
-                    return;
-
-                case NavTag.BudgetsRoot:
-                    _ctxBudgetsRoot.Show(treeNav, e.Location);
-                    return;
+                case NavTag.BanksRoot: _ctxBanksRoot.Show(treeNav, e.Location); return;
+                case NavTag.AccountsRoot: _ctxAccountsRoot.Show(treeNav, e.Location); return;
+                case NavTag.PayeesRoot: _ctxPayeesRoot.Show(treeNav, e.Location); return;
+                case NavTag.BudgetsRoot: _ctxBudgetsRoot.Show(treeNav, e.Location); return;
             }
         }
 
@@ -826,19 +1006,33 @@ public partial class MainForm : Form
             rootTag2 == NavTag.AccountsRoot)
         {
             _ctxAccountNode.Show(treeNav, e.Location);
+            return;
+        }
+
+        if (e.Node.Tag is string &&
+            e.Node.Parent?.Parent?.Tag is string tagGroup &&
+            tagGroup.StartsWith("Account.TagGroup.", StringComparison.OrdinalIgnoreCase))
+        {
+            _ctxAccountNode.Show(treeNav, e.Location);
+            return;
+        }
+
+        if (e.Node.Tag is string &&
+            e.Node.Parent?.Tag is string noneTag &&
+            string.Equals(noneTag, AccountNav.TagGroupNone, StringComparison.OrdinalIgnoreCase))
+        {
+            _ctxAccountNode.Show(treeNav, e.Location);
         }
     }
 
     private ContextMenuStrip BuildBanksRootMenu()
     {
         ContextMenuStrip menu = new();
-
         ToolStripMenuItem add = new("Add Bank");
         add.Click += (_, _) =>
         {
             using AddBankForm dlg = new();
-            if (dlg.ShowDialog(this) != DialogResult.OK)
-                return;
+            if (dlg.ShowDialog(this) != DialogResult.OK) return;
 
             Bank bank = new()
             {
@@ -853,7 +1047,6 @@ public partial class MainForm : Form
             RefreshCaches();
             BuildNavigationTree();
         };
-
         menu.Items.Add(add);
         return menu;
     }
@@ -861,21 +1054,17 @@ public partial class MainForm : Form
     private ContextMenuStrip BuildAccountsRootMenu()
     {
         ContextMenuStrip menu = new();
-
         ToolStripMenuItem addChecking = new("Add Checking Account...");
         addChecking.Click += (_, _) =>
         {
             using AddCheckingAccountForm dlg = new(_bankCache);
-            if (dlg.ShowDialog(this) != DialogResult.OK)
-                return;
+            if (dlg.ShowDialog(this) != DialogResult.OK) return;
 
             string? bankId = dlg.BankId;
-            if (string.IsNullOrWhiteSpace(bankId))
-                return;
+            if (string.IsNullOrWhiteSpace(bankId)) return;
 
             Bank? bank = _bankCache.FirstOrDefault(b => b.BankId == bankId);
-            if (bank is null)
-                return;
+            if (bank is null) return;
 
             Account acct = new()
             {
@@ -895,7 +1084,6 @@ public partial class MainForm : Form
             RefreshCaches();
             BuildNavigationTree();
         };
-
         menu.Items.Add(addChecking);
         return menu;
     }
@@ -903,13 +1091,11 @@ public partial class MainForm : Form
     private ContextMenuStrip BuildPayeesRootMenu()
     {
         ContextMenuStrip menu = new();
-
         ToolStripMenuItem add = new("Add Payee...");
         add.Click += (_, _) =>
         {
             string? name = PromptForText(this, "Add Payee", "Payee name:");
-            if (string.IsNullOrWhiteSpace(name))
-                return;
+            if (string.IsNullOrWhiteSpace(name)) return;
 
             Payee payee = new()
             {
@@ -922,39 +1108,29 @@ public partial class MainForm : Form
             RefreshCaches();
             BuildNavigationTree();
         };
-
         menu.Items.Add(add);
         return menu;
     }
 
-    private ContextMenuStrip BuildBudgetsRootMenu()
-    {
-        ContextMenuStrip menu = new();
-        return menu;
-    }
+    private ContextMenuStrip BuildBudgetsRootMenu() => new();
 
     private ContextMenuStrip BuildBankNodeMenu()
     {
         ContextMenuStrip menu = new();
-
         ToolStripMenuItem addChecking = new("Add Checking Account...");
         addChecking.Click += (_, _) =>
         {
             string? bankId = treeNav.SelectedNode?.Tag as string;
-            if (string.IsNullOrWhiteSpace(bankId))
-                return;
+            if (string.IsNullOrWhiteSpace(bankId)) return;
 
             using AddCheckingAccountForm dlg = new(_bankCache, preselectedBankId: bankId);
-            if (dlg.ShowDialog(this) != DialogResult.OK)
-                return;
+            if (dlg.ShowDialog(this) != DialogResult.OK) return;
 
             string? selectedBankId = dlg.BankId;
-            if (string.IsNullOrWhiteSpace(selectedBankId))
-                return;
+            if (string.IsNullOrWhiteSpace(selectedBankId)) return;
 
             Bank? bank = _bankCache.FirstOrDefault(b => b.BankId == selectedBankId);
-            if (bank is null)
-                return;
+            if (bank is null) return;
 
             Account acct = new()
             {
@@ -974,7 +1150,6 @@ public partial class MainForm : Form
             RefreshCaches();
             BuildNavigationTree();
         };
-
         menu.Items.Add(addChecking);
         return menu;
     }
@@ -982,30 +1157,26 @@ public partial class MainForm : Form
     private ContextMenuStrip BuildAccountNodeMenu()
     {
         ContextMenuStrip menu = new();
-
         ToolStripMenuItem del = new("Delete Account");
         del.Click += (_, _) =>
         {
             string? accountId = treeNav.SelectedNode?.Tag as string;
-            if (string.IsNullOrWhiteSpace(accountId))
-                return;
+            if (string.IsNullOrWhiteSpace(accountId)) return;
 
-            DialogResult ConfirmationNumber = MessageBox.Show(
+            DialogResult confirmation = MessageBox.Show(
                 this,
                 "Delete this account?",
-                "ConfirmationNumber",
+                "Confirmation",
                 MessageBoxButtons.YesNo,
                 MessageBoxIcon.Warning);
 
-            if (ConfirmationNumber != DialogResult.Yes)
-                return;
+            if (confirmation != DialogResult.Yes) return;
 
             _accounts.Delete(accountId);
             RefreshCaches();
             BuildNavigationTree();
             ShowAccountsList();
         };
-
         menu.Items.Add(del);
         return menu;
     }
@@ -1013,64 +1184,40 @@ public partial class MainForm : Form
     private ContextMenuStrip BuildPayeeNodeMenu()
     {
         ContextMenuStrip menu = new();
-
         ToolStripMenuItem del = new("Delete Payee");
         del.Click += (_, _) =>
         {
             string? payeeId = treeNav.SelectedNode?.Tag as string;
-            if (string.IsNullOrWhiteSpace(payeeId))
-                return;
+            if (string.IsNullOrWhiteSpace(payeeId)) return;
 
-            DialogResult ConfirmationNumber = MessageBox.Show(
+            DialogResult confirmation = MessageBox.Show(
                 this,
                 "Delete this payee?",
-                "ConfirmationNumber",
+                "Confirmation",
                 MessageBoxButtons.YesNo,
                 MessageBoxIcon.Warning);
 
-            if (ConfirmationNumber != DialogResult.Yes)
-                return;
+            if (confirmation != DialogResult.Yes) return;
 
             _payees.Delete(payeeId);
             RefreshCaches();
             BuildNavigationTree();
             ShowPayeesLanding();
         };
-
         menu.Items.Add(del);
         return menu;
     }
 
     private void ShowPayeeNameFilter()
     {
-        TextBox box = new()
-        {
-            Dock = DockStyle.Top,
-            Width = 300,
-            Text = _payeeNameFilter
-        };
-
-        Label label = new()
-        {
-            Dock = DockStyle.Top,
-            Height = 24,
-            Text = "Filter payees by name",
-            TextAlign = System.Drawing.ContentAlignment.MiddleLeft
-        };
-
-        Panel panel = new()
-        {
-            Dock = DockStyle.Fill
-        };
+        TextBox box = new() { Dock = DockStyle.Top, Width = 300, Text = _payeeNameFilter };
+        Label label = new() { Dock = DockStyle.Top, Height = 24, Text = "Filter payees by name", TextAlign = System.Drawing.ContentAlignment.MiddleLeft };
+        Panel panel = new() { Dock = DockStyle.Fill };
 
         box.TextChanged += (_, _) =>
         {
             _payeeNameFilter = box.Text.Trim();
-
-            TreeNode? payeesRoot = treeNav.Nodes
-                .Cast<TreeNode>()
-                .FirstOrDefault(n => n.Tag is NavTag tag && tag == NavTag.PayeesRoot);
-
+            TreeNode? payeesRoot = treeNav.Nodes.Cast<TreeNode>().FirstOrDefault(n => n.Tag is NavTag tag && tag == NavTag.PayeesRoot);
             if (payeesRoot is not null)
             {
                 treeNav.BeginUpdate();
@@ -1088,31 +1235,20 @@ public partial class MainForm : Form
 
         panel.Controls.Add(box);
         panel.Controls.Add(label);
-
         ShowChildForm(WrapControlInForm(panel, "Payee Name Filter"));
     }
 
     private void ShowBanksLanding()
     {
-        BanksLandingForm form = new(openBankDetails: bankId =>
-        {
-            ShowBankDetails(bankId);
-        });
-
+        BanksLandingForm form = new(openBankDetails: bankId => ShowBankDetails(bankId));
         form.SetBanks(_bankCache);
-
         ShowChildForm(form);
     }
 
     private void ShowAccountsList()
     {
-        AccountsListForm form = new(openAccountDetails: accountId =>
-        {
-            ShowAccountDetails(accountId);
-        });
-
+        AccountsListForm form = new(openAccountDetails: accountId => ShowAccountDetails(accountId));
         form.SetAccounts(_accountCache);
-
         ShowChildForm(form);
     }
 
@@ -1120,10 +1256,7 @@ public partial class MainForm : Form
     {
         PayeesLandingForm form = new(
             _dbSession,
-            openPayeeDetails: payeeId =>
-            {
-                ShowPayeeDetails(payeeId);
-            },
+            openPayeeDetails: payeeId => ShowPayeeDetails(payeeId),
             savePayee: payee =>
             {
                 _payees.Update(payee);
@@ -1132,7 +1265,6 @@ public partial class MainForm : Form
             });
 
         form.SetPayees(_payeeCache);
-
         ShowChildForm(form);
     }
 
@@ -1195,6 +1327,7 @@ public partial class MainForm : Form
         }
 
         AccountDetailsForm form = new(
+            db: _dbSession,
             repo: _accounts,
             banks: _bankCache,
             creds: _creds,
@@ -1233,12 +1366,10 @@ public partial class MainForm : Form
             }
             catch
             {
-                // ignore
             }
         }
 
         _activeChildForm = form;
-
         panelHost.Controls.Clear();
 
         form.TopLevel = false;
@@ -1249,24 +1380,12 @@ public partial class MainForm : Form
         form.Show();
     }
 
-    private void UpdateDbStatus()
-    {
-        statusDbMode.Text = "DB: ???";
-    }
-
-    private void SetStatus(string message)
-    {
-        statusText.Text = message;
-    }
+    private void UpdateDbStatus() => statusDbMode.Text = "DB: ???";
+    private void SetStatus(string message) => statusText.Text = message;
 
     private void ShowError(string title, Exception ex)
     {
-        MessageBox.Show(
-            this,
-            $"{ex.GetType().Name}: {ex.Message}",
-            title,
-            MessageBoxButtons.OK,
-            MessageBoxIcon.Error);
+        MessageBox.Show(this, $"{ex.GetType().Name}: {ex.Message}", title, MessageBoxButtons.OK, MessageBoxIcon.Error);
     }
 
     private static string? PromptForText(IWin32Window owner, string title, string prompt)
@@ -1308,7 +1427,6 @@ public partial class MainForm : Form
     private void budgetMonthsToolStripMenuItem_Click(object sender, EventArgs e)
     {
         DateTime today = DateTime.Today;
-
         using BudgetMonthForm form = new(_dbSession, _transactions, today.Year, today.Month);
         form.ShowDialog(this);
     }

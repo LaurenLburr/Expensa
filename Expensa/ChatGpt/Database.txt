@@ -1,5 +1,5 @@
 --
--- File generated with SQLiteStudio v3.4.15 on Sun Mar 15 20:06:09 2026
+-- File generated with SQLiteStudio v3.4.15 on Sun Mar 22 22:18:29 2026
 --
 -- Text encoding used: System
 --
@@ -29,6 +29,29 @@ CREATE TABLE IF NOT EXISTS Account (
         BankId
     )
     REFERENCES Bank (BankId) 
+);
+
+
+-- Table: AccountTag
+CREATE TABLE IF NOT EXISTS AccountTag (
+    AccountTagId TEXT    NOT NULL
+                         PRIMARY KEY,
+    AccountId    TEXT    NOT NULL,
+    TagId        TEXT    NOT NULL,
+    SortIndex    INTEGER NOT NULL
+                         DEFAULT 0,
+    FOREIGN KEY (
+        AccountId
+    )
+    REFERENCES Account (AccountId),
+    FOREIGN KEY (
+        TagId
+    )
+    REFERENCES Tag (TagId),
+    CONSTRAINT IX_AccountTag UNIQUE (
+        AccountId,
+        TagId
+    )
 );
 
 
@@ -173,12 +196,7 @@ CREATE TABLE IF NOT EXISTS PayeeTag (
     FOREIGN KEY (
         TagId
     )
-    REFERENCES Tag (TagId),
-    CONSTRAINT IX_PayeeTag_PayeeId_TagId UNIQUE (
-        PayeeTagId,
-        PayeeId
-    )
-    ON CONFLICT IGNORE
+    REFERENCES Tag (TagId) 
 );
 
 
@@ -194,8 +212,10 @@ CREATE TABLE IF NOT EXISTS SchemaMigrations (
 -- Table: SqlQuery
 CREATE TABLE IF NOT EXISTS SqlQuery (
     QueryName   TEXT    PRIMARY KEY,
-    Description TEXT    NOT NULL,
-    SqlText     TEXT    NOT NULL,
+    Description TEXT    NOT NULL
+                        DEFAULT (''),
+    SqlText     TEXT    NOT NULL
+                        DEFAULT (''),
     CreatedUtc  TEXT    NOT NULL
                         DEFAULT CURRENT_TIMESTAMP,
     Category    TEXT    NOT NULL
@@ -465,20 +485,24 @@ CREATE TABLE IF NOT EXISTS Tag (
     SortIndex INTEGER NOT NULL
                       DEFAULT 0,
     IsActive  INTEGER NOT NULL
-                      DEFAULT 1
+                      DEFAULT 1,
+    UNIQUE (
+        TagId COLLATE NOCASE
+    )
 );
 
 
 -- Table: Txn
 CREATE TABLE IF NOT EXISTS Txn (
-    TransactionId INTEGER PRIMARY KEY AUTOINCREMENT,
-    AccountId     TEXT    NOT NULL,
-    PayeeId       TEXT    NULL,
-    Status        INTEGER NOT NULL,-- 0=Projected,1=Outstanding,2=Cleared
-    Amount        REAL    NOT NULL,
-    StartDate     TEXT    NOT NULL,-- ISO yyyy-MM-dd
-    Confirm       TEXT    NULL,
-    Note          TEXT    NULL,
+    TransactionId      INTEGER PRIMARY KEY AUTOINCREMENT,
+    AccountId          TEXT    NOT NULL,
+    PayeeId            TEXT    NULL,
+    Status             TEXT    NOT NULL
+                               DEFAULT ('Projected '),
+    Amount             REAL    NOT NULL,
+    StartDate          TEXT    NOT NULL,
+    ConfirmationNumber TEXT    NULL,
+    Note               TEXT    NULL,
     FOREIGN KEY (
         AccountId
     )
@@ -486,7 +510,8 @@ CREATE TABLE IF NOT EXISTS Txn (
     FOREIGN KEY (
         PayeeId
     )
-    REFERENCES Payee (PayeeId) ON DELETE SET NULL
+    REFERENCES Payee (PayeeId) ON DELETE SET NULL,
+    CHECK (Status IN ('Projected', 'Outstanding', 'Cleared', 'Invalid') ) 
 );
 
 

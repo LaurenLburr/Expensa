@@ -1,5 +1,27 @@
 -- SqlQuery Catalog Dump
--- Generated 2026-03-15 02:45:57Z
+-- Generated 2026-03-23 05:19:11Z
+
+INSERT INTO [SqlQuery]
+(
+    [QueryName],
+    [Category],
+    [Description],
+    [SqlText],
+    [IsActive]
+)
+VALUES
+(
+    'AccountTag.SelectAllForNavigation',
+    '',
+    '',
+    'SELECT DISTINCT\n    at.[AccountId],\n    t.[TagId],\n    t.[TagName],\n    a.[AccountNickname],\n    a.[AccountNumber]\nFROM [AccountTag] at\nJOIN [Tag] t\n    ON t.[TagId] = at.[TagId]\nJOIN [Account] a\n    ON a.[AccountId] = at.[AccountId]\nWHERE t.[IsActive] = 1\nORDER BY t.[TagName], a.[AccountNickname], a.[AccountNumber];',
+    1
+)
+ON CONFLICT([QueryName]) DO UPDATE SET
+    [Category] = excluded.[Category],
+    [Description] = excluded.[Description],
+    [SqlText] = excluded.[SqlText],
+    [IsActive] = excluded.[IsActive];
 
 INSERT INTO [SqlQuery]
 (
@@ -103,6 +125,72 @@ VALUES
     'Account',
     'Returns all Account rows for a given BankId ordered by SortIndex. Used by AccountTransactionsPanel.',
     'SELECT *\nFROM Account\nWHERE BankId = @BankId\nORDER BY SortIndex',
+    1
+)
+ON CONFLICT([QueryName]) DO UPDATE SET
+    [Category] = excluded.[Category],
+    [Description] = excluded.[Description],
+    [SqlText] = excluded.[SqlText],
+    [IsActive] = excluded.[IsActive];
+
+INSERT INTO [SqlQuery]
+(
+    [QueryName],
+    [Category],
+    [Description],
+    [SqlText],
+    [IsActive]
+)
+VALUES
+(
+    'AccountTag.Delete',
+    'AccountTag',
+    'Remove a tag from an account',
+    'DELETE FROM AccountTag\n WHERE AccountId = @AccountId\n   AND TagId = @TagId;',
+    1
+)
+ON CONFLICT([QueryName]) DO UPDATE SET
+    [Category] = excluded.[Category],
+    [Description] = excluded.[Description],
+    [SqlText] = excluded.[SqlText],
+    [IsActive] = excluded.[IsActive];
+
+INSERT INTO [SqlQuery]
+(
+    [QueryName],
+    [Category],
+    [Description],
+    [SqlText],
+    [IsActive]
+)
+VALUES
+(
+    'AccountTag.GetByAccountId',
+    'AccountTag',
+    'Get tags assigned to an account',
+    'SELECT DISTINCT\n    t.[TagId],\n    t.[TagName]\nFROM [AccountTag] at\nJOIN [Tag] t\n    ON t.[TagId] = at.[TagId]\nWHERE at.[AccountId] = @AccountId\nORDER BY t.[TagName];',
+    1
+)
+ON CONFLICT([QueryName]) DO UPDATE SET
+    [Category] = excluded.[Category],
+    [Description] = excluded.[Description],
+    [SqlText] = excluded.[SqlText],
+    [IsActive] = excluded.[IsActive];
+
+INSERT INTO [SqlQuery]
+(
+    [QueryName],
+    [Category],
+    [Description],
+    [SqlText],
+    [IsActive]
+)
+VALUES
+(
+    'AccountTag.Insert',
+    'AccountTag',
+    'Assign a tag to an account',
+    'INSERT INTO AccountTag (AccountTagId, AccountId, TagId)\nSELECT @AccountTagId, @AccountId, @TagId\nWHERE NOT EXISTS (\n    SELECT 1\n    FROM AccountTag\n    WHERE AccountId = @AccountId\n      AND TagId = @TagId\n);\n\nSELECT changes();',
     1
 )
 ON CONFLICT([QueryName]) DO UPDATE SET
@@ -300,7 +388,7 @@ VALUES
     'BudgetMonth.SelectAll',
     'Budget',
     'Returns all BudgetMonth rows ordered by Year and Month.',
-    'SELECT\n    [BudgetMonthId],\n    [Year],\n    [Month],\n    [CreatedUtc]\nFROM [BudgetMonth]\nORDER BY\n    [Year],\n    [Month];',
+    'SELECT\n    BudgetMonthId,\n    Year,\n    Month\nFROM [BudgetMonth]\nORDER BY Year DESC, Month DESC;',
     1
 )
 ON CONFLICT([QueryName]) DO UPDATE SET
@@ -388,7 +476,7 @@ VALUES
     'BudgetMonthPayee.SelectByBudgetMonthId',
     'Budget',
     'Returns the full catalog of budget items for a specific BudgetMonthId including PayeeName for display in the monthly budget grid.',
-    'SELECT\n    bmp.[BudgetMonthPayeeId],\n    bmp.[BudgetMonthId],\n    bmp.[PayeeId],\n    p.[PayeeName],\n    bmp.[SortIndex],\n    bmp.[PlannedAmount],\n    bmp.[AccountId]\nFROM [BudgetMonthPayee] bmp\nINNER JOIN [Payee] p\n    ON p.[PayeeId] = bmp.[PayeeId]\nWHERE bmp.[BudgetMonthId] = @BudgetMonthId\nORDER BY\n    bmp.[SortIndex],\n    p.[PayeeName];',
+    'SELECT\n    bmp.BudgetMonthPayeeId,\n    bmp.BudgetMonthId,\n    bmp.PayeeId,\n    p.PayeeName,\n    p.SortIndex,\n    bmp.PlannedAmount,\n    bmp.AccountId,\n    b.BankName,\n    a.AccountNickname,\n    CASE\n        WHEN a.AccountId IS NULL THEN NULL\n        WHEN b.BankName IS NULL OR TRIM(b.BankName) = '''' THEN a.AccountNickname\n        WHEN a.AccountNickname IS NULL OR TRIM(a.AccountNickname) = '''' THEN b.BankName\n        ELSE b.BankName || '' - '' || a.AccountNickname\n    END AS AccountDisplayName\nFROM [BudgetMonthPayee] bmp\nINNER JOIN [Payee] p\n    ON p.PayeeId = bmp.PayeeId\nLEFT JOIN [Account] a\n    ON a.AccountId = bmp.AccountId\nLEFT JOIN [Bank] b\n    ON b.BankId = a.BankId\nWHERE bmp.BudgetMonthId = @BudgetMonthId\nORDER BY p.SortIndex, p.PayeeName;',
     1
 )
 ON CONFLICT([QueryName]) DO UPDATE SET
@@ -410,7 +498,7 @@ VALUES
     'BudgetMonthPayee.UpdatePlannedAmount',
     'Budget',
     'Updates PlannedAmount for a single BudgetMonthPayee row identified by BudgetMonthPayeeId.',
-    'UPDATE [BudgetMonthPayee]\nSET [PlannedAmount] = @PlannedAmount\nWHERE [BudgetMonthPayeeId] = @BudgetMonthPayeeId;',
+    'UPDATE [BudgetMonthPayee]\nSET PlannedAmount = @PlannedAmount\nWHERE BudgetMonthPayeeId = @BudgetMonthPayeeId;',
     1
 )
 ON CONFLICT([QueryName]) DO UPDATE SET
@@ -433,6 +521,28 @@ VALUES
     'Budget',
     'Returns the payees included in the budget template view ordered by SortIndex and PayeeName.',
     'SELECT\n    [PayeeId],\n    [PayeeName],\n    [SortIndex]\nFROM [vw_BudgetTemplatePayees]\nORDER BY\n    [SortIndex],\n    [PayeeName];',
+    1
+)
+ON CONFLICT([QueryName]) DO UPDATE SET
+    [Category] = excluded.[Category],
+    [Description] = excluded.[Description],
+    [SqlText] = excluded.[SqlText],
+    [IsActive] = excluded.[IsActive];
+
+INSERT INTO [SqlQuery]
+(
+    [QueryName],
+    [Category],
+    [Description],
+    [SqlText],
+    [IsActive]
+)
+VALUES
+(
+    'Payee.SelectActive',
+    'Budget',
+    'Retrieve active payees.',
+    'SELECT\n    PayeeId,\n    PayeeName,\n    IncludeInBudgetTemplate,\n    SortIndex,\n    IsActive,\n    WebsiteId\nFROM [Payee]\nWHERE IsActive = 1\nORDER BY SortIndex, PayeeName;',
     1
 )
 ON CONFLICT([QueryName]) DO UPDATE SET
@@ -519,8 +629,8 @@ VALUES
 (
     'SqlQuery.SelectCategoryCounts',
     'Diagnostics',
-    'Returns nlumber of quieries in the catalog',
-    'SELECT\n    [Category],\n    COUNT(*) AS [QueryCount]\nFROM [SqlQuery]\nGROUP BY [Category]\nORDER BY [Category];',
+    'Returns the number of queries in the catalog grouped by category.',
+    'SELECT\n    [Category],\n    COUNT(*) AS [QueryCount]\nFROM [SqlQuery]\nGROUP BY\n    [Category]\nORDER BY\n    [Category];',
     1
 )
 ON CONFLICT([QueryName]) DO UPDATE SET
@@ -872,7 +982,7 @@ VALUES
     'Payee.SelectAll',
     'Payee',
     'Returns all Payee rows ordered so that payees included in the budget template appear first, followed by the remaining payees sorted alphabetically by PayeeName. Used by payee management screens.',
-    'SELECT\n    [PayeeId],\n    [PayeeName],\n    [IncludeInBudgetTemplate],\n    [SortIndex],\n    [IsActive],\n    [WebsiteId],\n    [DefaultAccountId],\n    [DefaultAmount]\nFROM [Payee]\nORDER BY\n    [PayeeName];',
+    'SELECT\n    PayeeId,\n    PayeeName,\n    IncludeInBudgetTemplate,\n    SortIndex,\n    IsActive,\n    WebsiteId\nFROM [Payee]\nORDER BY SortIndex, PayeeName;',
     1
 )
 ON CONFLICT([QueryName]) DO UPDATE SET
@@ -1005,6 +1115,336 @@ VALUES
     'Tag',
     'Returns all payee-tag assignments with tag names for grouped payee navigation in the tree.',
     'SELECT\n    pt.[PayeeId],\n    pt.[TagId],\n    t.[TagName]\nFROM [PayeeTag] pt\nINNER JOIN [Tag] t\n    ON t.[TagId] = pt.[TagId]\nWHERE t.[IsActive] = 1\nORDER BY\n    t.[TagName],\n    pt.[SortIndex];',
+    1
+)
+ON CONFLICT([QueryName]) DO UPDATE SET
+    [Category] = excluded.[Category],
+    [Description] = excluded.[Description],
+    [SqlText] = excluded.[SqlText],
+    [IsActive] = excluded.[IsActive];
+
+INSERT INTO [SqlQuery]
+(
+    [QueryName],
+    [Category],
+    [Description],
+    [SqlText],
+    [IsActive]
+)
+VALUES
+(
+    'Tag.Insert',
+    'Tag',
+    'Insert new tag',
+    'INSERT INTO Tag (TagId, TagName)\n VALUES (@TagId, @TagName);',
+    1
+)
+ON CONFLICT([QueryName]) DO UPDATE SET
+    [Category] = excluded.[Category],
+    [Description] = excluded.[Description],
+    [SqlText] = excluded.[SqlText],
+    [IsActive] = excluded.[IsActive];
+
+INSERT INTO [SqlQuery]
+(
+    [QueryName],
+    [Category],
+    [Description],
+    [SqlText],
+    [IsActive]
+)
+VALUES
+(
+    'Tag.SearchByName',
+    'Tag',
+    'Search tags by partial name',
+    'SELECT DISTINCT\n    [TagId],\n    [TagName]\nFROM [Tag]\nWHERE [TagName] LIKE @Search || ''%''\nORDER BY [TagName];',
+    1
+)
+ON CONFLICT([QueryName]) DO UPDATE SET
+    [Category] = excluded.[Category],
+    [Description] = excluded.[Description],
+    [SqlText] = excluded.[SqlText],
+    [IsActive] = excluded.[IsActive];
+
+INSERT INTO [SqlQuery]
+(
+    [QueryName],
+    [Category],
+    [Description],
+    [SqlText],
+    [IsActive]
+)
+VALUES
+(
+    'TransactionStatusLog.Insert',
+    'Transactions',
+    'Insert a transaction status change log entry.',
+    '[INSERT INTO] [TransactionStatusLog] (\n        [TransactionId],\n        [OldStatus],\n        [NewStatus],\n        [Reason],\n        [ChangedUtc],\n        [ChangedBy],\n        [Source]\n    )\n    [VALUES] (\n        @TransactionId,\n        @OldStatus,\n        @NewStatus,\n        @Reason,\n        @ChangedUtc,\n        @ChangedBy,\n        @Source\n    );',
+    1
+)
+ON CONFLICT([QueryName]) DO UPDATE SET
+    [Category] = excluded.[Category],
+    [Description] = excluded.[Description],
+    [SqlText] = excluded.[SqlText],
+    [IsActive] = excluded.[IsActive];
+
+INSERT INTO [SqlQuery]
+(
+    [QueryName],
+    [Category],
+    [Description],
+    [SqlText],
+    [IsActive]
+)
+VALUES
+(
+    'TransactionStatusLog.SelectByTransactionId',
+    'Transactions',
+    'Return status log history for one transaction, newest first.',
+    '[SELECT]\n        [TransactionStatusLogId],\n        [TransactionId],\n        [OldStatus],\n        [NewStatus],\n        [Reason],\n        [ChangedUtc],\n        [ChangedBy],\n        [Source]\n    [FROM] [TransactionStatusLog]\n    [WHERE] [TransactionId] = @TransactionId\n    [ORDER BY] [ChangedUtc] [DESC], [TransactionStatusLogId] [DESC];',
+    1
+)
+ON CONFLICT([QueryName]) DO UPDATE SET
+    [Category] = excluded.[Category],
+    [Description] = excluded.[Description],
+    [SqlText] = excluded.[SqlText],
+    [IsActive] = excluded.[IsActive];
+
+INSERT INTO [SqlQuery]
+(
+    [QueryName],
+    [Category],
+    [Description],
+    [SqlText],
+    [IsActive]
+)
+VALUES
+(
+    'Txn.Add',
+    'Transactions',
+    'Inserts a transaction row and returns the new TransactionId.',
+    'INSERT INTO [Txn]\n     (\n         [AccountId],\n         [PayeeId],\n         [Status],\n         [Amount],\n         [StartDate],\n         [ConfirmationNumber],\n         [Note]\n     )\n     VALUES\n     (\n         @AccountId,\n         @PayeeId,\n         @Status,\n         @Amount,\n         @StartDate,\n         @ConfirmationNumber,\n         @Note\n     );\n     SELECT last_insert_rowid();',
+    1
+)
+ON CONFLICT([QueryName]) DO UPDATE SET
+    [Category] = excluded.[Category],
+    [Description] = excluded.[Description],
+    [SqlText] = excluded.[SqlText],
+    [IsActive] = excluded.[IsActive];
+
+INSERT INTO [SqlQuery]
+(
+    [QueryName],
+    [Category],
+    [Description],
+    [SqlText],
+    [IsActive]
+)
+VALUES
+(
+    'Txn.ChangeStatus',
+    'Transactions',
+    'Updates the status of a transaction.',
+    'UPDATE [Txn]\n     SET\n         [Status] = @Status\n     WHERE [TransactionId] = @TransactionId;',
+    1
+)
+ON CONFLICT([QueryName]) DO UPDATE SET
+    [Category] = excluded.[Category],
+    [Description] = excluded.[Description],
+    [SqlText] = excluded.[SqlText],
+    [IsActive] = excluded.[IsActive];
+
+INSERT INTO [SqlQuery]
+(
+    [QueryName],
+    [Category],
+    [Description],
+    [SqlText],
+    [IsActive]
+)
+VALUES
+(
+    'Txn.Delete',
+    'Transactions',
+    'Delete a transaction.',
+    'DELETE FROM [Txn]\n     WHERE [TransactionId] = @TransactionId;',
+    1
+)
+ON CONFLICT([QueryName]) DO UPDATE SET
+    [Category] = excluded.[Category],
+    [Description] = excluded.[Description],
+    [SqlText] = excluded.[SqlText],
+    [IsActive] = excluded.[IsActive];
+
+INSERT INTO [SqlQuery]
+(
+    [QueryName],
+    [Category],
+    [Description],
+    [SqlText],
+    [IsActive]
+)
+VALUES
+(
+    'Txn.GetByAccountId',
+    'Transactions',
+    'Gets transactions for an account ordered by date and transaction id.',
+    'SELECT\n        [TransactionId],\n        [AccountId],\n        [PayeeId],\n        [Status],\n        [Amount],\n        [StartDate],\n        [ConfirmationNumber],\n        [Note]\n     FROM [Txn]\n     WHERE [AccountId] = @AccountId\n     ORDER BY [StartDate], [TransactionId];',
+    1
+)
+ON CONFLICT([QueryName]) DO UPDATE SET
+    [Category] = excluded.[Category],
+    [Description] = excluded.[Description],
+    [SqlText] = excluded.[SqlText],
+    [IsActive] = excluded.[IsActive];
+
+INSERT INTO [SqlQuery]
+(
+    [QueryName],
+    [Category],
+    [Description],
+    [SqlText],
+    [IsActive]
+)
+VALUES
+(
+    'Txn.GetByTransactionId',
+    'Transactions',
+    'Gets a single transaction by TransactionId.',
+    'SELECT\n        [TransactionId],\n        [AccountId],\n        [PayeeId],\n        [Status],\n        [Amount],\n        [StartDate],\n        [ConfirmationNumber],\n        [Note]\n     FROM [Txn]\n     WHERE [TransactionId] = @TransactionId;',
+    1
+)
+ON CONFLICT([QueryName]) DO UPDATE SET
+    [Category] = excluded.[Category],
+    [Description] = excluded.[Description],
+    [SqlText] = excluded.[SqlText],
+    [IsActive] = excluded.[IsActive];
+
+INSERT INTO [SqlQuery]
+(
+    [QueryName],
+    [Category],
+    [Description],
+    [SqlText],
+    [IsActive]
+)
+VALUES
+(
+    'Txn.Insert',
+    'Transactions',
+    'Insert a new transaction.',
+    'INSERT INTO [Txn] (\n        [AccountId],\n        [PayeeId],\n        [Status],\n        [Amount],\n        [StartDate],\n        [Confirm],\n        [Note]\n    )\n    VALUES (\n        @AccountId,\n        @PayeeId,\n        @Status,\n        @Amount,\n        @StartDate,\n        @Confirm,\n        @Note\n    );\n\n    SELECT last_insert_rowid();',
+    1
+)
+ON CONFLICT([QueryName]) DO UPDATE SET
+    [Category] = excluded.[Category],
+    [Description] = excluded.[Description],
+    [SqlText] = excluded.[SqlText],
+    [IsActive] = excluded.[IsActive];
+
+INSERT INTO [SqlQuery]
+(
+    [QueryName],
+    [Category],
+    [Description],
+    [SqlText],
+    [IsActive]
+)
+VALUES
+(
+    'Txn.SelectByAccountId',
+    'Transactions',
+    'Return transactions for a single account.',
+    'SELECT\n        [TransactionId],\n        [AccountId],\n        [PayeeId],\n        [Status],\n        [Amount],\n        [StartDate],\n        [Confirm],\n        [Note]\n     FROM [Txn]\n     WHERE [AccountId] = @AccountId\n     ORDER BY [StartDate], [TransactionId];',
+    1
+)
+ON CONFLICT([QueryName]) DO UPDATE SET
+    [Category] = excluded.[Category],
+    [Description] = excluded.[Description],
+    [SqlText] = excluded.[SqlText],
+    [IsActive] = excluded.[IsActive];
+
+INSERT INTO [SqlQuery]
+(
+    [QueryName],
+    [Category],
+    [Description],
+    [SqlText],
+    [IsActive]
+)
+VALUES
+(
+    'Txn.SelectById',
+    'Transactions',
+    'Return a transaction by ID.',
+    'SELECT\n        [TransactionId],\n        [AccountId],\n        [PayeeId],\n        [Status],\n        [Amount],\n        [StartDate],\n        [Confirm],\n        [Note]\n     FROM [Txn]\n     WHERE [TransactionId] = @TransactionId;',
+    1
+)
+ON CONFLICT([QueryName]) DO UPDATE SET
+    [Category] = excluded.[Category],
+    [Description] = excluded.[Description],
+    [SqlText] = excluded.[SqlText],
+    [IsActive] = excluded.[IsActive];
+
+INSERT INTO [SqlQuery]
+(
+    [QueryName],
+    [Category],
+    [Description],
+    [SqlText],
+    [IsActive]
+)
+VALUES
+(
+    'Txn.Update',
+    'Transactions',
+    'Updates an existing transaction row.',
+    'UPDATE [Txn]\n     SET\n         [AccountId] = @AccountId,\n         [PayeeId] = @PayeeId,\n         [Status] = @Status,\n         [Amount] = @Amount,\n         [StartDate] = @StartDate,\n         [ConfirmationNumber] = @ConfirmationNumber,\n         [Note] = @Note\n     WHERE [TransactionId] = @TransactionId;',
+    1
+)
+ON CONFLICT([QueryName]) DO UPDATE SET
+    [Category] = excluded.[Category],
+    [Description] = excluded.[Description],
+    [SqlText] = excluded.[SqlText],
+    [IsActive] = excluded.[IsActive];
+
+INSERT INTO [SqlQuery]
+(
+    [QueryName],
+    [Category],
+    [Description],
+    [SqlText],
+    [IsActive]
+)
+VALUES
+(
+    'Txn.UpdateStatus',
+    'Transactions',
+    'Update only the transaction status.',
+    'UPDATE [Txn]\n     SET\n        [Status] = @Status,\n        [Confirm] = @Confirm,\n        [Note] = @Note\n     WHERE [TransactionId] = @TransactionId;',
+    1
+)
+ON CONFLICT([QueryName]) DO UPDATE SET
+    [Category] = excluded.[Category],
+    [Description] = excluded.[Description],
+    [SqlText] = excluded.[SqlText],
+    [IsActive] = excluded.[IsActive];
+
+INSERT INTO [SqlQuery]
+(
+    [QueryName],
+    [Category],
+    [Description],
+    [SqlText],
+    [IsActive]
+)
+VALUES
+(
+    'TxnStatusLog.Add',
+    'Transactions',
+    'Adds an audit log entry for a transaction status change.',
+    'INSERT INTO [TxnStatusLog]\n     (\n         [TransactionId],\n         [OldStatus],\n         [NewStatus],\n         [ReasonCode],\n         [ReasonText],\n         [ChangedUtc],\n         [ChangedBy],\n         [Source]\n     )\n     VALUES\n     (\n         @TransactionId,\n         @OldStatus,\n         @NewStatus,\n         @ReasonCode,\n         @ReasonText,\n         @ChangedUtc,\n         @ChangedBy,\n         @Sourcefile:///C:/Users/User/AppData/Local/Temp/7zE497DB439/Txn_Status_Log_SqlQuery_Upserts.sql\n     );',
     1
 )
 ON CONFLICT([QueryName]) DO UPDATE SET

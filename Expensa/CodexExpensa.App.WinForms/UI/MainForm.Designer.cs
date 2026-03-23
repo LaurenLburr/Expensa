@@ -1,243 +1,236 @@
-﻿namespace CodexExpensa.App.WinForms.UI
+namespace CodexExpensa.App.WinForms.UI;
+
+partial class MainForm
 {
-    partial class MainForm
+    private System.ComponentModel.IContainer components = null;
+
+    protected override void Dispose(bool disposing)
     {
-        private System.ComponentModel.IContainer components = null;
-
-        private System.Windows.Forms.MenuStrip menuMain;
-        private System.Windows.Forms.ToolStripMenuItem menuFile;
-        private System.Windows.Forms.ToolStripMenuItem menuFileSave;
-        private System.Windows.Forms.ToolStripMenuItem menuFileExit;
-
-        private System.Windows.Forms.ToolStripMenuItem menuView;
-        private System.Windows.Forms.ToolStripMenuItem menuViewRefresh;
-
-        private System.Windows.Forms.ToolStripMenuItem menuTools;
-        private System.Windows.Forms.ToolStripMenuItem menuToolsDbStatus;
-
-        private System.Windows.Forms.ToolStripMenuItem menuHelp;
-        private System.Windows.Forms.ToolStripMenuItem menuHelpAbout;
-
-        private System.Windows.Forms.StatusStrip statusMain;
-        private System.Windows.Forms.ToolStripStatusLabel statusText;
-        private System.Windows.Forms.ToolStripStatusLabel statusDbMode;
-
-        private System.Windows.Forms.SplitContainer splitMain;
-        private System.Windows.Forms.TreeView treeNav;
-        private System.Windows.Forms.Panel panelHost;
-
-        protected override void Dispose(bool disposing)
+        if (disposing && (components != null))
         {
-            if (disposing && (components != null))
-                components.Dispose();
-
-            base.Dispose(disposing);
+            components.Dispose();
         }
 
-        #region Windows Form Designer generated code
-
-        private void InitializeComponent()
-        {
-            menuMain = new MenuStrip();
-            menuFile = new ToolStripMenuItem();
-            menuFileSave = new ToolStripMenuItem();
-            menuFileExit = new ToolStripMenuItem();
-            menuView = new ToolStripMenuItem();
-            menuViewRefresh = new ToolStripMenuItem();
-            menuTools = new ToolStripMenuItem();
-            menuToolsDbStatus = new ToolStripMenuItem();
-            diagnosticsToolStripMenuItem = new ToolStripMenuItem();
-            budgetMonthsToolStripMenuItem = new ToolStripMenuItem();
-            menuHelp = new ToolStripMenuItem();
-            menuHelpAbout = new ToolStripMenuItem();
-            statusMain = new StatusStrip();
-            statusText = new ToolStripStatusLabel();
-            statusDbMode = new ToolStripStatusLabel();
-            splitMain = new SplitContainer();
-            treeNav = new TreeView();
-            panelHost = new Panel();
-            queryCatalogToolStripMenuItem = new ToolStripMenuItem();
-            menuMain.SuspendLayout();
-            statusMain.SuspendLayout();
-            ((System.ComponentModel.ISupportInitialize)splitMain).BeginInit();
-            splitMain.Panel1.SuspendLayout();
-            splitMain.Panel2.SuspendLayout();
-            splitMain.SuspendLayout();
-            SuspendLayout();
-            // 
-            // menuMain
-            // 
-            menuMain.ImageScalingSize = new Size(20, 20);
-            menuMain.Items.AddRange(new ToolStripItem[] { menuFile, menuView, menuTools, menuHelp });
-            menuMain.Location = new Point(0, 0);
-            menuMain.Name = "menuMain";
-            menuMain.Size = new Size(1060, 24);
-            menuMain.TabIndex = 0;
-            // 
-            // menuFile
-            // 
-            menuFile.DropDownItems.AddRange(new ToolStripItem[] { menuFileSave, menuFileExit });
-            menuFile.Name = "menuFile";
-            menuFile.Size = new Size(37, 20);
-            menuFile.Text = "&File";
-            // 
-            // menuFileSave
-            // 
-            menuFileSave.Name = "menuFileSave";
-            menuFileSave.Size = new Size(98, 22);
-            menuFileSave.Text = "&Save";
-            // 
-            // menuFileExit
-            // 
-            menuFileExit.Name = "menuFileExit";
-            menuFileExit.Size = new Size(98, 22);
-            menuFileExit.Text = "E&xit";
-            // 
-            // menuView
-            // 
-            menuView.DropDownItems.AddRange(new ToolStripItem[] { menuViewRefresh });
-            menuView.Name = "menuView";
-            menuView.Size = new Size(44, 20);
-            menuView.Text = "&View";
-            // 
-            // menuViewRefresh
-            // 
-            menuViewRefresh.Name = "menuViewRefresh";
-            menuViewRefresh.Size = new Size(113, 22);
-            menuViewRefresh.Text = "&Refresh";
-            // 
-            // menuTools
-            // 
-            menuTools.DropDownItems.AddRange(new ToolStripItem[] { menuToolsDbStatus, diagnosticsToolStripMenuItem, budgetMonthsToolStripMenuItem, queryCatalogToolStripMenuItem });
-            menuTools.Name = "menuTools";
-            menuTools.Size = new Size(46, 20);
-            menuTools.Text = "&Tools";
-            // 
-            // menuToolsDbStatus
-            // 
-            menuToolsDbStatus.Name = "menuToolsDbStatus";
-            menuToolsDbStatus.Size = new Size(180, 22);
-            menuToolsDbStatus.Text = "DB &Status...";
-            // 
-            // diagnosticsToolStripMenuItem
-            // 
-            diagnosticsToolStripMenuItem.Name = "diagnosticsToolStripMenuItem";
-            diagnosticsToolStripMenuItem.Size = new Size(180, 22);
-            diagnosticsToolStripMenuItem.Text = "Diagnostics";
-            diagnosticsToolStripMenuItem.Click += diagnosticsToolStripMenuItem_Click;
-            // 
-            // budgetMonthsToolStripMenuItem
-            // 
-            budgetMonthsToolStripMenuItem.Name = "budgetMonthsToolStripMenuItem";
-            budgetMonthsToolStripMenuItem.Size = new Size(180, 22);
-            budgetMonthsToolStripMenuItem.Text = "Budget Months";
-            budgetMonthsToolStripMenuItem.Click += budgetMonthsToolStripMenuItem_Click;
-            // 
-            // menuHelp
-            // 
-            menuHelp.DropDownItems.AddRange(new ToolStripItem[] { menuHelpAbout });
-            menuHelp.Name = "menuHelp";
-            menuHelp.Size = new Size(44, 20);
-            menuHelp.Text = "&Help";
-            // 
-            // menuHelpAbout
-            // 
-            menuHelpAbout.Name = "menuHelpAbout";
-            menuHelpAbout.Size = new Size(107, 22);
-            menuHelpAbout.Text = "&About";
-            menuHelpAbout.Click += menuHelpAbout_Click_1;
-            // 
-            // statusMain
-            // 
-            statusMain.ImageScalingSize = new Size(20, 20);
-            statusMain.Items.AddRange(new ToolStripItem[] { statusText, statusDbMode });
-            statusMain.Location = new Point(0, 628);
-            statusMain.Name = "statusMain";
-            statusMain.Size = new Size(1060, 22);
-            statusMain.TabIndex = 2;
-            // 
-            // statusText
-            // 
-            statusText.Name = "statusText";
-            statusText.Size = new Size(1002, 17);
-            statusText.Spring = true;
-            statusText.Text = "Ready";
-            // 
-            // statusDbMode
-            // 
-            statusDbMode.Name = "statusDbMode";
-            statusDbMode.Size = new Size(43, 17);
-            statusDbMode.Text = "DB: ???";
-            // 
-            // splitMain
-            // 
-            splitMain.Dock = DockStyle.Fill;
-            splitMain.FixedPanel = FixedPanel.Panel1;
-            splitMain.Location = new Point(0, 24);
-            splitMain.Name = "splitMain";
-            // 
-            // splitMain.Panel1
-            // 
-            splitMain.Panel1.Controls.Add(treeNav);
-            // 
-            // splitMain.Panel2
-            // 
-            splitMain.Panel2.Controls.Add(panelHost);
-            splitMain.Size = new Size(1060, 604);
-            splitMain.SplitterDistance = 280;
-            splitMain.TabIndex = 1;
-            // 
-            // treeNav
-            // 
-            treeNav.Dock = DockStyle.Fill;
-            treeNav.HideSelection = false;
-            treeNav.Location = new Point(0, 0);
-            treeNav.Name = "treeNav";
-            treeNav.Size = new Size(280, 604);
-            treeNav.TabIndex = 0;
-            // 
-            // panelHost
-            // 
-            panelHost.Dock = DockStyle.Fill;
-            panelHost.Location = new Point(0, 0);
-            panelHost.Name = "panelHost";
-            panelHost.Size = new Size(776, 604);
-            panelHost.TabIndex = 0;
-            // 
-            // queryCatalogToolStripMenuItem
-            // 
-            queryCatalogToolStripMenuItem.Name = "queryCatalogToolStripMenuItem";
-            queryCatalogToolStripMenuItem.Size = new Size(180, 22);
-            queryCatalogToolStripMenuItem.Text = "Query Catalog";
-            queryCatalogToolStripMenuItem.Click += queryCatalogToolStripMenuItem_Click;
-            // 
-            // MainForm
-            // 
-            AutoScaleDimensions = new SizeF(7F, 15F);
-            AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(1060, 650);
-            Controls.Add(splitMain);
-            Controls.Add(statusMain);
-            Controls.Add(menuMain);
-            MainMenuStrip = menuMain;
-            Name = "MainForm";
-            Text = "Expensa";
-            menuMain.ResumeLayout(false);
-            menuMain.PerformLayout();
-            statusMain.ResumeLayout(false);
-            statusMain.PerformLayout();
-            splitMain.Panel1.ResumeLayout(false);
-            splitMain.Panel2.ResumeLayout(false);
-            ((System.ComponentModel.ISupportInitialize)splitMain).EndInit();
-            splitMain.ResumeLayout(false);
-            ResumeLayout(false);
-            PerformLayout();
-        }
-
-        #endregion
-
-        private ToolStripMenuItem diagnosticsToolStripMenuItem;
-        private ToolStripMenuItem budgetMonthsToolStripMenuItem;
-        private ToolStripMenuItem queryCatalogToolStripMenuItem;
+        base.Dispose(disposing);
     }
+
+    private void InitializeComponent()
+    {
+        components = new System.ComponentModel.Container();
+        menuStrip1 = new System.Windows.Forms.MenuStrip();
+        menuFile = new System.Windows.Forms.ToolStripMenuItem();
+        menuFileSave = new System.Windows.Forms.ToolStripMenuItem();
+        menuFileExit = new System.Windows.Forms.ToolStripMenuItem();
+        menuView = new System.Windows.Forms.ToolStripMenuItem();
+        menuViewRefresh = new System.Windows.Forms.ToolStripMenuItem();
+        menuTools = new System.Windows.Forms.ToolStripMenuItem();
+        menuToolsDbStatus = new System.Windows.Forms.ToolStripMenuItem();
+        diagnosticsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+        queryCatalogToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+        budgetMonthsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+        menuHelp = new System.Windows.Forms.ToolStripMenuItem();
+        menuHelpAbout = new System.Windows.Forms.ToolStripMenuItem();
+        splitContainer1 = new System.Windows.Forms.SplitContainer();
+        treeNav = new System.Windows.Forms.TreeView();
+        panelHost = new System.Windows.Forms.Panel();
+        statusStrip1 = new System.Windows.Forms.StatusStrip();
+        statusText = new System.Windows.Forms.ToolStripStatusLabel();
+        statusDbMode = new System.Windows.Forms.ToolStripStatusLabel();
+        menuStrip1.SuspendLayout();
+        ((System.ComponentModel.ISupportInitialize)splitContainer1).BeginInit();
+        splitContainer1.Panel1.SuspendLayout();
+        splitContainer1.Panel2.SuspendLayout();
+        splitContainer1.SuspendLayout();
+        statusStrip1.SuspendLayout();
+        SuspendLayout();
+        // 
+        // menuStrip1
+        // 
+        menuStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { menuFile, menuView, menuTools, menuHelp });
+        menuStrip1.Location = new System.Drawing.Point(0, 0);
+        menuStrip1.Name = "menuStrip1";
+        menuStrip1.Size = new System.Drawing.Size(1264, 24);
+        menuStrip1.TabIndex = 0;
+        menuStrip1.Text = "menuStrip1";
+        // 
+        // menuFile
+        // 
+        menuFile.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { menuFileSave, menuFileExit });
+        menuFile.Name = "menuFile";
+        menuFile.Size = new System.Drawing.Size(37, 20);
+        menuFile.Text = "&File";
+        // 
+        // menuFileSave
+        // 
+        menuFileSave.Name = "menuFileSave";
+        menuFileSave.Size = new System.Drawing.Size(98, 22);
+        menuFileSave.Text = "&Save";
+        // 
+        // menuFileExit
+        // 
+        menuFileExit.Name = "menuFileExit";
+        menuFileExit.Size = new System.Drawing.Size(98, 22);
+        menuFileExit.Text = "E&xit";
+        // 
+        // menuView
+        // 
+        menuView.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { menuViewRefresh });
+        menuView.Name = "menuView";
+        menuView.Size = new System.Drawing.Size(44, 20);
+        menuView.Text = "&View";
+        // 
+        // menuViewRefresh
+        // 
+        menuViewRefresh.Name = "menuViewRefresh";
+        menuViewRefresh.Size = new System.Drawing.Size(113, 22);
+        menuViewRefresh.Text = "&Refresh";
+        // 
+        // menuTools
+        // 
+        menuTools.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { menuToolsDbStatus, diagnosticsToolStripMenuItem, queryCatalogToolStripMenuItem, budgetMonthsToolStripMenuItem });
+        menuTools.Name = "menuTools";
+        menuTools.Size = new System.Drawing.Size(46, 20);
+        menuTools.Text = "&Tools";
+        // 
+        // menuToolsDbStatus
+        // 
+        menuToolsDbStatus.Name = "menuToolsDbStatus";
+        menuToolsDbStatus.Size = new System.Drawing.Size(161, 22);
+        menuToolsDbStatus.Text = "&DB Status";
+        // 
+        // diagnosticsToolStripMenuItem
+        // 
+        diagnosticsToolStripMenuItem.Name = "diagnosticsToolStripMenuItem";
+        diagnosticsToolStripMenuItem.Size = new System.Drawing.Size(161, 22);
+        diagnosticsToolStripMenuItem.Text = "&Diagnostics";
+        diagnosticsToolStripMenuItem.Click += diagnosticsToolStripMenuItem_Click;
+        // 
+        // queryCatalogToolStripMenuItem
+        // 
+        queryCatalogToolStripMenuItem.Name = "queryCatalogToolStripMenuItem";
+        queryCatalogToolStripMenuItem.Size = new System.Drawing.Size(161, 22);
+        queryCatalogToolStripMenuItem.Text = "&Query Catalog";
+        queryCatalogToolStripMenuItem.Click += queryCatalogToolStripMenuItem_Click;
+        // 
+        // budgetMonthsToolStripMenuItem
+        // 
+        budgetMonthsToolStripMenuItem.Name = "budgetMonthsToolStripMenuItem";
+        budgetMonthsToolStripMenuItem.Size = new System.Drawing.Size(161, 22);
+        budgetMonthsToolStripMenuItem.Text = "&Budget Months";
+        budgetMonthsToolStripMenuItem.Click += budgetMonthsToolStripMenuItem_Click;
+        // 
+        // menuHelp
+        // 
+        menuHelp.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { menuHelpAbout });
+        menuHelp.Name = "menuHelp";
+        menuHelp.Size = new System.Drawing.Size(44, 20);
+        menuHelp.Text = "&Help";
+        // 
+        // menuHelpAbout
+        // 
+        menuHelpAbout.Name = "menuHelpAbout";
+        menuHelpAbout.Size = new System.Drawing.Size(107, 22);
+        menuHelpAbout.Text = "&About";
+        menuHelpAbout.Click += menuHelpAbout_Click_1;
+        // 
+        // splitContainer1
+        // 
+        splitContainer1.Dock = System.Windows.Forms.DockStyle.Fill;
+        splitContainer1.Location = new System.Drawing.Point(0, 24);
+        splitContainer1.Name = "splitContainer1";
+        // 
+        // splitContainer1.Panel1
+        // 
+        splitContainer1.Panel1.Controls.Add(treeNav);
+        // 
+        // splitContainer1.Panel2
+        // 
+        splitContainer1.Panel2.Controls.Add(panelHost);
+        splitContainer1.Size = new System.Drawing.Size(1264, 659);
+        splitContainer1.SplitterDistance = 280;
+        splitContainer1.TabIndex = 1;
+        // 
+        // treeNav
+        // 
+        treeNav.Dock = System.Windows.Forms.DockStyle.Fill;
+        treeNav.HideSelection = false;
+        treeNav.Location = new System.Drawing.Point(0, 0);
+        treeNav.Name = "treeNav";
+        treeNav.Size = new System.Drawing.Size(280, 659);
+        treeNav.TabIndex = 0;
+        // 
+        // panelHost
+        // 
+        panelHost.Dock = System.Windows.Forms.DockStyle.Fill;
+        panelHost.Location = new System.Drawing.Point(0, 0);
+        panelHost.Name = "panelHost";
+        panelHost.Size = new System.Drawing.Size(980, 659);
+        panelHost.TabIndex = 0;
+        // 
+        // statusStrip1
+        // 
+        statusStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { statusText, statusDbMode });
+        statusStrip1.Location = new System.Drawing.Point(0, 683);
+        statusStrip1.Name = "statusStrip1";
+        statusStrip1.Size = new System.Drawing.Size(1264, 22);
+        statusStrip1.TabIndex = 2;
+        statusStrip1.Text = "statusStrip1";
+        // 
+        // statusText
+        // 
+        statusText.Name = "statusText";
+        statusText.Size = new System.Drawing.Size(39, 17);
+        statusText.Text = "Ready";
+        statusText.Spring = true;
+        statusText.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
+        // 
+        // statusDbMode
+        // 
+        statusDbMode.Name = "statusDbMode";
+        statusDbMode.Size = new System.Drawing.Size(55, 17);
+        statusDbMode.Text = "DB: ???";
+        // 
+        // MainForm
+        // 
+        AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
+        AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
+        ClientSize = new System.Drawing.Size(1264, 705);
+        Controls.Add(splitContainer1);
+        Controls.Add(statusStrip1);
+        Controls.Add(menuStrip1);
+        MainMenuStrip = menuStrip1;
+        Name = "MainForm";
+        StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
+        Text = "CodexExpensa";
+        menuStrip1.ResumeLayout(false);
+        menuStrip1.PerformLayout();
+        splitContainer1.Panel1.ResumeLayout(false);
+        splitContainer1.Panel2.ResumeLayout(false);
+        ((System.ComponentModel.ISupportInitialize)splitContainer1).EndInit();
+        splitContainer1.ResumeLayout(false);
+        statusStrip1.ResumeLayout(false);
+        statusStrip1.PerformLayout();
+        ResumeLayout(false);
+        PerformLayout();
+    }
+
+    private System.Windows.Forms.MenuStrip menuStrip1;
+    private System.Windows.Forms.ToolStripMenuItem menuFile;
+    private System.Windows.Forms.ToolStripMenuItem menuFileSave;
+    private System.Windows.Forms.ToolStripMenuItem menuFileExit;
+    private System.Windows.Forms.ToolStripMenuItem menuView;
+    private System.Windows.Forms.ToolStripMenuItem menuViewRefresh;
+    private System.Windows.Forms.ToolStripMenuItem menuTools;
+    private System.Windows.Forms.ToolStripMenuItem menuToolsDbStatus;
+    private System.Windows.Forms.ToolStripMenuItem diagnosticsToolStripMenuItem;
+    private System.Windows.Forms.ToolStripMenuItem queryCatalogToolStripMenuItem;
+    private System.Windows.Forms.ToolStripMenuItem budgetMonthsToolStripMenuItem;
+    private System.Windows.Forms.ToolStripMenuItem menuHelp;
+    private System.Windows.Forms.ToolStripMenuItem menuHelpAbout;
+    private System.Windows.Forms.SplitContainer splitContainer1;
+    private System.Windows.Forms.TreeView treeNav;
+    private System.Windows.Forms.Panel panelHost;
+    private System.Windows.Forms.StatusStrip statusStrip1;
+    private System.Windows.Forms.ToolStripStatusLabel statusText;
+    private System.Windows.Forms.ToolStripStatusLabel statusDbMode;
 }

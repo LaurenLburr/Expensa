@@ -1,19 +1,21 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Windows.Forms;
+using CodexExpensa.App.WinForms.UI.Banks;
+using CodexExpensa.App.WinForms.UI.Common;
 using CodexExpensa.Core.Abstractions;
 using CodexExpensa.Core.Domain.Accounts;
 using CodexExpensa.Core.Domain.Banks;
 using CodexExpensa.Core.Domain.Payees;
 using CodexExpensa.Core.Domain.Transactions;
-using CodexExpensa.App.WinForms.UI.Banks;
 
 namespace CodexExpensa.App.WinForms.UI.Accounts;
 
 public sealed class AccountDetailsForm : Form
 {
+    private readonly IDatabaseSession _db;
     private readonly IAccountRepository _repo;
     private readonly ICredentialStore _creds;
     private readonly Action _onSaved;
@@ -44,6 +46,11 @@ public sealed class AccountDetailsForm : Form
     private readonly LinkLabel _lnkUsername;
     private readonly LinkLabel _lnkPw;
 
+    private readonly GroupBox _groupBank;
+    private readonly GroupBox _groupTags;
+
+    private readonly TagAssignmentControl _tagAssignmentControl;
+
     private string? _urlTarget;
 
     private readonly Button _btnSave;
@@ -51,6 +58,7 @@ public sealed class AccountDetailsForm : Form
     private readonly AccountTransactionsPanel _transactionsPanel;
 
     public AccountDetailsForm(
+        IDatabaseSession db,
         IAccountRepository repo,
         IReadOnlyList<Bank> banks,
         ICredentialStore creds,
@@ -58,6 +66,7 @@ public sealed class AccountDetailsForm : Form
         IPayeeRepository payees,
         Action onSaved)
     {
+        _db = db ?? throw new ArgumentNullException(nameof(db));
         _repo = repo ?? throw new ArgumentNullException(nameof(repo));
         _banks = banks ?? throw new ArgumentNullException(nameof(banks));
         _creds = creds ?? throw new ArgumentNullException(nameof(creds));
@@ -109,7 +118,7 @@ public sealed class AccountDetailsForm : Form
         };
 
         // -------- Details Tab --------
-        var details = new Panel { Dock = DockStyle.Fill };
+        var details = new Panel { Dock = DockStyle.Fill, AutoScroll = true };
         _tabDetails.Controls.Add(details);
 
         var lblNick = new Label { Text = "Nickname:", AutoSize = true, Left = 12, Top = 16 };
@@ -126,7 +135,7 @@ public sealed class AccountDetailsForm : Form
 
         _chkActive = new CheckBox { Text = "Active", Left = 140, Top = 120, Width = 120 };
 
-        var groupBank = new GroupBox
+        _groupBank = new GroupBox
         {
             Text = "Bank (linked record)",
             Left = 12,
@@ -142,7 +151,7 @@ public sealed class AccountDetailsForm : Form
             AutoSize = true,
             Left = 12,
             Top = 30,
-            Parent = groupBank
+            Parent = _groupBank
         };
         _lnkBankLabel.LinkClicked += (_, _) => ShowBankPopup();
 
@@ -151,14 +160,14 @@ public sealed class AccountDetailsForm : Form
             Left = 120,
             Top = 26,
             Width = 700,
-            Parent = groupBank,
+            Parent = _groupBank,
             Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
             DropDownStyle = ComboBoxStyle.DropDownList
         };
         _cmbBank.SelectedIndexChanged += (_, _) => BankSelectionChanged();
 
-        var lblRouting = new Label { Text = "Routing #:", AutoSize = true, Left = 12, Top = 70, Parent = groupBank };
-        _txtRouting = new TextBox { Left = 120, Top = 66, Width = 240, ReadOnly = true, Parent = groupBank };
+        var lblRouting = new Label { Text = "Routing #:", AutoSize = true, Left = 12, Top = 70, Parent = _groupBank };
+        _txtRouting = new TextBox { Left = 120, Top = 66, Width = 240, ReadOnly = true, Parent = _groupBank };
 
         _lnkOpenBankUrl = new LinkLabel
         {
@@ -166,7 +175,7 @@ public sealed class AccountDetailsForm : Form
             AutoSize = true,
             Left = 12,
             Top = 106,
-            Parent = groupBank
+            Parent = _groupBank
         };
         _lnkOpenBankUrl.LinkClicked += (_, _) => OpenUrl();
 
@@ -176,7 +185,7 @@ public sealed class AccountDetailsForm : Form
             AutoSize = true,
             Left = 140,
             Top = 106,
-            Parent = groupBank
+            Parent = _groupBank
         };
         _lnkUsername.LinkClicked += (_, _) => EditCredentials();
 
@@ -186,7 +195,7 @@ public sealed class AccountDetailsForm : Form
             AutoSize = true,
             Left = 320,
             Top = 106,
-            Parent = groupBank
+            Parent = _groupBank
         };
         _lnkPw.LinkClicked += (_, _) => EditCredentials();
 
@@ -196,8 +205,44 @@ public sealed class AccountDetailsForm : Form
             AutoSize = true,
             Left = 12,
             Top = 145,
-            Parent = groupBank
+            Parent = _groupBank
         };
+
+        _groupTags = new GroupBox
+        {
+            Text = "Tags",
+            Left = 12,
+            Top = 395,
+            Width = 860,
+            Height = 275,
+            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+        };
+
+        _tagAssignmentControl = new TagAssignmentControl(
+            _db,
+            new TagAssignmentOptions
+            {
+                EntityDisplayName = "account",
+                LoadAssignedTagsQueryName = "AccountTag.GetByAccountId",
+                SearchTagsQueryName = "Tag.SearchByName",
+                InsertTagQueryName = "Tag.Insert",
+                AssignTagQueryName = "AccountTag.Insert",
+                RemoveTagQueryName = "AccountTag.Delete",
+                EntityIdParameterName = "@AccountId",
+                SearchParameterName = "@Search",
+                TagIdParameterName = "@TagId",
+                TagNameParameterName = "@TagName",
+                AssignmentIdParameterName = "@AccountTagId",
+                AssignedTagIdColumnName = "TagId",
+                AssignedTagNameColumnName = "TagName",
+                SearchTagIdColumnName = "TagId",
+                SearchTagNameColumnName = "TagName"
+            })
+        {
+            Parent = _groupTags,
+            Dock = DockStyle.Fill
+        };
+        _tagAssignmentControl.TagsChanged += (_, _) => _onSaved();
 
         details.Controls.Add(lblNick);
         details.Controls.Add(_txtNickname);
@@ -208,13 +253,15 @@ public sealed class AccountDetailsForm : Form
         details.Controls.Add(lblType);
         details.Controls.Add(_txtAccountType);
         details.Controls.Add(_chkActive);
-        details.Controls.Add(groupBank);
+        details.Controls.Add(_groupBank);
+        details.Controls.Add(_groupTags);
 
         _tabDetails.Resize += (_, _) =>
         {
-            groupBank.Width = _tabDetails.ClientSize.Width - 24;
+            _groupBank.Width = _tabDetails.ClientSize.Width - 24;
+            _groupTags.Width = _tabDetails.ClientSize.Width - 24;
             _txtNickname.Width = _tabDetails.ClientSize.Width - _txtNickname.Left - 24;
-            _cmbBank.Width = groupBank.ClientSize.Width - _cmbBank.Left - 24;
+            _cmbBank.Width = _groupBank.ClientSize.Width - _cmbBank.Left - 24;
         };
 
         // -------- Transactions Tab --------
@@ -240,6 +287,8 @@ public sealed class AccountDetailsForm : Form
 
         SelectBankByAccount(account);
         UpdateCredentialLinkText();
+
+        _tagAssignmentControl.LoadForEntity(account.AccountId);
 
         _transactionsPanel.LoadForAccount(
             accountId: account.AccountId,
