@@ -188,9 +188,6 @@ public sealed class TagAssignmentControl : UserControl
         {
             _lstSearch.Items.Clear();
 
-            if (string.IsNullOrWhiteSpace(search))
-                return;
-
             HashSet<string> seenTagNames = new(StringComparer.OrdinalIgnoreCase);
 
             DataTable table = _db.QueryDataTable(
@@ -258,6 +255,7 @@ public sealed class TagAssignmentControl : UserControl
         _txtSearch.Text = string.Empty;
         RefreshSearchResults();
         RefreshAssignedTags();
+        _db.Save();
         TagsChanged?.Invoke(this, EventArgs.Empty);
     }
 
@@ -278,6 +276,7 @@ public sealed class TagAssignmentControl : UserControl
             });
 
         RefreshAssignedTags();
+        _db.Save();
         TagsChanged?.Invoke(this, EventArgs.Empty);
     }
 

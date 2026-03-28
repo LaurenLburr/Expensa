@@ -242,7 +242,7 @@ public sealed class AccountDetailsForm : Form
             Parent = _groupTags,
             Dock = DockStyle.Fill
         };
-        _tagAssignmentControl.TagsChanged += (_, _) => _onSaved();
+        _tagAssignmentControl.TagsChanged += OnTagsChanged;
 
         details.Controls.Add(lblNick);
         details.Controls.Add(_txtNickname);
@@ -272,6 +272,13 @@ public sealed class AccountDetailsForm : Form
         SetUrl(null);
         UpdateCredentialLinkText();
         UpdateBankLinksEnabled();
+    }
+
+
+    private void OnTagsChanged(object? sender, EventArgs e)
+    {
+        _db.Save();
+        _onSaved();
     }
 
     public void LoadAccount(Account account)
