@@ -12,8 +12,6 @@ namespace CodexExpensa.App.WinForms.UI.Common;
 
 public sealed class TagAssignmentControl : UserControl
 {
-    private const string UpdateSortIndexQueryName = "TagAssignment.UpdateSortIndex";
-
     private readonly IDatabaseSession _db;
     private readonly TagAssignmentOptions _options;
 
@@ -27,8 +25,6 @@ public sealed class TagAssignmentControl : UserControl
     private readonly Label _lblAssigned;
     private readonly ListBox _lstAssigned;
     private readonly Button _btnRemove;
-    private readonly Button _btnMoveUp;
-    private readonly Button _btnMoveDown;
     private readonly Label _lblHint;
 
     public event EventHandler? TagsChanged;
@@ -119,35 +115,13 @@ public sealed class TagAssignmentControl : UserControl
         };
         _btnRemove.Click += (_, _) => RemoveSelectedTag();
 
-        _btnMoveUp = new Button
-        {
-            Text = "Move Up",
-            Left = 660,
-            Top = 88,
-            Width = 90,
-            Height = 30,
-            Parent = _group
-        };
-        _btnMoveUp.Click += (_, _) => MoveSelectedAssignedTag(-1);
-
-        _btnMoveDown = new Button
-        {
-            Text = "Move Down",
-            Left = 660,
-            Top = 128,
-            Width = 90,
-            Height = 30,
-            Parent = _group
-        };
-        _btnMoveDown.Click += (_, _) => MoveSelectedAssignedTag(1);
-
         _lblHint = new Label
         {
             Left = 12,
             Top = 212,
             Width = 740,
             Height = 36,
-            Text = "Type part of a tag name to search. If nothing matches, the typed text will be created as a new tag and assigned. Use Move Up / Move Down to persist tag order.",
+            Text = "Type part of a tag name to search. If nothing matches, the typed text will be created as a new tag and assigned.",
             Parent = _group
         };
 
@@ -183,21 +157,10 @@ public sealed class TagAssignmentControl : UserControl
         {
             _lstAssigned.Items.Clear();
 
-            IEnumerable<DataRow> rows = table.Rows.Cast<DataRow>();
-
-            if (table.Columns.Contains("AssignmentSortIndex"))
-            {
-                rows = rows.OrderBy(row => ToInt32(row["AssignmentSortIndex"]))
-                           .ThenBy(row => Convert.ToString(row[_options.AssignedTagNameColumnName]) ?? string.Empty, StringComparer.OrdinalIgnoreCase);
-            }
-
-            foreach (DataRow row in rows)
+            foreach (DataRow row in table.Rows)
             {
                 string tagId = Convert.ToString(row[_options.AssignedTagIdColumnName]) ?? string.Empty;
                 string tagName = Convert.ToString(row[_options.AssignedTagNameColumnName]) ?? string.Empty;
-                int sortIndex = table.Columns.Contains("AssignmentSortIndex")
-                    ? ToInt32(row["AssignmentSortIndex"])
-                    : _lstAssigned.Items.Count;
 
                 if (string.IsNullOrWhiteSpace(tagId) || string.IsNullOrWhiteSpace(tagName))
                     continue;
@@ -205,7 +168,7 @@ public sealed class TagAssignmentControl : UserControl
                 if (_lstAssigned.Items.Cast<TagListItem>().Any(x => string.Equals(x.TagId, tagId, StringComparison.Ordinal)))
                     continue;
 
-                _lstAssigned.Items.Add(new TagListItem(tagId, tagName, sortIndex));
+                _lstAssigned.Items.Add(new TagListItem(tagId, tagName));
             }
         }
         finally
@@ -243,7 +206,7 @@ public sealed class TagAssignmentControl : UserControl
                 if (!seenTagNames.Add(tagName))
                     continue;
 
-                _lstSearch.Items.Add(new TagListItem(tagId, tagName, 0));
+                _lstSearch.Items.Add(new TagListItem(tagId, tagName));
             }
         }
         finally
@@ -278,11 +241,8 @@ public sealed class TagAssignmentControl : UserControl
         if (IsAlreadyAssigned(item.TagId) || FindAssignedByName(item.TagName) is not null)
             return;
 
-        int nextSortIndex = _lstAssigned.Items.Cast<TagListItem>().Select(x => x.SortIndex).DefaultIfEmpty(-1).Max() + 1;
-
         List<DbParameter> parameters = BuildEntityParameters(includeTagId: true, tagId: item.TagId).ToList();
         parameters.Add(new SqliteParameter(_options.AssignmentIdParameterName, Guid.NewGuid().ToString("N")));
-        parameters.Add(new SqliteParameter("@SortIndex", nextSortIndex));
 
         _db.Execute(_options.AssignTagQueryName, parameters.ToArray());
 
@@ -306,59 +266,8 @@ public sealed class TagAssignmentControl : UserControl
             BuildEntityParameters(includeTagId: true, tagId: item.TagId));
 
         RefreshAssignedTags();
-        PersistAssignedOrder();
         _db.Save();
         TagsChanged?.Invoke(this, EventArgs.Empty);
-    }
-
-    private void MoveSelectedAssignedTag(int delta)
-    {
-        if (_lstAssigned.SelectedItem is not TagListItem selectedItem)
-            return;
-
-        int oldIndex = _lstAssigned.SelectedIndex;
-        if (oldIndex < 0)
-            return;
-
-        int newIndex = oldIndex + delta;
-        if (newIndex < 0 || newIndex >= _lstAssigned.Items.Count)
-            return;
-
-        _lstAssigned.BeginUpdate();
-        try
-        {
-            _lstAssigned.Items.RemoveAt(oldIndex);
-            _lstAssigned.Items.Insert(newIndex, selectedItem);
-            _lstAssigned.SelectedIndex = newIndex;
-        }
-        finally
-        {
-            _lstAssigned.EndUpdate();
-        }
-
-        PersistAssignedOrder();
-        RefreshAssignedTags();
-        _db.Save();
-        TagsChanged?.Invoke(this, EventArgs.Empty);
-    }
-
-    private void PersistAssignedOrder()
-    {
-        if (string.IsNullOrWhiteSpace(_entityId))
-            return;
-
-        for (int index = 0; index < _lstAssigned.Items.Count; index++)
-        {
-            if (_lstAssigned.Items[index] is not TagListItem item)
-                continue;
-
-            item.SortIndex = index;
-
-            List<DbParameter> parameters = BuildEntityParameters(includeTagId: true, tagId: item.TagId).ToList();
-            parameters.Add(new SqliteParameter("@SortIndex", index));
-
-            _db.Execute(UpdateSortIndexQueryName, parameters.ToArray());
-        }
     }
 
     private DbParameter[] BuildEntityParameters(bool includeTagId, string? tagId)
@@ -401,7 +310,7 @@ public sealed class TagAssignmentControl : UserControl
                 continue;
 
             if (string.Equals(existingTagName, tagName, StringComparison.OrdinalIgnoreCase))
-                return new TagListItem(existingTagId, existingTagName, 0);
+                return new TagListItem(existingTagId, existingTagName);
         }
 
         return null;
@@ -423,7 +332,7 @@ public sealed class TagAssignmentControl : UserControl
                 new SqliteParameter(_options.TagNameParameterName, tagName)
             });
 
-        return new TagListItem(newTagId, tagName, 0);
+        return new TagListItem(newTagId, tagName);
     }
 
     private bool IsAlreadyAssigned(string tagId)
@@ -472,41 +381,20 @@ public sealed class TagAssignmentControl : UserControl
         _btnRemove.Top = 48;
         _btnRemove.Width = buttonColumnWidth;
 
-        _btnMoveUp.Left = _lstAssigned.Right + 12;
-        _btnMoveUp.Top = 88;
-        _btnMoveUp.Width = buttonColumnWidth;
-
-        _btnMoveDown.Left = _lstAssigned.Right + 12;
-        _btnMoveDown.Top = 128;
-        _btnMoveDown.Width = buttonColumnWidth;
-
         _lblHint.Left = margin;
         _lblHint.Top = _lstSearch.Bottom + 10;
         _lblHint.Width = Math.Max(400, ClientSize.Width - 24);
-    }
-
-    private static int ToInt32(object? value)
-    {
-        if (value is null || value is DBNull)
-            return 0;
-
-        if (value is int i)
-            return i;
-
-        return Convert.ToInt32(value);
     }
 
     private sealed class TagListItem
     {
         public string TagId { get; }
         public string TagName { get; }
-        public int SortIndex { get; set; }
 
-        public TagListItem(string tagId, string tagName, int sortIndex)
+        public TagListItem(string tagId, string tagName)
         {
             TagId = tagId ?? throw new ArgumentNullException(nameof(tagId));
             TagName = tagName ?? throw new ArgumentNullException(nameof(tagName));
-            SortIndex = sortIndex;
         }
 
         public override string ToString() => TagName;

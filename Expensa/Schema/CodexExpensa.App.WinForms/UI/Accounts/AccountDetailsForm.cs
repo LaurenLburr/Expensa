@@ -401,12 +401,10 @@ public sealed class AccountDetailsForm : TaggedDetailsFormBase
         }
         catch (Exception ex)
         {
-            MessageBox.Show(
-    this,
-    $"Could not open URL:\r\n\r\n{ex.Message}",
-    "Open Bank URL",
-    MessageBoxButtons.OK,
-    MessageBoxIcon.Error);
+            MessageBox.Show(this, $"Could not open URL:
+
+{ex.Message}", "Open Bank URL",
+                MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
 
