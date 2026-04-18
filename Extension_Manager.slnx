@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="Extensions/Core/CodexExpensa.Navigation.Abstractions/CodexExpensa.Navigation.Abstractions.csproj" />
+  <Project Path="Extensions/Core/CodexExpensa.Navigation.Hosting/CodexExpensa.Navigation.Hosting.csproj" />
+  <Project Path="Extensions/Host/CodexExpensa.ExtensionDevHost/CodexExpensa.ExtensionDevHost.csproj" />
+  <Project Path="Extensions/Modules/CodexExpensa.Feature.Websites/CodexExpensa.Feature.Websites.csproj" />
+  <Project Path="Extensions/Tests/CodexExpensa.Navigation.Hosting.Tests/CodexExpensa.Navigation.Hosting.Tests.csproj" />
+</Solution>
