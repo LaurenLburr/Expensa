@@ -1,4 +1,4 @@
-using System.Windows.Forms;
+using CodexExpensa.ExtensionDevHost.Commands.Abstractions;
 
 namespace CodexExpensa.ExtensionDevHost.Commands;
 
@@ -14,8 +14,8 @@ public sealed class ExitApplicationCommand : ExtMgrCommandBase
 
     protected override int GetDefaultItemOrder() => 1000;
 
-    public override void Execute(Form owner)
+    public override void Execute(ICommandContext context)
     {
-        owner.Close();
+        GetOwner(context).Close();
     }
 }

@@ -1,3 +1,7 @@
+using CodexExpensa.ExtensionDevHost.Commands.Abstractions;
+using CodexExpensa.ExtensionDevHost.Commands.Runtime;
+using CodexExpensa.ExtensionDevHost.Commands.Services;
+using CodexExpensa.ExtensionDevHost.Services.Ai;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -41,7 +45,23 @@ public sealed class CommandRegistry
             throw new InvalidOperationException($"Command '{commandKey}' is not registered.");
         }
 
-        command.Execute(owner);
+        CommandServiceProvider services = new();
+
+        services.Register<ICommandUiService>(new WinFormsCommandUiService(owner));
+        services.Register<ICommandLogger>(new DebugCommandLogger());
+        services.Register<ICommandAiService>(new FakeCommandAiService());
+        services.Register<ICommandAiService>(new OpenAiCommandAiService(new OpenAiApiKeyStore()));
+
+        ICommandContext context = new DefaultCommandContext
+        {
+            Owner = owner,
+            SelectedNode = null,
+            ProjectName = null,
+            ActiveDatabasePath = null,
+            Services = services
+        };
+
+        command.Execute(context);
     }
 
     public void LoadConfig()

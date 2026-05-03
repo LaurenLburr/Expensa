@@ -1,4 +1,5 @@
-using System.Windows.Forms;
+using CodexExpensa.ExtensionDevHost.Commands.Abstractions;
+using CodexExpensa.ExtensionDevHost.Commands.Services;
 using CodexExpensa.ExtensionDevHost.UI;
 
 namespace CodexExpensa.ExtensionDevHost.Commands;
@@ -9,11 +10,15 @@ public sealed class OpenCommandCatalogCommand : ExtMgrCommandBase
     public override string TopLevelMenu => "Tools";
     protected override string GetDefaultMenuText() => "Command Catalog";
 
-    public override void Execute(Form owner)
+    public override void Execute(ICommandContext context)
     {
-        if (owner is not MainForm mainForm)
+        var ui = GetUi(context);
+        var logger = context.Services.GetRequiredService<ICommandLogger>();
+        logger.Log("OpenCommandCatalogCommand executed");
+
+        if (ui.Owner is not MainForm mainForm)
         {
-            ShowNotAvailable(owner, "Command Catalog");
+            ShowNotAvailable(ui.Owner, "Command Catalog");
             return;
         }
 
@@ -23,6 +28,6 @@ public sealed class OpenCommandCatalogCommand : ExtMgrCommandBase
             mainForm.RebuildMenu
         );
 
-        dialog.ShowDialog(owner);
+        ui.ShowDialog(dialog);
     }
 }

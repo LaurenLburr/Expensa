@@ -1,4 +1,6 @@
 using System.Windows.Forms;
+using CodexExpensa.ExtensionDevHost.Commands.Abstractions;
+using CodexExpensa.ExtensionDevHost.Commands.Services;
 
 namespace CodexExpensa.ExtensionDevHost.Commands;
 
@@ -44,6 +46,19 @@ public abstract class ExtMgrCommandBase : IExtMgrCommand
         };
     }
 
+    protected static ICommandUiService GetUi(ICommandContext context)
+    {
+        if (context == null)
+            throw new ArgumentNullException(nameof(context));
+
+        return context.GetRequiredService<ICommandUiService>();
+    }
+
+    protected static Form GetOwner(ICommandContext context)
+    {
+        return GetUi(context).Owner;
+    }
+
     protected static void ShowNotAvailable(Form owner, string featureName)
     {
         MessageBox.Show(
@@ -66,5 +81,5 @@ public abstract class ExtMgrCommandBase : IExtMgrCommand
         return instance as Form;
     }
 
-    public abstract void Execute(Form owner);
+    public abstract void Execute(ICommandContext context);
 }

@@ -1,0 +1,7 @@
+Add AI Add-in Designer wiring notes
+
+Adds follow-up documentation for wiring the AI Add-in Designer command into MainForm.
+
+Documents the required command registration, TreeView node insertion, expected navigation layout, and initial test workflow.
+
+The AI Add-in Designer is intended to become the main conversational design workspace for add-in projects before code generation is added.

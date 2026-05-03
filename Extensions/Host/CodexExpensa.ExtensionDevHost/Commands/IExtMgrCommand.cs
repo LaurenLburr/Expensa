@@ -1,4 +1,4 @@
-using System.Windows.Forms;
+using CodexExpensa.ExtensionDevHost.Commands.Abstractions;
 
 namespace CodexExpensa.ExtensionDevHost.Commands;
 
@@ -10,5 +10,6 @@ public interface IExtMgrCommand
     int MenuOrder { get; }
     int ItemOrder { get; }
     bool IsSeparator { get; }
-    void Execute(Form owner);
+
+    void Execute(ICommandContext context);
 }

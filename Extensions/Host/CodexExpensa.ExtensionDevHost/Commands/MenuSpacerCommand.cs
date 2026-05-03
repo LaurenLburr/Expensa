@@ -1,4 +1,4 @@
-using System.Windows.Forms;
+using CodexExpensa.ExtensionDevHost.Commands.Abstractions;
 
 namespace CodexExpensa.ExtensionDevHost.Commands;
 
@@ -8,7 +8,7 @@ public abstract class MenuSpacerCommand : ExtMgrCommandBase
 
     public override bool IsSeparator => true;
 
-    public override void Execute(Form owner)
+    public override void Execute(ICommandContext context)
     {
     }
 }

@@ -1,0 +1,1 @@
+Addin Design Spec placeholder

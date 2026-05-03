@@ -1,4 +1,4 @@
-using System.Windows.Forms;
+using CodexExpensa.ExtensionDevHost.Commands.Abstractions;
 
 namespace CodexExpensa.ExtensionDevHost.Commands;
 
@@ -14,9 +14,11 @@ public sealed class NewProjectSpaceCommand : ExtMgrCommandBase
 
     protected override int GetDefaultItemOrder() => 100;
 
-    public override void Execute(Form owner)
+    public override void Execute(ICommandContext context)
     {
-        using Form? dialog = CreateFormIfAvailable(owner, "CodexExpensa.ExtensionDevHost.ProjectSpaceForm");
+        var owner = GetOwner(context);
+
+        using var dialog = CreateFormIfAvailable(owner, "CodexExpensa.ExtensionDevHost.ProjectSpaceForm");
         if (dialog is null)
         {
             ShowNotAvailable(owner, "Project Space Setup");
