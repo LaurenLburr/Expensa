@@ -20,7 +20,7 @@ public partial class DocsEditorForm : Form
     private bool _suppressPreviewHighlightClear;
     private bool _isApplyingAiReviewResult;
     private bool _isWaitingForAiReply;
-    private bool _previewRefreshQueued;
+    private string? _pendingPreviewHtml;
     private HashSet<int> _highlightedPreviewLineIndexes = new();
 
     private Image? _aiReviewReadyImage;
@@ -38,6 +38,22 @@ public partial class DocsEditorForm : Form
 
         ApplyToolbarIcons();
         WireRuntimeEvents();
+    }
+
+    public void FocusEditor()
+    {
+        if (!IsHandleCreated)
+        {
+            CreateControl();
+        }
+
+        PerformLayout();
+        Refresh();
+
+        if (sourceEditor.Visible && !editorSplit.Panel2Collapsed)
+        {
+            sourceEditor.Focus();
+        }
     }
 
     public void SelectDocumentByTag(string docTag)
@@ -67,6 +83,11 @@ public partial class DocsEditorForm : Form
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
 
+        if (!IsHandleCreated)
+        {
+            CreateControl();
+        }
+
         string? folder = Path.GetDirectoryName(filePath);
         if (!string.IsNullOrWhiteSpace(folder))
         {
@@ -78,13 +99,15 @@ public partial class DocsEditorForm : Form
             File.WriteAllText(filePath, $"# {Path.GetFileNameWithoutExtension(filePath)}{Environment.NewLine}");
         }
 
+        string loadedText = NormalizeMarkdownLineEndings(File.ReadAllText(filePath));
+
         _currentFilePath = filePath;
         pathTextBox.Text = filePath;
 
         _suppressPreviewHighlightClear = true;
         try
         {
-            sourceEditor.Text = NormalizeMarkdownLineEndings(File.ReadAllText(filePath));
+            sourceEditor.Text = loadedText;
             sourceEditor.SelectionStart = 0;
             sourceEditor.SelectionLength = 0;
         }
@@ -95,11 +118,23 @@ public partial class DocsEditorForm : Form
 
         _highlightedPreviewLineIndexes.Clear();
 
-        showSourceButton.Checked = false;
-        showSourceButton.Text = "Show Source";
-        editorSplit.Panel2Collapsed = true;
+        // Important: keep the source pane visible after loading.
+        // This proves the selected file actually loaded and avoids the preview browser
+        // looking blank while WinForms/IE finishes rendering.
+        showSourceButton.Checked = true;
+        showSourceButton.Text = "Hide Source";
+        editorSplit.Panel2Collapsed = false;
+        ApplySavedSplitterLayout();
+
+        PerformLayout();
+
+        if (previewBrowser.Document is null)
+        {
+            previewBrowser.Navigate("about:blank");
+        }
 
         RenderPreview();
+        Refresh();
     }
 
     private void WireRuntimeEvents()
@@ -150,6 +185,7 @@ public partial class DocsEditorForm : Form
         };
 
         editorSplit.SplitterMoved += (_, _) => SaveSplitterLocation();
+        previewBrowser.DocumentCompleted += PreviewBrowser_DocumentCompleted;
 
         Shown += (_, _) => ApplySavedSplitterLayout();
         Resize += (_, _) =>
@@ -663,61 +699,58 @@ public partial class DocsEditorForm : Form
             _highlightedPreviewLineIndexes,
             _isWaitingForAiReply);
 
+        _pendingPreviewHtml = html;
+
+        if (!previewBrowser.IsHandleCreated)
+        {
+            previewBrowser.CreateControl();
+        }
+
+        if (previewBrowser.Document is null)
+        {
+            previewBrowser.Navigate("about:blank");
+            return;
+        }
+
+        WritePreviewHtml(html);
+    }
+
+    private void PreviewBrowser_DocumentCompleted(object? sender, WebBrowserDocumentCompletedEventArgs e)
+    {
+        if (string.IsNullOrWhiteSpace(_pendingPreviewHtml))
+        {
+            return;
+        }
+
+        WritePreviewHtml(_pendingPreviewHtml);
+    }
+
+    private void WritePreviewHtml(string html)
+    {
         _isRendering = true;
 
         try
         {
-            if (!previewBrowser.IsHandleCreated)
+            HtmlDocument? document = previewBrowser.Document;
+
+            if (document is null)
             {
-                previewBrowser.CreateControl();
+                _pendingPreviewHtml = html;
+                previewBrowser.Navigate("about:blank");
+                return;
             }
 
-            previewBrowser.DocumentText = html;
+            document.OpenNew(replaceInHistory: true);
+            document.Write(html);
+            //document.Close();
+
+            _pendingPreviewHtml = null;
             previewBrowser.Refresh();
         }
         finally
         {
             _isRendering = false;
         }
-
-        QueuePreviewRefresh();
-    }
-
-    private void QueuePreviewRefresh()
-    {
-        if (_previewRefreshQueued || IsDisposed || !IsHandleCreated)
-        {
-            return;
-        }
-
-        _previewRefreshQueued = true;
-
-        BeginInvoke(new MethodInvoker(() =>
-        {
-            _previewRefreshQueued = false;
-
-            if (IsDisposed || previewBrowser.IsDisposed)
-            {
-                return;
-            }
-
-            string html = BuildHtmlDocument(
-                sourceEditor.Text,
-                _highlightedPreviewLineIndexes,
-                _isWaitingForAiReply);
-
-            _isRendering = true;
-
-            try
-            {
-                previewBrowser.DocumentText = html;
-                previewBrowser.Refresh();
-            }
-            finally
-            {
-                _isRendering = false;
-            }
-        }));
     }
 
     private static HashSet<int> FindChangedLineIndexes(string originalText, string revisedText)

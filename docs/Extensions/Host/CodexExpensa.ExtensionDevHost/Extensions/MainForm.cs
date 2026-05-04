@@ -216,17 +216,6 @@ public partial class MainForm : Form
         };
     }
 
-    private void NavigationTreeView_NodeMouseClick(object? sender, TreeNodeMouseClickEventArgs e)
-    {
-        if (e.Node is null)
-        {
-            return;
-        }
-
-        navigationTreeView.SelectedNode = e.Node;
-        ShowNavigationNode(e.Node);
-    }
-
     private void NavigationTreeView_AfterSelect(object? sender, TreeViewEventArgs e)
     {
         if (e.Node is null)
@@ -323,14 +312,6 @@ public partial class MainForm : Form
                 ShowManageExtensionsPanel();
                 break;
 
-            case "Tools.QueryCatalog":
-                ShowQueryCatalogPanel();
-                break;
-
-            case "Tools.CommandCatalog":
-                ShowCommandCatalogPanel();
-                break;
-
             default:
                 ShowLandingText(
                     $"Command:{Environment.NewLine}{commandTag.CommandKey}{Environment.NewLine}{Environment.NewLine}" +
@@ -353,14 +334,6 @@ public partial class MainForm : Form
 
             case "Tools.ManageExtensions":
                 ShowManageExtensionsPanel();
-                break;
-
-            case "Tools.QueryCatalog":
-                ShowQueryCatalogPanel();
-                break;
-
-            case "Tools.CommandCatalog":
-                ShowCommandCatalogPanel();
                 break;
 
             default:
@@ -393,28 +366,6 @@ public partial class MainForm : Form
 
 
 
-
-
-    private void ShowCommandCatalogPanel()
-    {
-        CommandCatalogForm panel = new(
-            _commandRegistry,
-            _commandConfigPath,
-            RebuildMenu);
-
-        ShowEmbeddedForm(panel);
-    }
-
-    private void ShowQueryCatalogPanel()
-    {
-        string dbPath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "Expensa",
-            "Extensions",
-            "ExtensionMgr.db");
-
-        ShowEmbeddedForm(new QueryCatalogForm(dbPath));
-    }
 
     private void ShowManageExtensionsPanel()
     {

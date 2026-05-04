@@ -65,7 +65,6 @@ partial class MainForm
         navigationTreeView.Size = new Size(165, 688);
         navigationTreeView.TabIndex = 0;
         navigationTreeView.AfterSelect += NavigationTreeView_AfterSelect;
-        navigationTreeView.NodeMouseClick += NavigationTreeView_NodeMouseClick;
         navigationTreeView.NodeMouseDoubleClick += NavigationTreeView_NodeMouseDoubleClick;
         // 
         // contentPanel
