@@ -1,8 +1,106 @@
+# =========================================
+# CodexExpensa / Visual Studio / .NET
+# =========================================
+
+# Build output
+[Bb]in/
+[Oo]bj/
+out/
+publish/
+
+# Rider / ReSharper
+_ReSharper*/
+*.DotSettings.user
+
+# Visual Studio
 .vs/
-bin/
-obj/
 *.user
 *.suo
-*.dbmdl
-*.cache
+*.userosscache
+*.sln.docstates
+
+# Test output
+TestResults/
+coverage/
+*.coverage
+*.coveragexml
+
+# NuGet
+packages/
+*.nupkg
+.nuget/
+
+# Logs
 *.log
+logs/
+
+# SQLite / local databases
+*.db-shm
+*.db-wal
+
+# Local runtime databases
+*.db
+
+# Keep schema/template databases if desired
+#!schema.db
+
+# Environment / secrets
+.env
+.env.*
+appsettings.Development.json
+secrets.json
+
+# AI / generated uploads
+AI_Replies/
+Processed/
+Failed/
+
+# Zip artifacts
+*.zip
+
+# Generated docs
+*.pdf
+
+# OS junk
+Thumbs.db
+Desktop.ini
+
+# JetBrains
+.idea/
+
+# Node
+node_modules/
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.orig
+
+# VS Code
+.vscode/
+
+# Azure
+.azurite/
+
+# Python
+__pycache__/
+*.pyc
+
+# Generated markdown previews
+*.html
+
+# Windows crash dumps
+*.dmp
+
+# Git merge leftovers
+*.LOCAL.*
+*.REMOTE.*
+*.BASE.*
+
+# =========================================
+# Keep important project files
+# =========================================
+
+!.gitignore
+!.gitattributes

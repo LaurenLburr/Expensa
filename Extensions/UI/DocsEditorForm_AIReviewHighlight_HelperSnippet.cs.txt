@@ -1,0 +1,5 @@
+// Add field:
+private HashSet<int> _highlightedPreviewLineIndexes = new();
+
+// Save prompt and changed-line helpers are documented in:
+// Extensions/Host/CodexExpensa.ExtensionDevHost/Docs/DocsEditorForm_AIReviewHighlightAndSavePrompt.md

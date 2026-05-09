@@ -17,4 +17,8 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Extensions\Host\CodexExpensa.ExtensionDevHost\" />
+  </ItemGroup>
 </Project>

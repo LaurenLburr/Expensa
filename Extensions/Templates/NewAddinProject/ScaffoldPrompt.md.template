@@ -1,0 +1,9 @@
+# ChatGPT Scaffold Prompt
+
+{{ChatGptPrompt}}
+
+## Notes
+
+This prompt was captured during project creation.
+The current scaffold path saves the prompt and creates a deterministic starter project.
+Wire this into a live ChatGPT scaffold generator next.

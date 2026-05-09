@@ -1,0 +1,14 @@
+using CodexExpensa.Navigation.Abstractions;
+
+namespace {{ProjectName}};
+
+/// <summary>
+/// {{DescriptionXml}}
+{{ChatGptSummaryLine}}
+/// </summary>
+public sealed class {{ClassName}} : ITreeNodeExtension
+{
+    public string ExtensionKey => "{{ExtensionKey}}";
+
+    public int SortOrder => 100;
+}
