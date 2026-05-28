@@ -1,10 +1,18 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net8.0-windows</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\..\Core\CodexExpensa.Navigation.Abstractions\CodexExpensa.Navigation.Abstractions.csproj" />
+    <ProjectReference Include="..\..\..\Codex.CommandEngine\Core\Codex.CommandEngine.Core\Codex.CommandEngine.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="extension.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 </Project>

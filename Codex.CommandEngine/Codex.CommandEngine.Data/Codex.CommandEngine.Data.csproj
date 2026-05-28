@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\Database\CommandEngine.dev.db" Link="Database\CommandEngine.dev.db" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\Database\CommandEngine.dev.sql" Link="Database\CommandEngine.dev.sql" CopyToOutputDirectory="PreserveNewest" Condition="Exists('..\Database\CommandEngine.dev.sql')" />
+  </ItemGroup>
+</Project>

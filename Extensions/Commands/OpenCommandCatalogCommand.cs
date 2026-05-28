@@ -1,6 +1,7 @@
 using CodexExpensa.ExtensionDevHost.Commands.Abstractions;
 using CodexExpensa.ExtensionDevHost.Commands.Services;
 using CodexExpensa.ExtensionDevHost.UI;
+using CodexExpensa.ExtensionDevHost;
 
 namespace CodexExpensa.ExtensionDevHost.Commands;
 

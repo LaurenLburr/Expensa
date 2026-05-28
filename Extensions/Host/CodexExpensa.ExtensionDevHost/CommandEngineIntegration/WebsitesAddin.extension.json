@@ -1,0 +1,10 @@
+{
+  "extensionId": "WebsitesAddin",
+  "displayName": "Websites Add-in",
+  "version": "1.0.0",
+  "assemblyFile": "WebsitesAddin.dll",
+  "providerType": "WebsitesAddin.WebsitesAddinCommandProvider",
+  "minimumHostVersion": "1.0.0",
+  "enabled": true,
+  "description": "CommandEngine-enabled Websites add-in."
+}

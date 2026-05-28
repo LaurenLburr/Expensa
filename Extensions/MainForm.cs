@@ -1,4 +1,6 @@
-﻿using CodexExpensa.ExtensionDevHost.Commands;
+
+// This file is part of the Codex-Expensa Extension Manager
+using CodexExpensa.ExtensionDevHost.Commands;
 using CodexExpensa.ExtensionDevHost.Commands.Services;
 using CodexExpensa.ExtensionDevHost.Models;
 using CodexExpensa.ExtensionDevHost.Services;
@@ -108,7 +110,16 @@ public partial class MainForm : Form
             tools.Nodes.Add(CreateCommandNode("Folder Watcher / Auto Unzip", "Tools.FolderWatcherAutoUnzip"));
 
             TreeNode docs = new("Docs");
-            docs.Nodes.Add(CreateWorkspaceDocNode("AI Add-in Design Workflow", "AiAddinDesignWorkflow.md"));
+
+            TreeNode aiInstructions = new("AI Instructions / General Rules");
+            aiInstructions.Nodes.Add(CreateWorkspaceDocNode("General Coding Rules", "GeneralCodingRules.md"));
+            aiInstructions.Nodes.Add(CreateWorkspaceDocNode("General Coding Spec", "GeneralCodingSpec.md"));
+            aiInstructions.Nodes.Add(CreateWorkspaceDocNode("AI Add-in Design Workflow", "AiAddinDesignWorkflow.md"));
+            aiInstructions.Nodes.Add(CreateWorkspaceDocNode("Add-in Design Spec Template", "AddinDesignSpecTemplate.md"));
+            aiInstructions.Nodes.Add(CreateWorkspaceDocNode("Expensa Integration Spec Template", "ExpensaIntegrationSpecTemplate.md"));
+            aiInstructions.Nodes.Add(CreateCommandNode("Update Standard AI Docs", "Docs.UpdateStandardAiDocs"));
+
+            docs.Nodes.Add(aiInstructions);
             docs.Nodes.Add(CreateWorkspaceDocNode("Workspace Roadmap", "WorkspaceRoadmap.md"));
 
             navigationTreeView.Nodes.Add(project);
@@ -117,7 +128,10 @@ public partial class MainForm : Form
             navigationTreeView.Nodes.Add(tools);
             navigationTreeView.Nodes.Add(docs);
 
-            navigationTreeView.ExpandAll();
+            project.Expand();
+            templates.Expand();
+            tools.Expand();
+            docs.Expand();
         }
         finally
         {
@@ -362,6 +376,10 @@ private static TreeNode CreateCommandNode(string text, string commandKey)
                 ShowFolderWatcherAutoUnzipPanel();
                 break;
 
+            case "Docs.UpdateStandardAiDocs":
+                ShowStandardAiDocsUpdatePanel();
+                break;
+
             default:
                 ShowLandingText(
                     $"Command:{Environment.NewLine}{commandTag.CommandKey}{Environment.NewLine}{Environment.NewLine}" +
@@ -398,6 +416,10 @@ private static TreeNode CreateCommandNode(string text, string commandKey)
                 ShowFolderWatcherAutoUnzipPanel();
                 break;
 
+            case "Docs.UpdateStandardAiDocs":
+                ShowStandardAiDocsUpdatePanel();
+                break;
+
             default:
                 InvokeCommand(commandTag.CommandKey);
                 break;
@@ -430,6 +452,12 @@ private static TreeNode CreateCommandNode(string text, string commandKey)
 
 
 
+
+
+    private void ShowStandardAiDocsUpdatePanel()
+    {
+        ShowEmbeddedForm(new StandardAiDocsUpdateForm());
+    }
 
     private void ShowFolderWatcherAutoUnzipPanel()
     {

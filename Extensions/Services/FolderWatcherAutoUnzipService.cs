@@ -6,6 +6,7 @@ public sealed class FolderWatcherAutoUnzipService : IDisposable
 {
     private readonly object _syncRoot = new();
     private readonly HashSet<string> _processingFiles = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _completedSourceFiles = new(StringComparer.OrdinalIgnoreCase);
 
     private FileSystemWatcher? _watcher;
     private bool _disposed;
@@ -16,16 +17,18 @@ public sealed class FolderWatcherAutoUnzipService : IDisposable
 
     public bool IsRunning => _watcher is not null;
 
-    public void Start(string watchFolder, string extractRootFolder)
+    public void Start(string watchFolder, string extractFolder)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentException.ThrowIfNullOrWhiteSpace(watchFolder);
-        ArgumentException.ThrowIfNullOrWhiteSpace(extractRootFolder);
+        ArgumentException.ThrowIfNullOrWhiteSpace(extractFolder);
 
         Stop();
 
         Directory.CreateDirectory(watchFolder);
-        Directory.CreateDirectory(extractRootFolder);
+        Directory.CreateDirectory(extractFolder);
+        Directory.CreateDirectory(GetProcessedFolder(watchFolder));
+        Directory.CreateDirectory(GetFailedFolder(watchFolder));
 
         _watcher = new FileSystemWatcher(watchFolder, "*.zip")
         {
@@ -34,14 +37,9 @@ public sealed class FolderWatcherAutoUnzipService : IDisposable
             NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite | NotifyFilters.CreationTime
         };
 
-        _watcher.Created += (_, e) => QueueImport(e.FullPath, extractRootFolder);
-        _watcher.Changed += (_, e) => QueueImport(e.FullPath, extractRootFolder);
-        _watcher.Renamed += (_, e) => QueueImport(e.FullPath, extractRootFolder);
-
-        foreach (string zipPath in Directory.GetFiles(watchFolder, "*.zip"))
-        {
-            QueueImport(zipPath, extractRootFolder);
-        }
+        _watcher.Created += (_, e) => QueueImport(e.FullPath, extractFolder);
+        _watcher.Changed += (_, e) => QueueImport(e.FullPath, extractFolder);
+        _watcher.Renamed += (_, e) => QueueImport(e.FullPath, extractFolder);
     }
 
     public void Stop()
@@ -56,30 +54,50 @@ public sealed class FolderWatcherAutoUnzipService : IDisposable
         _watcher = null;
     }
 
-    public void ImportExistingZips(string watchFolder, string extractRootFolder)
+    public void ImportExistingZips(string watchFolder, string extractFolder)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(watchFolder);
-        ArgumentException.ThrowIfNullOrWhiteSpace(extractRootFolder);
+        ArgumentException.ThrowIfNullOrWhiteSpace(extractFolder);
 
         Directory.CreateDirectory(watchFolder);
-        Directory.CreateDirectory(extractRootFolder);
+        Directory.CreateDirectory(extractFolder);
+        Directory.CreateDirectory(GetProcessedFolder(watchFolder));
+        Directory.CreateDirectory(GetFailedFolder(watchFolder));
 
-        foreach (string zipPath in Directory.GetFiles(watchFolder, "*.zip"))
+        foreach (string zipPath in Directory.GetFiles(watchFolder, "*.zip", SearchOption.TopDirectoryOnly))
         {
-            QueueImport(zipPath, extractRootFolder);
+            QueueImport(zipPath, extractFolder);
         }
     }
 
-    private void QueueImport(string zipPath, string extractRootFolder)
+    private void QueueImport(string zipPath, string extractFolder)
     {
-        if (string.IsNullOrWhiteSpace(zipPath) || !File.Exists(zipPath))
+        if (string.IsNullOrWhiteSpace(zipPath))
+        {
+            return;
+        }
+
+        string fullZipPath = Path.GetFullPath(zipPath);
+
+        string? parentFolder = Path.GetDirectoryName(fullZipPath);
+        if (string.IsNullOrWhiteSpace(parentFolder))
+        {
+            return;
+        }
+
+        if (IsInsideCleanupFolder(fullZipPath, parentFolder))
         {
             return;
         }
 
         lock (_syncRoot)
         {
-            if (!_processingFiles.Add(zipPath))
+            if (_completedSourceFiles.Contains(fullZipPath))
+            {
+                return;
+            }
+
+            if (!_processingFiles.Add(fullZipPath))
             {
                 return;
             }
@@ -89,24 +107,67 @@ public sealed class FolderWatcherAutoUnzipService : IDisposable
         {
             try
             {
-                await WaitForFileReadyAsync(zipPath).ConfigureAwait(false);
-                string outputFolder = ImportZip(zipPath, extractRootFolder);
+                await WaitForFileReadyAsync(fullZipPath).ConfigureAwait(false);
+
+                if (!File.Exists(fullZipPath))
+                {
+                    return;
+                }
+
+                ImportZip(fullZipPath, extractFolder);
+
+                string processedPath = MoveZipToCleanupFolder(
+                    fullZipPath,
+                    GetProcessedFolder(parentFolder));
+
+                lock (_syncRoot)
+                {
+                    _completedSourceFiles.Add(fullZipPath);
+                }
 
                 ZipImported?.Invoke(
                     this,
-                    new ZipImportedEventArgs(zipPath, outputFolder, DateTime.Now));
+                    new ZipImportedEventArgs(processedPath, extractFolder, DateTime.Now));
+            }
+            catch (FileNotFoundException)
+            {
+                // Duplicate file-system event after another event already moved the zip.
+            }
+            catch (DirectoryNotFoundException)
+            {
+                // Duplicate file-system event after cleanup/move.
+            }
+            catch (IOException ex) when (!File.Exists(fullZipPath))
+            {
+                // Duplicate stale event after the zip was moved to Processed.
             }
             catch (Exception ex)
             {
+                string failedPath = fullZipPath;
+
+                try
+                {
+                    if (File.Exists(fullZipPath))
+                    {
+                        failedPath = MoveZipToCleanupFolder(
+                            fullZipPath,
+                            GetFailedFolder(parentFolder));
+                    }
+                }
+                catch
+                {
+                    // Do not hide the original import failure with cleanup failure.
+                }
+
                 ZipImportFailed?.Invoke(
                     this,
-                    new ZipImportFailedEventArgs(zipPath, ex.Message, DateTime.Now));
+                    new ZipImportFailedEventArgs(failedPath, ex.Message, DateTime.Now));
             }
             finally
             {
                 lock (_syncRoot)
                 {
-                    _processingFiles.Remove(zipPath);
+                    _processingFiles.Remove(fullZipPath);
                 }
             }
         });
@@ -118,6 +179,11 @@ public sealed class FolderWatcherAutoUnzipService : IDisposable
 
         for (int attempt = 1; attempt <= maxAttempts; attempt++)
         {
+            if (!File.Exists(path))
+            {
+                throw new FileNotFoundException("Zip file no longer exists. It may have already been processed.", path);
+            }
+
             try
             {
                 using FileStream stream = new(
@@ -146,36 +212,132 @@ public sealed class FolderWatcherAutoUnzipService : IDisposable
         throw new IOException($"File was not ready for import: {path}");
     }
 
-    private static string ImportZip(string zipPath, string extractRootFolder)
+    private static void ImportZip(string zipPath, string extractFolder)
     {
-        string zipName = Path.GetFileNameWithoutExtension(zipPath);
-        string safeFolderName = SanitizeFolderName(zipName);
+        Directory.CreateDirectory(extractFolder);
 
-        string destinationFolder = Path.Combine(extractRootFolder, safeFolderName);
+        string extractRoot = Path.GetFullPath(extractFolder);
 
-        if (Directory.Exists(destinationFolder))
+        using ZipArchive archive = ZipFile.OpenRead(zipPath);
+
+        foreach (ZipArchiveEntry entry in archive.Entries)
         {
-            Directory.Delete(destinationFolder, recursive: true);
+            string relativePath = NormalizeEntryPath(entry.FullName);
+
+            if (string.IsNullOrWhiteSpace(relativePath))
+            {
+                continue;
+            }
+
+            string destinationPath = Path.GetFullPath(Path.Combine(extractRoot, relativePath));
+
+            if (!IsPathInsideFolder(destinationPath, extractRoot))
+            {
+                throw new InvalidOperationException($"Zip entry would extract outside the selected folder: {entry.FullName}");
+            }
+
+            if (string.IsNullOrEmpty(entry.Name))
+            {
+                Directory.CreateDirectory(destinationPath);
+                continue;
+            }
+
+            string? destinationDirectory = Path.GetDirectoryName(destinationPath);
+            if (!string.IsNullOrWhiteSpace(destinationDirectory))
+            {
+                Directory.CreateDirectory(destinationDirectory);
+            }
+
+            entry.ExtractToFile(destinationPath, overwrite: true);
         }
-
-        Directory.CreateDirectory(destinationFolder);
-
-        ZipFile.ExtractToDirectory(zipPath, destinationFolder, overwriteFiles: true);
-
-        return destinationFolder;
     }
 
-    private static string SanitizeFolderName(string name)
+    private static string NormalizeEntryPath(string path)
     {
-        char[] invalid = Path.GetInvalidFileNameChars();
+        return path
+            .Replace('\\', '/')
+            .TrimStart('/');
+    }
 
-        string cleaned = new(name
-            .Select(ch => invalid.Contains(ch) ? '_' : ch)
-            .ToArray());
+    private static bool IsPathInsideFolder(string path, string folder)
+    {
+        string normalizedFolder = Path.GetFullPath(folder)
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+            + Path.DirectorySeparatorChar;
 
-        return string.IsNullOrWhiteSpace(cleaned)
-            ? "ImportedZip"
-            : cleaned.Trim();
+        string normalizedPath = Path.GetFullPath(path);
+
+        return normalizedPath.StartsWith(normalizedFolder, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsInsideCleanupFolder(string zipPath, string watchFolder)
+    {
+        string processedFolder = GetProcessedFolder(watchFolder);
+        string failedFolder = GetFailedFolder(watchFolder);
+        string fullZipPath = Path.GetFullPath(zipPath);
+
+        return fullZipPath.StartsWith(
+                   Path.GetFullPath(processedFolder),
+                   StringComparison.OrdinalIgnoreCase) ||
+               fullZipPath.StartsWith(
+                   Path.GetFullPath(failedFolder),
+                   StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string MoveZipToCleanupFolder(string zipPath, string cleanupFolder)
+    {
+        if (!File.Exists(zipPath))
+        {
+            return zipPath;
+        }
+
+        Directory.CreateDirectory(cleanupFolder);
+
+        string destinationPath = Path.Combine(
+            cleanupFolder,
+            Path.GetFileName(zipPath));
+
+        destinationPath = GetAvailableFilePath(destinationPath);
+
+        File.Move(zipPath, destinationPath);
+
+        return destinationPath;
+    }
+
+    private static string GetAvailableFilePath(string destinationPath)
+    {
+        if (!File.Exists(destinationPath))
+        {
+            return destinationPath;
+        }
+
+        string folder = Path.GetDirectoryName(destinationPath) ?? string.Empty;
+        string fileName = Path.GetFileNameWithoutExtension(destinationPath);
+        string extension = Path.GetExtension(destinationPath);
+
+        for (int index = 1; index < int.MaxValue; index++)
+        {
+            string candidate = Path.Combine(
+                folder,
+                $"{fileName}_{index:000}{extension}");
+
+            if (!File.Exists(candidate))
+            {
+                return candidate;
+            }
+        }
+
+        throw new IOException($"Could not find an available file name for: {destinationPath}");
+    }
+
+    private static string GetProcessedFolder(string watchFolder)
+    {
+        return Path.Combine(watchFolder, "Processed");
+    }
+
+    private static string GetFailedFolder(string watchFolder)
+    {
+        return Path.Combine(watchFolder, "Failed");
     }
 
     public void Dispose()
@@ -198,8 +360,4 @@ public sealed record ZipImportedEventArgs(
 public sealed record ZipImportFailedEventArgs(
     string ZipPath,
     string ErrorMessage,
-    DateTime FailedAt)
-{
-
-};
-
+    DateTime FailedAt);

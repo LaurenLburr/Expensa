@@ -150,6 +150,7 @@ partial class DesignSpecConversationForm
         designSpecPreviewBrowser.Dock = DockStyle.Fill;
         designSpecPreviewBrowser.AllowWebBrowserDrop = false;
         designSpecPreviewBrowser.ScriptErrorsSuppressed = true;
+        designSpecPreviewBrowser.TabStop = false;
 
         designSpecPreviewGroupBox.Controls.Add(designSpecPreviewBrowser);
 

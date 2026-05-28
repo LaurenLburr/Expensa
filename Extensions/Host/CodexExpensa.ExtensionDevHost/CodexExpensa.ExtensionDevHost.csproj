@@ -13,20 +13,39 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="CommandEngineIntegration\CodexExpensa.ExtensionDevHost.CommandEngineIntegration.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Content Include="Templates\**\*.*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Remove="CommandEngineIntegration\**\*.cs" />
+    <Compile Remove="CommandEngineIntegration.TestHarness\**\*.cs" />
+    <Compile Remove="CodexExpensa.ExtensionDevHost.CommandEngineIntegration\**\*.cs" />
+    <Compile Remove="CodexExpensa.ExtensionDevHost.CommandEngineIntegration.TestHarness\**\*.cs" />
+
+    <EmbeddedResource Remove="CommandEngineIntegration\**\*" />
+    <EmbeddedResource Remove="CommandEngineIntegration.TestHarness\**\*" />
+    <EmbeddedResource Remove="CodexExpensa.ExtensionDevHost.CommandEngineIntegration\**\*" />
+    <EmbeddedResource Remove="CodexExpensa.ExtensionDevHost.CommandEngineIntegration.TestHarness\**\*" />
+
+    <None Remove="CommandEngineIntegration\**\*" />
+    <None Remove="CommandEngineIntegration.TestHarness\**\*" />
+    <None Remove="CodexExpensa.ExtensionDevHost.CommandEngineIntegration\**\*" />
+    <None Remove="CodexExpensa.ExtensionDevHost.CommandEngineIntegration.TestHarness\**\*" />
+
+    <Compile Remove="**\bin\**\*.cs" />
+    <Compile Remove="**\obj\**\*.cs" />
+    <EmbeddedResource Remove="**\bin\**\*" />
+    <EmbeddedResource Remove="**\obj\**\*" />
+    <None Remove="**\bin\**\*" />
+    <None Remove="**\obj\**\*" />
+
     <Compile Remove="Extensions\MainForm.Designer.cs" />
-  </ItemGroup>
-
-  <ItemGroup>
     <EmbeddedResource Remove="Extensions\MainForm.resx" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="Extensions\Host\CodexExpensa.ExtensionDevHost\" />
   </ItemGroup>
 </Project>

@@ -11,8 +11,7 @@ public partial class FolderWatcherAutoUnzipForm : Form
     private readonly FolderWatcherAutoUnzipService _watcher = new();
     private readonly string _settingsPath;
 
-    private bool _isLoadingSettings;
-    private bool _hasLoadedSettings;
+    private bool _settingsLoaded;
 
     public FolderWatcherAutoUnzipForm()
     {
@@ -56,29 +55,20 @@ public partial class FolderWatcherAutoUnzipForm : Form
 
     private void LoadSettings()
     {
-        _isLoadingSettings = true;
+        FolderWatcherAutoUnzipSettings settings = ReadSettings();
 
-        try
-        {
-            FolderWatcherAutoUnzipSettings settings = ReadSettings();
+        watchFolderTextBox.Text = string.IsNullOrWhiteSpace(settings.WatchFolder)
+            ? DefaultWatchFolder
+            : settings.WatchFolder;
 
-            watchFolderTextBox.Text = string.IsNullOrWhiteSpace(settings.WatchFolder)
-                ? DefaultWatchFolder
-                : settings.WatchFolder;
+        extractFolderTextBox.Text = string.IsNullOrWhiteSpace(settings.ExtractFolder)
+            ? DefaultExtractFolder
+            : settings.ExtractFolder;
 
-            extractFolderTextBox.Text = string.IsNullOrWhiteSpace(settings.ExtractFolder)
-                ? DefaultExtractFolder
-                : settings.ExtractFolder;
+        _settingsLoaded = true;
+        SaveSettings();
 
-            _hasLoadedSettings = true;
-            SaveSettings();
-
-            AppendLog($"Settings loaded from: {_settingsPath}");
-        }
-        finally
-        {
-            _isLoadingSettings = false;
-        }
+        AppendLog($"Settings loaded from: {_settingsPath}");
     }
 
     private FolderWatcherAutoUnzipSettings ReadSettings()
@@ -108,7 +98,7 @@ public partial class FolderWatcherAutoUnzipForm : Form
 
     private void SaveSettingsIfReady()
     {
-        if (_isLoadingSettings || !_hasLoadedSettings)
+        if (!_settingsLoaded)
         {
             return;
         }
@@ -118,7 +108,7 @@ public partial class FolderWatcherAutoUnzipForm : Form
 
     private void SaveSettings()
     {
-        if (!_hasLoadedSettings && !_isLoadingSettings)
+        if (!_settingsLoaded)
         {
             return;
         }
@@ -216,6 +206,19 @@ public partial class FolderWatcherAutoUnzipForm : Form
         OpenFolder(extractFolderTextBox.Text);
     }
 
+    private void OpenSettingsFolderButton_Click(object? sender, EventArgs e)
+    {
+        SaveSettings();
+
+        string? settingsFolder = Path.GetDirectoryName(_settingsPath);
+        if (string.IsNullOrWhiteSpace(settingsFolder))
+        {
+            return;
+        }
+
+        OpenFolder(settingsFolder);
+    }
+
     private void BrowseWatchFolderButton_Click(object? sender, EventArgs e)
     {
         BrowseFolder(watchFolderTextBox);
@@ -237,8 +240,8 @@ public partial class FolderWatcherAutoUnzipForm : Form
 
         BeginInvoke(new MethodInvoker(() =>
         {
-            AppendLog($"Imported: {e.ZipPath}");
-            AppendLog($"Extracted to selected folder: {e.OutputFolder}");
+            AppendLog($"Imported and moved zip to: {e.ZipPath}");
+            AppendLog($"Extracted to: {e.OutputFolder}");
         }));
     }
 
@@ -251,8 +254,8 @@ public partial class FolderWatcherAutoUnzipForm : Form
 
         BeginInvoke(new MethodInvoker(() =>
         {
-            AppendLog($"FAILED: {e.ZipPath}");
-            AppendLog($"Error:  {e.ErrorMessage}");
+            AppendLog($"FAILED and moved zip to: {e.ZipPath}");
+            AppendLog($"Error: {e.ErrorMessage}");
         }));
     }
 

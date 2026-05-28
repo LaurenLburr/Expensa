@@ -1,0 +1,13 @@
+<Solution>
+  <Project Path="../Codex.CommandEngine/Core/Codex.CommandEngine.Abstractions/Codex.CommandEngine.Abstractions.csproj" />
+  <Project Path="../Codex.CommandEngine/Core/Codex.CommandEngine.Core/Codex.CommandEngine.Core.csproj" />
+  <Project Path="Core/CodexExpensa.Navigation.Abstractions/CodexExpensa.Navigation.Abstractions.csproj" />
+  <Project Path="Core/CodexExpensa.Navigation.Hosting/CodexExpensa.Navigation.Hosting.csproj" />
+  <Project Path="Host/CodexExpensa.ExtensionDevHost.CommandEngineIntegration.TestHarness/CodexExpensa.ExtensionDevHost.CommandEngineIntegration.TestHarness.csproj" />
+  <Project Path="Host/CodexExpensa.ExtensionDevHost/CodexExpensa.ExtensionDevHost.csproj" />
+  <Project Path="Host/CodexExpensa.ExtensionDevHost/CommandEngineIntegration/CodexExpensa.ExtensionDevHost.CommandEngineIntegration.csproj" />
+  <Project Path="Modules/CodexExpensa.Feature.Websites/CodexExpensa.Feature.Websites.csproj" />
+  <Project Path="Modules/WebsitesAddin/WebsitesAddin.csproj" />
+  <Project Path="Tests/CodexExpensa.ExtensionDevHost.CommandEngineIntegration.Tests/CodexExpensa.ExtensionDevHost.CommandEngineIntegration.Tests.csproj" />
+  <Project Path="Tests/CodexExpensa.Navigation.Hosting.Tests/CodexExpensa.Navigation.Hosting.Tests.csproj" />
+</Solution>

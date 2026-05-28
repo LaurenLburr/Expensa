@@ -1,9 +1,8 @@
-// AUTO UPDATE TEST - REAL MAINFORM CORRECT PATH
-// This file belongs under Extensions\MainForm.cs inside the ExtensionDevHost project.
-// If this comment appears and no duplicate MainForm.cs exists at the project root, the auto-update path is correct.
 
+// This file is part of the Codex-Expensa Extension Manager
 using CodexExpensa.ExtensionDevHost.Commands;
 using CodexExpensa.ExtensionDevHost.Commands.Services;
+using CodexExpensa.ExtensionDevHost.CommandEngineIntegration;
 using CodexExpensa.ExtensionDevHost.Models;
 using CodexExpensa.ExtensionDevHost.Services;
 using CodexExpensa.ExtensionDevHost.UI;
@@ -97,6 +96,7 @@ public partial class MainForm : Form
 
             TreeNode project = new("Project");
             project.Nodes.Add(CreateCommandNode("OpenAI API Key", "Project.OpenAiApiKey"));
+            project.Nodes.Add(CreateCommandNode("Database Connection", "Project.DatabaseConnection"));
             project.Nodes.Add(CreateCommandNode("AI Add-in Designer", "Tools.AiAddinDesigner"));
 
             TreeNode addinProjects = BuildAddinProjectsNode();
@@ -110,10 +110,20 @@ public partial class MainForm : Form
             tools.Nodes.Add(CreateCommandNode("Command Catalog", "Tools.CommandCatalog"));
             tools.Nodes.Add(CreateCommandNode("Query Catalog", "Tools.QueryCatalog"));
             tools.Nodes.Add(CreateCommandNode("Folder Watcher / Auto Unzip", "Tools.FolderWatcherAutoUnzip"));
+            tools.Nodes.Add(CreateCommandNode("CommandEngine Runtime", "Tools.CommandEngineRuntime"));
 
             TreeNode docs = new("Docs");
-            docs.Nodes.Add(CreateWorkspaceDocNode("AI Add-in Design Workflow", "AiAddinDesignWorkflow.md"));
-            docs.Nodes.Add(CreateWorkspaceDocNode("Workspace Roadmap", "WorkspaceRoadmap.md"));
+
+            TreeNode aiInstructions = new("AI Instructions / General Rules");
+            aiInstructions.Nodes.Add(CreateWorkspaceDocNode("General Coding Rules", "GeneralCodingRules.md"));
+            aiInstructions.Nodes.Add(CreateWorkspaceDocNode("General Coding Spec", "GeneralCodingSpec.md"));
+            aiInstructions.Nodes.Add(CreateWorkspaceDocNode("AI Add-in Design Workflow", "AiAddinDesignWorkflow.md"));
+            aiInstructions.Nodes.Add(CreateWorkspaceDocNode("Add-in Design Spec Template", "AddinDesignSpecTemplate.md"));
+            aiInstructions.Nodes.Add(CreateWorkspaceDocNode("Expensa Integration Spec Template", "ExpensaIntegrationSpecTemplate.md"));
+            aiInstructions.Nodes.Add(CreateCommandNode("Update Standard AI Docs", "Docs.UpdateStandardAiDocs"));
+
+            docs.Nodes.Add(aiInstructions);
+            docs.Nodes.Add(CreateWorkspaceDocNode("Workspace Roadmap", "Roadmap.md"));
 
             navigationTreeView.Nodes.Add(project);
             navigationTreeView.Nodes.Add(addinProjects);
@@ -121,7 +131,10 @@ public partial class MainForm : Form
             navigationTreeView.Nodes.Add(tools);
             navigationTreeView.Nodes.Add(docs);
 
-            navigationTreeView.ExpandAll();
+            project.Expand();
+            templates.Expand();
+            tools.Expand();
+            docs.Expand();
         }
         finally
         {
@@ -346,6 +359,14 @@ private static TreeNode CreateCommandNode(string text, string commandKey)
                 ShowEmbeddedForm(new OpenAiApiKeyPanelForm());
                 break;
 
+            case "Project.DatabaseConnection":
+                ShowEmbeddedForm(new DatabaseConnectionPanelForm());
+                break;
+
+            //case "Project.DatabaseConnection":
+            //    ShowEmbeddedForm(new DatabaseConnectionPanelForm());
+            //    break;
+
             case "Tools.AiAddinDesigner":
                 ShowAiAddinDesignerPanel();
                 break;
@@ -364,6 +385,14 @@ private static TreeNode CreateCommandNode(string text, string commandKey)
 
             case "Tools.FolderWatcherAutoUnzip":
                 ShowFolderWatcherAutoUnzipPanel();
+                break;
+
+            case "Tools.CommandEngineRuntime":
+                ShowCommandEngineRuntimePanel();
+                break;
+
+            case "Docs.UpdateStandardAiDocs":
+                ShowStandardAiDocsUpdatePanel();
                 break;
 
             default:
@@ -402,6 +431,14 @@ private static TreeNode CreateCommandNode(string text, string commandKey)
                 ShowFolderWatcherAutoUnzipPanel();
                 break;
 
+            case "Tools.CommandEngineRuntime":
+                ShowCommandEngineRuntimePanel();
+                break;
+
+            case "Docs.UpdateStandardAiDocs":
+                ShowStandardAiDocsUpdatePanel();
+                break;
+
             default:
                 InvokeCommand(commandTag.CommandKey);
                 break;
@@ -434,6 +471,17 @@ private static TreeNode CreateCommandNode(string text, string commandKey)
 
 
 
+
+
+    private void ShowCommandEngineRuntimePanel()
+    {
+        ShowEmbeddedForm(new ExtensionRuntimeDashboardForm());
+    }
+
+    private void ShowStandardAiDocsUpdatePanel()
+    {
+        ShowEmbeddedForm(new StandardAiDocsUpdateForm());
+    }
 
     private void ShowFolderWatcherAutoUnzipPanel()
     {

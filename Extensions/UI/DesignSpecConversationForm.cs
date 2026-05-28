@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text;
 using System.Text.RegularExpressions;
+using CodexExpensa.ExtensionDevHost.Services;
 
 namespace CodexExpensa.ExtensionDevHost.UI;
 
@@ -9,6 +10,12 @@ public partial class DesignSpecConversationForm : Form
     private readonly string _projectName;
     private readonly string _designSpecPath;
     private readonly string _conversationPath;
+    private readonly AiInstructionContextService _instructionContextService = new();
+
+    private readonly System.Windows.Forms.Timer _previewRenderTimer = new()
+    {
+        Interval = 450
+    };
 
     private bool _isRendering;
 
@@ -24,8 +31,19 @@ public partial class DesignSpecConversationForm : Form
             "DesignConversation.md");
 
         InitializeComponent();
+        WirePreviewRenderTimer();
         WireRuntimeEvents();
         LoadWorkspace();
+    }
+
+
+    private void WirePreviewRenderTimer()
+    {
+        _previewRenderTimer.Tick += (_, _) =>
+        {
+            _previewRenderTimer.Stop();
+            RenderDesignSpecPreviewPreservingEditorState();
+        };
     }
 
     private void WireRuntimeEvents()
@@ -37,7 +55,7 @@ public partial class DesignSpecConversationForm : Form
                 return;
             }
 
-            RenderDesignSpecPreview();
+            ScheduleDesignSpecPreviewRender();
         };
     }
 
@@ -52,7 +70,7 @@ public partial class DesignSpecConversationForm : Form
         designSpecEditor.Text = File.ReadAllText(_designSpecPath);
         conversationEditor.Text = File.ReadAllText(_conversationPath);
 
-        RenderDesignSpecPreview();
+        RenderDesignSpecPreviewPreservingEditorState();
 
         SetStatus("Loaded design spec conversation workspace.");
     }
@@ -210,7 +228,7 @@ This file stores the ongoing AI design conversation for the add-in design spec.
     {
         File.WriteAllText(_designSpecPath, designSpecEditor.Text);
         File.WriteAllText(_conversationPath, conversationEditor.Text);
-        RenderDesignSpecPreview();
+        RenderDesignSpecPreviewPreservingEditorState();
     }
 
     private void OpenDocsFolderButton_Click(object? sender, EventArgs e)
@@ -227,6 +245,45 @@ This file stores the ongoing AI design conversation for the add-in design spec.
             FileName = folder,
             UseShellExecute = true
         });
+    }
+
+
+    private void ScheduleDesignSpecPreviewRender()
+    {
+        if (_isRendering)
+        {
+            return;
+        }
+
+        _previewRenderTimer.Stop();
+        _previewRenderTimer.Start();
+    }
+
+    private void RenderDesignSpecPreviewPreservingEditorState()
+    {
+        bool editorHadFocus = designSpecEditor.Focused;
+        int selectionStart = designSpecEditor.SelectionStart;
+        int selectionLength = designSpecEditor.SelectionLength;
+
+        try
+        {
+            RenderDesignSpecPreview();
+        }
+        finally
+        {
+            if (!designSpecEditor.IsDisposed && selectionStart <= designSpecEditor.TextLength)
+            {
+                designSpecEditor.SelectionStart = selectionStart;
+                designSpecEditor.SelectionLength = Math.Min(
+                    selectionLength,
+                    designSpecEditor.TextLength - selectionStart);
+            }
+
+            if (editorHadFocus && !designSpecEditor.IsDisposed)
+            {
+                designSpecEditor.Focus();
+            }
+        }
     }
 
     private void RenderDesignSpecPreview()
@@ -490,3 +547,36 @@ td, th { border: 1px solid #ccc; padding: 6px 10px; }
         statusLabel.Text = message;
     }
 }
+    private void AcceptAiUpdateButton_Click(object? sender, EventArgs e)
+    {
+        if (string.IsNullOrWhiteSpace(_pendingAiSpecUpdate))
+        {
+            return;
+        }
+
+        designSpecEditor.Text = _pendingAiSpecUpdate;
+
+        SaveWorkspace();
+        RenderDesignSpecPreviewWhenReady();
+
+        _pendingAiSpecUpdate = string.Empty;
+        aiSpecPreviewTextBox.Clear();
+
+        acceptAiUpdateButton.Enabled = false;
+        rejectAiUpdateButton.Enabled = false;
+
+        SetStatus("Applied AI Design Spec update.");
+    }
+
+    private void RejectAiUpdateButton_Click(object? sender, EventArgs e)
+    {
+        _pendingAiSpecUpdate = string.Empty;
+        aiSpecPreviewTextBox.Clear();
+
+        acceptAiUpdateButton.Enabled = false;
+        rejectAiUpdateButton.Enabled = false;
+
+        SetStatus("Rejected AI Design Spec update.");
+    }
+
+

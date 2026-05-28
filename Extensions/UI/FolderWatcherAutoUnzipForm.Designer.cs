@@ -18,6 +18,7 @@ partial class FolderWatcherAutoUnzipForm
     private Button startButton;
     private Button stopButton;
     private Button importExistingButton;
+    private Button openSettingsFolderButton;
     private TextBox logTextBox;
     private Label statusLabel;
 
@@ -39,6 +40,7 @@ partial class FolderWatcherAutoUnzipForm
         startButton = new Button();
         stopButton = new Button();
         importExistingButton = new Button();
+        openSettingsFolderButton = new Button();
         logTextBox = new TextBox();
         statusLabel = new Label();
 
@@ -118,9 +120,14 @@ partial class FolderWatcherAutoUnzipForm
         importExistingButton.Text = "Import Existing Zips";
         importExistingButton.Click += ImportExistingButton_Click;
 
+        openSettingsFolderButton.AutoSize = true;
+        openSettingsFolderButton.Text = "Open Settings Folder";
+        openSettingsFolderButton.Click += OpenSettingsFolderButton_Click;
+
         buttonPanel.Controls.Add(startButton);
         buttonPanel.Controls.Add(stopButton);
         buttonPanel.Controls.Add(importExistingButton);
+        buttonPanel.Controls.Add(openSettingsFolderButton);
 
         logTextBox.Dock = DockStyle.Fill;
         logTextBox.Multiline = true;
