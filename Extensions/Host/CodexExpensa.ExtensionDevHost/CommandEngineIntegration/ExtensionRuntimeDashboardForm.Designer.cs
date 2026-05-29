@@ -50,12 +50,17 @@ partial class ExtensionRuntimeDashboardForm
     private ToolStripMenuItem copySelectedQueueOutputMenuItem;
     private ToolStripMenuItem copyQueueReportMenuItem;
     private ToolStripMenuItem persistenceMenuItem;
+    private ToolStripMenuItem openPersistentExecutionExplorerMenuItem;
     private ToolStripMenuItem showPersistedExecutionCountsMenuItem;
     private ToolStripMenuItem showPersistedQueueRecordsMenuItem;
     private ToolStripMenuItem showPersistedHistoryRecordsMenuItem;
     private ToolStripMenuItem openExecutionDatabaseMenuItem;
     private ToolStripMenuItem openExecutionDatabaseFolderMenuItem;
     private ToolStripMenuItem copyExecutionDatabasePathMenuItem;
+    private ToolStripMenuItem openPersistentExecutionRetentionDialogMenuItem;
+    private ToolStripMenuItem purgeFailedPersistedExecutionsMenuItem;
+    private ToolStripMenuItem purgePersistedHistoryOlderThan30DaysMenuItem;
+    private ToolStripMenuItem vacuumExecutionDatabaseMenuItem;
     private ToolStripMenuItem replaySelectedPersistedExecutionMenuItem;
     private ToolStripMenuItem showSelectedPersistedExecutionDetailsMenuItem;
     private ToolStripMenuItem copySelectedPersistedExecutionParametersMenuItem;
@@ -141,12 +146,17 @@ partial class ExtensionRuntimeDashboardForm
         copySelectedQueueOutputMenuItem = new ToolStripMenuItem();
         copyQueueReportMenuItem = new ToolStripMenuItem();
         persistenceMenuItem = new ToolStripMenuItem();
+        openPersistentExecutionExplorerMenuItem = new ToolStripMenuItem();
         showPersistedExecutionCountsMenuItem = new ToolStripMenuItem();
         showPersistedQueueRecordsMenuItem = new ToolStripMenuItem();
         showPersistedHistoryRecordsMenuItem = new ToolStripMenuItem();
         openExecutionDatabaseMenuItem = new ToolStripMenuItem();
         openExecutionDatabaseFolderMenuItem = new ToolStripMenuItem();
         copyExecutionDatabasePathMenuItem = new ToolStripMenuItem();
+        openPersistentExecutionRetentionDialogMenuItem = new ToolStripMenuItem();
+        purgeFailedPersistedExecutionsMenuItem = new ToolStripMenuItem();
+        purgePersistedHistoryOlderThan30DaysMenuItem = new ToolStripMenuItem();
+        vacuumExecutionDatabaseMenuItem = new ToolStripMenuItem();
         replaySelectedPersistedExecutionMenuItem = new ToolStripMenuItem();
         showSelectedPersistedExecutionDetailsMenuItem = new ToolStripMenuItem();
         copySelectedPersistedExecutionParametersMenuItem = new ToolStripMenuItem();
@@ -356,6 +366,8 @@ partial class ExtensionRuntimeDashboardForm
         persistenceMenuItem.Text = "&Persistence";
         persistenceMenuItem.DropDownItems.AddRange(new ToolStripItem[]
         {
+            openPersistentExecutionExplorerMenuItem,
+            new ToolStripSeparator(),
             showPersistedExecutionCountsMenuItem,
             showPersistedQueueRecordsMenuItem,
             showPersistedHistoryRecordsMenuItem,
@@ -369,6 +381,8 @@ partial class ExtensionRuntimeDashboardForm
             copySelectedPersistedExecutionParametersMenuItem,
             copySelectedPersistedExecutionOutputMenuItem
         });
+        openPersistentExecutionExplorerMenuItem.Text = "Open Persistent Execution &Explorer";
+        openPersistentExecutionExplorerMenuItem.Click += OpenPersistentExecutionExplorer;
         showPersistedExecutionCountsMenuItem.Text = "Show Persisted Execution &Counts";
         showPersistedExecutionCountsMenuItem.Click += ShowPersistedExecutionCounts;
         showPersistedQueueRecordsMenuItem.Text = "Show Persisted &Queue Records";
@@ -389,6 +403,14 @@ partial class ExtensionRuntimeDashboardForm
         copySelectedPersistedExecutionParametersMenuItem.Click += CopySelectedPersistedExecutionParameters;
         copySelectedPersistedExecutionOutputMenuItem.Text = "Copy Selected Persisted &Output";
         copySelectedPersistedExecutionOutputMenuItem.Click += CopySelectedPersistedExecutionOutput;
+        openPersistentExecutionRetentionDialogMenuItem.Text = "Open Retention &Manager";
+        openPersistentExecutionRetentionDialogMenuItem.Click += OpenPersistentExecutionRetentionDialog;
+        purgeFailedPersistedExecutionsMenuItem.Text = "Purge &Failed Persisted Executions";
+        purgeFailedPersistedExecutionsMenuItem.Click += PurgeFailedPersistedExecutions;
+        purgePersistedHistoryOlderThan30DaysMenuItem.Text = "Purge History Older Than &30 Days";
+        purgePersistedHistoryOlderThan30DaysMenuItem.Click += PurgePersistedHistoryOlderThan30Days;
+        vacuumExecutionDatabaseMenuItem.Text = "&Vacuum Execution Database";
+        vacuumExecutionDatabaseMenuItem.Click += VacuumExecutionDatabase;
         historyMenuItem.Text = "&History";
         historyMenuItem.DropDownItems.AddRange(new ToolStripItem[]
         {
@@ -514,5 +536,8 @@ partial class ExtensionRuntimeDashboardForm
         PerformLayout();
     }
 }
+
+
+
 
 

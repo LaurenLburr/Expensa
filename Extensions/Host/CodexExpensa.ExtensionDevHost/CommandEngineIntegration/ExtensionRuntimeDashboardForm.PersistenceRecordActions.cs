@@ -31,7 +31,7 @@ public sealed partial class ExtensionRuntimeDashboardForm
         return null;
     }
 
-    private void ShowSelectedPersistedExecutionDetails(
+    private async void ShowSelectedPersistedExecutionDetails(
         object? sender,
         EventArgs e)
     {
@@ -43,10 +43,34 @@ public sealed partial class ExtensionRuntimeDashboardForm
             return;
         }
 
-        diagnosticsTextBox.Text =
-            CommandExecutionPersistentRecordTextFormatter.Format(
-                "Selected Persisted Execution Record",
-                [record]);
+        using PersistentExecutionDetailDialog dialog = new(record);
+
+        if (dialog.ShowDialog(this) != DialogResult.OK)
+        {
+            return;
+        }
+
+        if (!dialog.ReplayRequested)
+        {
+            return;
+        }
+
+        DialogResult response =
+            MessageBox.Show(
+                this,
+                $"Replay persisted command '{dialog.Record.CommandName}' with its saved parameters?",
+                "Replay Persisted Command",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Question);
+
+        if (response != DialogResult.Yes)
+        {
+            return;
+        }
+
+        await ExecuteCommandAndRecordAsync(
+            CommandExecutionPersistentRecordReplayMapper.GetCommandName(dialog.Record),
+            CommandExecutionPersistentRecordReplayMapper.GetParameterJson(dialog.Record)).ConfigureAwait(true);
     }
 
     private void CopySelectedPersistedExecutionParameters(
@@ -100,6 +124,8 @@ public sealed partial class ExtensionRuntimeDashboardForm
             return;
         }
 
-        await ExecuteCommandAndRecordAsync(record.CommandName, record.ParameterJson).ConfigureAwait(true);
+        await ExecuteCommandAndRecordAsync(
+            CommandExecutionPersistentRecordReplayMapper.GetCommandName(record),
+            CommandExecutionPersistentRecordReplayMapper.GetParameterJson(record)).ConfigureAwait(true);
     }
 }

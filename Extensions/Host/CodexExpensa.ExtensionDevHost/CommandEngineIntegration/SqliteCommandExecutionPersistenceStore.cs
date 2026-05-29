@@ -8,16 +8,14 @@ public sealed class SqliteCommandExecutionPersistenceStore :
 {
     private readonly string _connectionString;
 
-    public SqliteCommandExecutionPersistenceStore(
-        CommandExecutionPersistenceOptions options)
+    public SqliteCommandExecutionPersistenceStore(CommandExecutionPersistenceOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentException.ThrowIfNullOrWhiteSpace(options.DatabasePath);
 
         DatabasePath = options.DatabasePath;
 
-        string? folder =
-            Path.GetDirectoryName(DatabasePath);
+        string? folder = Path.GetDirectoryName(DatabasePath);
 
         if (!string.IsNullOrWhiteSpace(folder))
         {
@@ -36,23 +34,15 @@ public sealed class SqliteCommandExecutionPersistenceStore :
 
     public void EnsureCreated()
     {
-        using SqliteConnection connection =
-            OpenConnection();
+        using SqliteConnection connection = OpenConnection();
 
-        ExecuteNonQuery(
-            connection,
-            CommandExecutionPersistenceSchema.CreateCommandExecutionTable);
-
-        ExecuteNonQuery(
-            connection,
-            CommandExecutionPersistenceSchema.CreateCommandExecutionIndexes);
+        ExecuteNonQuery(connection, CommandExecutionPersistenceSchema.CreateCommandExecutionTable);
+        ExecuteNonQuery(connection, CommandExecutionPersistenceSchema.CreateCommandExecutionIndexes);
     }
 
-    public void UpsertQueueItem(
-        CommandExecutionQueueItem item)
+    public void UpsertQueueItem(CommandExecutionQueueItem item)
     {
         ArgumentNullException.ThrowIfNull(item);
-
         EnsureCreated();
 
         Upsert(new CommandExecutionPersistentRecord
@@ -73,11 +63,9 @@ public sealed class SqliteCommandExecutionPersistenceStore :
         });
     }
 
-    public void UpsertHistoryRecord(
-        CommandExecutionHistoryRecord record)
+    public void UpsertHistoryRecord(CommandExecutionHistoryRecord record)
     {
         ArgumentNullException.ThrowIfNull(record);
-
         EnsureCreated();
 
         Upsert(new CommandExecutionPersistentRecord
@@ -100,65 +88,87 @@ public sealed class SqliteCommandExecutionPersistenceStore :
 
     public IReadOnlyList<CommandExecutionPersistentRecord> ListQueueItems()
     {
-        EnsureCreated();
-
-        using SqliteConnection connection =
-            OpenConnection();
-
-        using SqliteCommand command =
-            connection.CreateCommand();
-
-        command.CommandText =
-            CommandExecutionPersistenceSchema.SelectQueueItems;
-
-        DataTable table =
-            ExecuteDataTable(command);
-
-        return MapRecords(table);
+        return QueryRecords(new CommandExecutionPersistentRecordQuery
+        {
+            SourceFilter = CommandExecutionPersistentRecordSourceFilter.Queue
+        });
     }
 
     public IReadOnlyList<CommandExecutionPersistentRecord> ListHistoryRecords()
     {
+        return QueryRecords(new CommandExecutionPersistentRecordQuery
+        {
+            SourceFilter = CommandExecutionPersistentRecordSourceFilter.History
+        });
+    }
+
+    public IReadOnlyList<CommandExecutionPersistentRecord> QueryRecords(
+        CommandExecutionPersistentRecordQuery query)
+    {
+        ArgumentNullException.ThrowIfNull(query);
         EnsureCreated();
 
-        using SqliteConnection connection =
-            OpenConnection();
+        CommandExecutionPersistentRecordQuerySql sql =
+            CommandExecutionPersistentRecordQueryBuilder.Build(query);
 
-        using SqliteCommand command =
-            connection.CreateCommand();
+        using SqliteConnection connection = OpenConnection();
+        using SqliteCommand command = connection.CreateCommand();
 
-        command.CommandText =
-            CommandExecutionPersistenceSchema.SelectHistoryRecords;
+        command.CommandText = sql.SqlText;
 
-        DataTable table =
-            ExecuteDataTable(command);
+        foreach (KeyValuePair<string, object> parameter in sql.Parameters)
+        {
+            command.Parameters.AddWithValue(parameter.Key, parameter.Value);
+        }
 
-        return MapRecords(table);
+        return MapRecords(ExecuteDataTable(command));
+    }
+
+    public int DeleteRecords(CommandExecutionRetentionOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        EnsureCreated();
+
+        CommandExecutionPersistentRecordQuerySql sql =
+            CommandExecutionRetentionSqlBuilder.BuildDeleteSql(options);
+
+        using SqliteConnection connection = OpenConnection();
+        using SqliteCommand command = connection.CreateCommand();
+
+        command.CommandText = sql.SqlText;
+
+        foreach (KeyValuePair<string, object> parameter in sql.Parameters)
+        {
+            command.Parameters.AddWithValue(parameter.Key, parameter.Value);
+        }
+
+        return command.ExecuteNonQuery();
     }
 
     public void DeleteCompletedQueueItems()
     {
         EnsureCreated();
 
-        using SqliteConnection connection =
-            OpenConnection();
+        using SqliteConnection connection = OpenConnection();
 
-        ExecuteNonQuery(
-            connection,
-            CommandExecutionPersistenceSchema.DeleteCompletedQueueItems);
+        ExecuteNonQuery(connection, CommandExecutionPersistenceSchema.DeleteCompletedQueueItems);
     }
 
-    private void Upsert(
-        CommandExecutionPersistentRecord record)
+    public void Vacuum()
     {
-        using SqliteConnection connection =
-            OpenConnection();
+        EnsureCreated();
 
-        using SqliteCommand command =
-            connection.CreateCommand();
+        using SqliteConnection connection = OpenConnection();
 
-        command.CommandText =
-            CommandExecutionPersistenceSchema.UpsertCommandExecution;
+        ExecuteNonQuery(connection, "VACUUM;");
+    }
+
+    private void Upsert(CommandExecutionPersistentRecord record)
+    {
+        using SqliteConnection connection = OpenConnection();
+        using SqliteCommand command = connection.CreateCommand();
+
+        command.CommandText = CommandExecutionPersistenceSchema.UpsertCommandExecution;
 
         command.Parameters.AddWithValue("@ExecutionId", record.ExecutionId);
         command.Parameters.AddWithValue("@SourceKind", record.SourceKind);
@@ -179,43 +189,30 @@ public sealed class SqliteCommandExecutionPersistenceStore :
 
     private SqliteConnection OpenConnection()
     {
-        SqliteConnection connection =
-            new(_connectionString);
-
+        SqliteConnection connection = new(_connectionString);
         connection.Open();
-
         return connection;
     }
 
-    private static void ExecuteNonQuery(
-        SqliteConnection connection,
-        string commandText)
+    private static void ExecuteNonQuery(SqliteConnection connection, string commandText)
     {
-        using SqliteCommand command =
-            connection.CreateCommand();
-
-        command.CommandText =
-            commandText;
-
+        using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = commandText;
         command.ExecuteNonQuery();
     }
 
-    private static DataTable ExecuteDataTable(
-        SqliteCommand command)
+    private static DataTable ExecuteDataTable(SqliteCommand command)
     {
-        DataTable table =
-            new();
+        DataTable table = new();
 
-        using SqliteDataReader reader =
-            command.ExecuteReader();
+        using SqliteDataReader reader = command.ExecuteReader();
 
         table.Load(reader);
 
         return table;
     }
 
-    private static IReadOnlyList<CommandExecutionPersistentRecord> MapRecords(
-        DataTable table)
+    private static IReadOnlyList<CommandExecutionPersistentRecord> MapRecords(DataTable table)
     {
         List<CommandExecutionPersistentRecord> records = [];
 
@@ -242,36 +239,27 @@ public sealed class SqliteCommandExecutionPersistenceStore :
         return records;
     }
 
-    private static string GetString(
-        DataRow row,
-        string columnName)
+    private static string GetString(DataRow row, string columnName)
     {
-        object value =
-            row[columnName];
+        object value = row[columnName];
 
         return value == DBNull.Value
             ? string.Empty
             : Convert.ToString(value) ?? string.Empty;
     }
 
-    private static int GetInt32(
-        DataRow row,
-        string columnName)
+    private static int GetInt32(DataRow row, string columnName)
     {
-        object value =
-            row[columnName];
+        object value = row[columnName];
 
         return value == DBNull.Value
             ? 0
             : Convert.ToInt32(value);
     }
 
-    private static DateTimeOffset? GetNullableDateTimeOffset(
-        DataRow row,
-        string columnName)
+    private static DateTimeOffset? GetNullableDateTimeOffset(DataRow row, string columnName)
     {
-        string value =
-            GetString(row, columnName);
+        string value = GetString(row, columnName);
 
         return string.IsNullOrWhiteSpace(value)
             ? null

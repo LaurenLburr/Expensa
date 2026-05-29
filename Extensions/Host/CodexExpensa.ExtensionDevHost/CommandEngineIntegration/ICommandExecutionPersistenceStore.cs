@@ -12,5 +12,12 @@ public interface ICommandExecutionPersistenceStore
 
     IReadOnlyList<CommandExecutionPersistentRecord> ListHistoryRecords();
 
+    IReadOnlyList<CommandExecutionPersistentRecord> QueryRecords(
+        CommandExecutionPersistentRecordQuery query);
+
+    int DeleteRecords(CommandExecutionRetentionOptions options);
+
     void DeleteCompletedQueueItems();
+
+    void Vacuum();
 }
