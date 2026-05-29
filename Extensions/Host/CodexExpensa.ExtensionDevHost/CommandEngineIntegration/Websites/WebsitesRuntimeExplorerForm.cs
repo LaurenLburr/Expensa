@@ -1,22 +1,20 @@
-using Codex.CommandEngine.Core;
-
 namespace CodexExpensa.ExtensionDevHost.CommandEngineIntegration.Websites;
 
 public sealed partial class WebsitesRuntimeExplorerForm : Form
 {
-    private readonly HostWebsiteRuntimeModuleInvoker _invoker;
+    private readonly IHostWebsiteTreeLoader _treeLoader;
 
     public WebsitesRuntimeExplorerForm()
-        : this(new HostWebsiteRuntimeModuleInvoker())
+        : this(new HostWebsiteTreeLoader())
     {
     }
 
     public WebsitesRuntimeExplorerForm(
-        HostWebsiteRuntimeModuleInvoker invoker)
+        IHostWebsiteTreeLoader treeLoader)
     {
-        ArgumentNullException.ThrowIfNull(invoker);
+        ArgumentNullException.ThrowIfNull(treeLoader);
 
-        _invoker = invoker;
+        _treeLoader = treeLoader;
 
         InitializeComponent();
     }
@@ -36,29 +34,22 @@ public sealed partial class WebsitesRuntimeExplorerForm : Form
 
         try
         {
-            CommandExecutionResult result =
-                await _invoker.ExecuteAsync(
-                    new HostWebsiteRuntimeLoadRequest
+            HostWebsiteTreeLoadResult result =
+                await _treeLoader.LoadIntoTreeViewAsync(
+                    websitesTreeView,
+                    new HostWebsiteTreeLoadOptions
                     {
                         SearchText = searchTextBox.Text.Trim(),
                         IncludeDisabled = includeDisabledCheckBox.Checked,
-                        MaximumRows = (int)maximumRowsNumericUpDown.Value
+                        MaximumRows = (int)maximumRowsNumericUpDown.Value,
+                        ExpandAll = true
                     }).ConfigureAwait(true);
 
-            HostWebsiteLoadExecutionResultAdapter.RenderExecutionResult(
-                websitesTreeView,
-                result);
-
-            HostWebsiteLoadResult loadResult =
-                HostWebsiteLoadExecutionResultAdapter.FromExecutionResult(result);
-
             statusLabel.Text =
-                $"{result.Status}: {loadResult.Message}";
+                $"{result.ExecutionResult.Status}: {result.WebsiteResult.Message}";
 
             detailsTextBox.Text =
-                result.OutputJson;
-
-            websitesTreeView.ExpandAll();
+                result.ExecutionResult.OutputJson;
         }
         catch (Exception exception)
         {
@@ -82,21 +73,13 @@ public sealed partial class WebsitesRuntimeExplorerForm : Form
         object? sender,
         TreeViewEventArgs e)
     {
-        HostWebsiteTreeNode? node =
-            HostWebsiteTreeViewRenderer.GetSelectedWebsiteNode(websitesTreeView);
+        string details =
+            HostWebsiteTreeSelectionFormatter.FormatSelectedNode(websitesTreeView);
 
-        if (node is null)
+        if (!string.IsNullOrWhiteSpace(details))
         {
-            return;
+            detailsTextBox.Text = details;
         }
-
-        detailsTextBox.Text =
-            $"NodeId: {node.NodeId}{Environment.NewLine}" +
-            $"DisplayText: {node.DisplayText}{Environment.NewLine}" +
-            $"Category: {node.Category}{Environment.NewLine}" +
-            $"Url: {node.Url}{Environment.NewLine}" +
-            $"Enabled: {node.IsEnabled}{Environment.NewLine}" +
-            $"Children: {node.Children.Count}";
     }
 
     private void websitesTreeView_DoubleClick(
