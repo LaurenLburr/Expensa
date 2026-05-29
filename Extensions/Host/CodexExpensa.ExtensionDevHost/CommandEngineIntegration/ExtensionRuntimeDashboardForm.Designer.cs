@@ -49,6 +49,8 @@ partial class ExtensionRuntimeDashboardForm
     private ToolStripMenuItem copySelectedQueueParametersMenuItem;
     private ToolStripMenuItem copySelectedQueueOutputMenuItem;
     private ToolStripMenuItem copyQueueReportMenuItem;
+    private ToolStripMenuItem websitesMenuItem;
+    private ToolStripMenuItem openWebsitesRuntimeExplorerMenuItem;
     private ToolStripMenuItem persistenceMenuItem;
     private ToolStripMenuItem openPersistentExecutionExplorerMenuItem;
     private ToolStripMenuItem showPersistedExecutionCountsMenuItem;
@@ -161,6 +163,8 @@ partial class ExtensionRuntimeDashboardForm
         showSelectedPersistedExecutionDetailsMenuItem = new ToolStripMenuItem();
         copySelectedPersistedExecutionParametersMenuItem = new ToolStripMenuItem();
         copySelectedPersistedExecutionOutputMenuItem = new ToolStripMenuItem();
+        websitesMenuItem = new ToolStripMenuItem();
+        openWebsitesRuntimeExplorerMenuItem = new ToolStripMenuItem();
         historyMenuItem = new ToolStripMenuItem();
         showExecutionHistoryMenuItem = new ToolStripMenuItem();
         replaySelectedHistoryMenuItem = new ToolStripMenuItem();
@@ -411,6 +415,13 @@ partial class ExtensionRuntimeDashboardForm
         purgePersistedHistoryOlderThan30DaysMenuItem.Click += PurgePersistedHistoryOlderThan30Days;
         vacuumExecutionDatabaseMenuItem.Text = "&Vacuum Execution Database";
         vacuumExecutionDatabaseMenuItem.Click += VacuumExecutionDatabase;
+        websitesMenuItem.Text = "&Websites";
+        websitesMenuItem.DropDownItems.AddRange(new ToolStripItem[]
+        {
+            openWebsitesRuntimeExplorerMenuItem
+        });
+        openWebsitesRuntimeExplorerMenuItem.Text = "Open Websites Runtime &Explorer";
+        openWebsitesRuntimeExplorerMenuItem.Click += OpenWebsitesRuntimeExplorer;
         historyMenuItem.Text = "&History";
         historyMenuItem.DropDownItems.AddRange(new ToolStripItem[]
         {
@@ -536,6 +547,7 @@ partial class ExtensionRuntimeDashboardForm
         PerformLayout();
     }
 }
+
 
 
 
