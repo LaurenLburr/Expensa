@@ -1,5 +1,3 @@
-using CodexExpensa.ExtensionDevHost.CommandEngineIntegration.Websites;
-
 namespace CodexExpensa.ExtensionDevHost.CommandEngineIntegration.ExtensionManager;
 
 public sealed class ExtensionTreeNodeLoaderProviderCatalog
@@ -21,8 +19,6 @@ public sealed class ExtensionTreeNodeLoaderProviderCatalog
 
     public IReadOnlyList<IExtensionTreeNodeLoaderProvider> GetProviders()
     {
-        List<IExtensionTreeNodeLoaderProvider> providers = [];
-
         ExtensionModuleAssemblyLoader assemblyLoader = new();
 
         IReadOnlyList<ExtensionModuleAssemblyLoadResult> assemblyResults =
@@ -36,14 +32,6 @@ public sealed class ExtensionTreeNodeLoaderProviderCatalog
 
         ExtensionTreeNodeLoaderProviderDiscovery discovery = new();
 
-        providers.AddRange(
-            discovery.DiscoverProviders(loadedAssemblies));
-
-        if (providers.Count == 0)
-        {
-            providers.Add(new WebsitesExtensionTreeNodeLoaderProvider());
-        }
-
-        return providers;
+        return discovery.DiscoverProviders(loadedAssemblies);
     }
 }

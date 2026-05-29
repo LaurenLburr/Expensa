@@ -3,7 +3,7 @@ using Xunit;
 
 namespace CodexExpensa.ExtensionDevHost.CommandEngineIntegration.Tests.ExtensionManager;
 
-public sealed class ExtensionTreeNodeLoaderProviderCatalogTests
+public sealed class ExtensionTreeNodeLoaderProviderCatalogNoFallbackTests
 {
     [Fact]
     public void GetProviders_WhenModulesFolderEmpty_ReturnsEmpty()
@@ -11,7 +11,7 @@ public sealed class ExtensionTreeNodeLoaderProviderCatalogTests
         string folder =
             Path.Combine(
                 Path.GetTempPath(),
-                "ExtensionTreeNodeLoaderProviderCatalogTests",
+                "ExtensionTreeNodeLoaderProviderCatalogNoFallbackTests",
                 Guid.NewGuid().ToString("N"));
 
         Directory.CreateDirectory(folder);
