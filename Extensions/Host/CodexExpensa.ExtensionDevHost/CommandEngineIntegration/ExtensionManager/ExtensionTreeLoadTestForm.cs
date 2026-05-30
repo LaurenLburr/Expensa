@@ -4,13 +4,15 @@ public sealed partial class ExtensionTreeLoadTestForm : Form
 {
     private readonly ExtensionTreeLoadOrchestrator _orchestrator;
 
+    private IReadOnlySet<string> _lastExpandedNodeNames =
+        new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
     public ExtensionTreeLoadTestForm()
         : this(new ExtensionTreeLoadOrchestrator(new ExtensionTreeNodeLoaderCatalog().GetLoaders()))
     {
     }
 
-    public ExtensionTreeLoadTestForm(
-        ExtensionTreeLoadOrchestrator orchestrator)
+    public ExtensionTreeLoadTestForm(ExtensionTreeLoadOrchestrator orchestrator)
     {
         ArgumentNullException.ThrowIfNull(orchestrator);
 
@@ -19,9 +21,7 @@ public sealed partial class ExtensionTreeLoadTestForm : Form
         InitializeComponent();
     }
 
-    private async void loadTreeButton_Click(
-        object? sender,
-        EventArgs e)
+    private async void loadTreeButton_Click(object? sender, EventArgs e)
     {
         await LoadTreeAsync().ConfigureAwait(true);
     }
@@ -32,18 +32,26 @@ public sealed partial class ExtensionTreeLoadTestForm : Form
         statusLabel.Text = "Loading extension tree...";
         detailsTextBox.Clear();
 
+        IReadOnlySet<string> expandedBeforeReload =
+            TreeViewExpansionStateService.CaptureExpandedNodeNames(extensionTreeView);
+
         try
         {
             ExtensionTreeLoadSummary summary =
                 await _orchestrator.LoadAsync(extensionTreeView).ConfigureAwait(true);
 
-            extensionTreeView.ExpandAll();
+            IReadOnlySet<string> stateToRestore =
+                expandedBeforeReload.Count > 0
+                    ? expandedBeforeReload
+                    : _lastExpandedNodeNames;
 
-            statusLabel.Text =
-                summary.ToDisplayText();
+            TreeViewExpansionStateService.RestoreExpandedNodeNames(extensionTreeView, stateToRestore);
 
-            detailsTextBox.Text =
-                ExtensionTreeLoadSummaryFormatter.Format(summary);
+            _lastExpandedNodeNames =
+                TreeViewExpansionStateService.CaptureExpandedNodeNames(extensionTreeView);
+
+            statusLabel.Text = summary.ToDisplayText();
+            detailsTextBox.Text = ExtensionTreeLoadSummaryFormatter.Format(summary);
         }
         catch (Exception exception)
         {
@@ -63,25 +71,25 @@ public sealed partial class ExtensionTreeLoadTestForm : Form
         }
     }
 
-    private void extensionTreeView_AfterSelect(
-        object? sender,
-        TreeViewEventArgs e)
+    private void extensionTreeView_AfterExpand(object? sender, TreeViewEventArgs e)
     {
-        if (e.Node?.Tag is not null)
-        {
-            detailsTextBox.Text =
-                e.Node.Tag.ToString() ?? string.Empty;
-        }
-        else
-        {
-            detailsTextBox.Text =
-                e.Node?.Text ?? string.Empty;
-        }
+        _lastExpandedNodeNames =
+            TreeViewExpansionStateService.CaptureExpandedNodeNames(extensionTreeView);
     }
 
-    private void closeButton_Click(
-        object? sender,
-        EventArgs e)
+    private void extensionTreeView_AfterCollapse(object? sender, TreeViewEventArgs e)
+    {
+        _lastExpandedNodeNames =
+            TreeViewExpansionStateService.CaptureExpandedNodeNames(extensionTreeView);
+    }
+
+    private void extensionTreeView_AfterSelect(object? sender, TreeViewEventArgs e)
+    {
+        detailsTextBox.Text =
+            e.Node?.Tag?.ToString() ?? e.Node?.Text ?? string.Empty;
+    }
+
+    private void closeButton_Click(object? sender, EventArgs e)
     {
         Close();
     }

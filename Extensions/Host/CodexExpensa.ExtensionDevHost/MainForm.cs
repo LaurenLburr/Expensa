@@ -4,6 +4,7 @@ using CodexExpensa.ExtensionDevHost.Commands;
 using CodexExpensa.ExtensionDevHost.Commands.Services;
 using CodexExpensa.ExtensionDevHost.CommandEngineIntegration;
 using CodexExpensa.ExtensionDevHost.CommandEngineIntegration.ExtensionManager;
+using CodexExpensa.ExtensionDevHost.CommandEngineIntegration.Websites;
 using CodexExpensa.ExtensionDevHost.Models;
 using CodexExpensa.ExtensionDevHost.Services;
 using CodexExpensa.ExtensionDevHost.UI;
@@ -24,7 +25,9 @@ public partial class MainForm : Form
 
     private DocsEditorForm? _docsEditorForm;
 
-    public MainForm()
+    private IReadOnlySet<string> _lastNavigationExpandedNodeNames =
+        new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+public MainForm()
     {
         InitializeComponent();
 
@@ -52,12 +55,17 @@ public partial class MainForm : Form
         _commandRegistry.LoadConfig();
 
         EnsureWorkspaceDocumentsExist();
+        _lastNavigationExpandedNodeNames = LoadSavedNavigationExpandedNodeNames();
         BuildNavigationTree();
         RebuildMenu();
 
+
         Shown += (_, _) => RestoreMainSplitterDistance();
         FormClosing += (_, _) => SaveMainSplitterDistance();
+        FormClosing += (_, _) => SaveNavigationExpandedNodeNames();
         mainSplitContainer.SplitterMoved += (_, _) => SaveMainSplitterDistance();
+        navigationTreeView.AfterExpand += NavigationTreeView_ExpansionChanged;
+        navigationTreeView.AfterCollapse += NavigationTreeView_ExpansionChanged;
     }
 
     public CommandRegistry CommandRegistry => _commandRegistry;
@@ -89,33 +97,51 @@ public partial class MainForm : Form
 
     private void BuildNavigationTree()
     {
+        IReadOnlySet<string> expandedBeforeRebuild =
+            CaptureExpandedNavigationNodeNames();
+
         navigationTreeView.BeginUpdate();
 
         try
         {
             navigationTreeView.Nodes.Clear();
 
-            TreeNode project = new("Project");
+            TreeNode project = new("Project")
+            {
+                Name = "project"
+            };
             project.Nodes.Add(CreateCommandNode("OpenAI API Key", "Project.OpenAiApiKey"));
             project.Nodes.Add(CreateCommandNode("Database Connection", "Project.DatabaseConnection"));
             project.Nodes.Add(CreateCommandNode("AI Add-in Designer", "Tools.AiAddinDesigner"));
 
             TreeNode addinProjects = BuildAddinProjectsNode();
 
-            TreeNode templates = new("Templates");
+            TreeNode templates = new("Templates")
+            {
+                Name = "templates"
+            };
             templates.Nodes.Add(CreateWorkspaceDocNode("Add-in Design Spec Template", "AddinDesignSpecTemplate.md"));
             templates.Nodes.Add(CreateWorkspaceDocNode("Expensa Integration Spec Template", "ExpensaIntegrationSpecTemplate.md"));
 
-            TreeNode tools = new("Tools");
+            TreeNode tools = new("Tools")
+            {
+                Name = "tools"
+            };
             tools.Nodes.Add(CreateCommandNode("Manage Extensions", "Tools.ManageExtensions"));
             tools.Nodes.Add(CreateCommandNode("Command Catalog", "Tools.CommandCatalog"));
             tools.Nodes.Add(CreateCommandNode("Query Catalog", "Tools.QueryCatalog"));
             tools.Nodes.Add(CreateCommandNode("Folder Watcher / Auto Unzip", "Tools.FolderWatcherAutoUnzip"));
             tools.Nodes.Add(CreateCommandNode("CommandEngine Runtime", "Tools.CommandEngineRuntime"));
 
-            TreeNode docs = new("Docs");
+            TreeNode docs = new("Docs")
+            {
+                Name = "docs"
+            };
 
-            TreeNode aiInstructions = new("AI Instructions / General Rules");
+            TreeNode aiInstructions = new("AI Instructions / General Rules")
+            {
+                Name = "docs.aiInstructions"
+            };
             aiInstructions.Nodes.Add(CreateWorkspaceDocNode("General Coding Rules", "GeneralCodingRules.md"));
             aiInstructions.Nodes.Add(CreateWorkspaceDocNode("General Coding Spec", "GeneralCodingSpec.md"));
             aiInstructions.Nodes.Add(CreateWorkspaceDocNode("AI Add-in Design Workflow", "AiAddinDesignWorkflow.md"));
@@ -132,20 +158,145 @@ public partial class MainForm : Form
             navigationTreeView.Nodes.Add(tools);
             navigationTreeView.Nodes.Add(docs);
 
-            project.Expand();
-            templates.Expand();
-            tools.Expand();
-            docs.Expand();
+            IReadOnlySet<string> stateToRestore =
+                expandedBeforeRebuild.Count > 0
+                    ? expandedBeforeRebuild
+                    : _lastNavigationExpandedNodeNames;
+
+            RestoreExpandedNavigationNodeNames(stateToRestore);
+
+            _lastNavigationExpandedNodeNames =
+                CaptureExpandedNavigationNodeNames();
         }
         finally
         {
             navigationTreeView.EndUpdate();
         }
     }
+    private IReadOnlySet<string> CaptureExpandedNavigationNodeNames()
+    {
+        HashSet<string> expandedNodeNames =
+            new(StringComparer.OrdinalIgnoreCase);
+
+        foreach (TreeNode node in navigationTreeView.Nodes)
+        {
+            CaptureExpandedNavigationNodeNames(node, expandedNodeNames);
+        }
+
+        return expandedNodeNames;
+    }
+
+    private static void CaptureExpandedNavigationNodeNames(
+        TreeNode node,
+        HashSet<string> expandedNodeNames)
+    {
+        if (node.IsExpanded && !string.IsNullOrWhiteSpace(node.Name))
+        {
+            expandedNodeNames.Add(node.Name);
+        }
+
+        foreach (TreeNode child in node.Nodes)
+        {
+            CaptureExpandedNavigationNodeNames(child, expandedNodeNames);
+        }
+    }
+
+    private void RestoreExpandedNavigationNodeNames(
+        IReadOnlySet<string> expandedNodeNames)
+    {
+        foreach (TreeNode node in navigationTreeView.Nodes)
+        {
+            RestoreExpandedNavigationNodeNames(node, expandedNodeNames);
+        }
+    }
+
+    private static void RestoreExpandedNavigationNodeNames(
+        TreeNode node,
+        IReadOnlySet<string> expandedNodeNames)
+    {
+        if (!string.IsNullOrWhiteSpace(node.Name) &&
+            expandedNodeNames.Contains(node.Name))
+        {
+            node.Expand();
+        }
+        else
+        {
+            node.Collapse();
+        }
+
+        foreach (TreeNode child in node.Nodes)
+        {
+            RestoreExpandedNavigationNodeNames(child, expandedNodeNames);
+        }
+    }
+
+    private IReadOnlySet<string> LoadSavedNavigationExpandedNodeNames()
+    {
+        MainFormSettings settings =
+            LoadMainFormSettings();
+
+        return new HashSet<string>(
+            settings.NavigationExpandedNodeNames ?? [],
+            StringComparer.OrdinalIgnoreCase);
+    }
+
+    private void SaveNavigationExpandedNodeNames()
+    {
+        try
+        {
+            MainFormSettings settings =
+                LoadMainFormSettings();
+
+            settings.NavigationExpandedNodeNames =
+                CaptureExpandedNavigationNodeNames()
+                    .OrderBy(static name => name, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+            SaveMainFormSettings(settings);
+        }
+        catch
+        {
+            // Tree expansion persistence should never break the host.
+        }
+    }
+
+    private void NavigationTreeView_ExpansionChanged(
+        object? sender,
+        TreeViewEventArgs e)
+    {
+        _lastNavigationExpandedNodeNames =
+            CaptureExpandedNavigationNodeNames();
+
+        SaveNavigationExpandedNodeNames();
+    }
+
+    private static string CreateSafeTreeNodeName(
+        string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "empty";
+        }
+
+        char[] chars =
+            value.Trim()
+                .Select(static character =>
+                    char.IsLetterOrDigit(character)
+                        ? character
+                        : '.')
+                .ToArray();
+
+        return new string(chars)
+            .Replace("..", ".", StringComparison.Ordinal)
+            .Trim('.');
+    }
 
     private TreeNode BuildAddinProjectsNode()
     {
-        TreeNode addinProjects = new("Add-in Projects");
+        TreeNode addinProjects = new("Add-in Projects")
+        {
+            Name = "addinProjects"
+        };
 
         foreach (ExtensionProjectRegistration registration in _registrationStore.GetAll())
         {
@@ -162,6 +313,7 @@ public partial class MainForm : Form
 
         TreeNode projectNode = new(registration.ProjectName)
         {
+            Name = $"addin.{CreateSafeTreeNodeName(registration.ProjectName)}",
             Tag = new ProjectNavigationTag(registration.ProjectName, projectFolder)
         };
 
@@ -185,6 +337,7 @@ public partial class MainForm : Form
 
         projectNode.Nodes.Add(new TreeNode("Database")
         {
+            Name = $"addin.{CreateSafeTreeNodeName(registration.ProjectName)}.database",
             Tag = new AddinProjectDatabaseNavigationTag(
                 registration.ProjectName,
                 projectFolder)
@@ -192,6 +345,7 @@ public partial class MainForm : Form
 
         projectNode.Nodes.Add(new TreeNode("Test")
         {
+            Name = $"addin.{CreateSafeTreeNodeName(registration.ProjectName)}.test",
             Tag = new AddinProjectTestNavigationTag(
                 registration.ProjectName,
                 projectFolder)
@@ -199,11 +353,13 @@ public partial class MainForm : Form
 
         projectNode.Nodes.Add(new TreeNode("Project Folder")
         {
+            Name = $"addin.{CreateSafeTreeNodeName(registration.ProjectName)}.projectFolder",
             Tag = new FolderNavigationTag(projectFolder)
         });
 
         TreeNode docsFolderNode = new("Docs Folder")
         {
+            Name = $"addin.{CreateSafeTreeNodeName(registration.ProjectName)}.docsFolder",
             Tag = new FolderNavigationTag(docsFolder)
         };
 
@@ -240,6 +396,7 @@ public partial class MainForm : Form
 
         return new TreeNode(caption)
         {
+            Name = $"workspaceDoc.{CreateSafeTreeNodeName(fileName)}",
             Tag = new ProjectDocumentNavigationTag(
                 "Workspace",
                 path,
@@ -259,6 +416,7 @@ private static TreeNode CreateCommandNode(string text, string commandKey)
     {
         return new TreeNode(text)
         {
+            Name = $"docs.{CreateSafeTreeNodeName(docsTag)}",
             Tag = new GlobalDocumentNavigationTag(docsTag)
         };
     }
@@ -271,10 +429,10 @@ private static TreeNode CreateCommandNode(string text, string commandKey)
     {
         return new TreeNode(text)
         {
+            Name = $"addin.{CreateSafeTreeNodeName(projectName)}.doc.{CreateSafeTreeNodeName(kind.ToString())}",
             Tag = new ProjectDocumentNavigationTag(projectName, filePath, kind)
         };
     }
-
     private void NavigationTreeView_NodeMouseClick(object? sender, TreeNodeMouseClickEventArgs e)
     {
         if (e.Node is null)
@@ -506,6 +664,12 @@ private static TreeNode CreateCommandNode(string text, string commandKey)
 
     private void ShowAddinDatabaseNode(AddinProjectDatabaseNavigationTag tag)
     {
+        if (IsWebsitesAddinProject(tag.ProjectName))
+        {
+            ShowEmbeddedForm(new WebsitesDatabasePanelForm());
+            return;
+        }
+
         ShowLandingText(
             $"{tag.ProjectName} Database{Environment.NewLine}{Environment.NewLine}" +
             $"Project folder:{Environment.NewLine}{tag.ProjectFolder}{Environment.NewLine}{Environment.NewLine}" +
@@ -514,9 +678,7 @@ private static TreeNode CreateCommandNode(string text, string commandKey)
 
     private void OpenAddinTestNode(AddinProjectTestNavigationTag tag)
     {
-        if (string.Equals(tag.ProjectName, "WebsitesAddin", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(tag.ProjectName, "Websites Add-in", StringComparison.OrdinalIgnoreCase) ||
-            tag.ProjectName.Contains("Website", StringComparison.OrdinalIgnoreCase))
+        if (IsWebsitesAddinProject(tag.ProjectName))
         {
             ShowEmbeddedForm(new ExtensionTreeLoadTestForm());
             return;
@@ -525,6 +687,14 @@ private static TreeNode CreateCommandNode(string text, string commandKey)
         ShowLandingText(
             $"{tag.ProjectName} Test{Environment.NewLine}{Environment.NewLine}" +
             "No add-in-specific test form is wired yet.");
+    }
+
+    private static bool IsWebsitesAddinProject(
+        string projectName)
+    {
+        return string.Equals(projectName, "WebsitesAddin", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(projectName, "Websites Add-in", StringComparison.OrdinalIgnoreCase) ||
+            projectName.Contains("Website", StringComparison.OrdinalIgnoreCase);
     }
 
     private void ShowCommandEngineRuntimePanel()
@@ -988,5 +1158,7 @@ Describe how this add-in should be deployed or updated into Expensa.
     private sealed class MainFormSettings
     {
         public int MainSplitterDistance { get; set; }
+
+        public List<string> NavigationExpandedNodeNames { get; set; } = [];
     }
 }

@@ -73,6 +73,8 @@ partial class ExtensionTreeLoadTestForm
         extensionTreeView.Dock = DockStyle.Fill;
         extensionTreeView.HideSelection = false;
         extensionTreeView.AfterSelect += extensionTreeView_AfterSelect;
+        extensionTreeView.AfterExpand += extensionTreeView_AfterExpand;
+        extensionTreeView.AfterCollapse += extensionTreeView_AfterCollapse;
 
         detailsTextBox.Dock = DockStyle.Fill;
         detailsTextBox.Multiline = true;
