@@ -6,13 +6,15 @@ namespace CodexExpensa.ExtensionDevHost.CommandEngineIntegration.Tests.Extension
 public sealed class ExtensionManagerAddinTestCatalogTests
 {
     [Fact]
-    public void GetAddins_IncludesWebsitesAddin()
+    public void GetAddins_IncludesWebsitesAddinWithDatabaseAndTestNames()
     {
         ExtensionManagerAddinTestCatalog catalog = new();
 
-        IReadOnlyList<ExtensionManagerAddinTestNode> addins =
-            catalog.GetAddins();
+        ExtensionManagerAddinTestNode websites =
+            Assert.Single(catalog.GetAddins());
 
-        Assert.Contains(addins, addin => addin.AddinId == "websites");
+        Assert.Equal("websites", websites.AddinId);
+        Assert.Equal("Websites Database", websites.DatabaseDisplayName);
+        Assert.Equal("Websites Tree Test", websites.TestFormName);
     }
 }

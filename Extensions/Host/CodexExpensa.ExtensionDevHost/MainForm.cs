@@ -3,6 +3,7 @@
 using CodexExpensa.ExtensionDevHost.Commands;
 using CodexExpensa.ExtensionDevHost.Commands.Services;
 using CodexExpensa.ExtensionDevHost.CommandEngineIntegration;
+using CodexExpensa.ExtensionDevHost.CommandEngineIntegration.ExtensionManager;
 using CodexExpensa.ExtensionDevHost.Models;
 using CodexExpensa.ExtensionDevHost.Services;
 using CodexExpensa.ExtensionDevHost.UI;
@@ -182,6 +183,20 @@ public partial class MainForm : Form
             Path.Combine(docsFolder, "Expensa_Integration_Design_Spec.md"),
             ProjectDocumentKind.ExpensaIntegrationSpec));
 
+        projectNode.Nodes.Add(new TreeNode("Database")
+        {
+            Tag = new AddinProjectDatabaseNavigationTag(
+                registration.ProjectName,
+                projectFolder)
+        });
+
+        projectNode.Nodes.Add(new TreeNode("Test")
+        {
+            Tag = new AddinProjectTestNavigationTag(
+                registration.ProjectName,
+                projectFolder)
+        });
+
         projectNode.Nodes.Add(new TreeNode("Project Folder")
         {
             Tag = new FolderNavigationTag(projectFolder)
@@ -302,6 +317,14 @@ private static TreeNode CreateCommandNode(string text, string commandKey)
                     "Select a document or folder under this project.");
                 break;
 
+            case AddinProjectDatabaseNavigationTag databaseTag:
+                ShowAddinDatabaseNode(databaseTag);
+                break;
+
+            case AddinProjectTestNavigationTag testTag:
+                OpenAddinTestNode(testTag);
+                break;
+
             case ProjectDocumentNavigationTag documentTag:
                 ShowProjectDocument(documentTag);
                 break;
@@ -346,6 +369,14 @@ private static TreeNode CreateCommandNode(string text, string commandKey)
 
             case FolderNavigationTag folderTag:
                 OpenFolder(folderTag.FolderPath);
+                break;
+
+            case AddinProjectDatabaseNavigationTag databaseTag:
+                ShowAddinDatabaseNode(databaseTag);
+                break;
+
+            case AddinProjectTestNavigationTag testTag:
+                OpenAddinTestNode(testTag);
                 break;
         }
     }
@@ -472,6 +503,29 @@ private static TreeNode CreateCommandNode(string text, string commandKey)
 
 
 
+
+    private void ShowAddinDatabaseNode(AddinProjectDatabaseNavigationTag tag)
+    {
+        ShowLandingText(
+            $"{tag.ProjectName} Database{Environment.NewLine}{Environment.NewLine}" +
+            $"Project folder:{Environment.NewLine}{tag.ProjectFolder}{Environment.NewLine}{Environment.NewLine}" +
+            "Database page is not wired yet.");
+    }
+
+    private void OpenAddinTestNode(AddinProjectTestNavigationTag tag)
+    {
+        if (string.Equals(tag.ProjectName, "WebsitesAddin", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(tag.ProjectName, "Websites Add-in", StringComparison.OrdinalIgnoreCase) ||
+            tag.ProjectName.Contains("Website", StringComparison.OrdinalIgnoreCase))
+        {
+            ShowEmbeddedForm(new ExtensionTreeLoadTestForm());
+            return;
+        }
+
+        ShowLandingText(
+            $"{tag.ProjectName} Test{Environment.NewLine}{Environment.NewLine}" +
+            "No add-in-specific test form is wired yet.");
+    }
 
     private void ShowCommandEngineRuntimePanel()
     {
@@ -909,6 +963,14 @@ Describe how this add-in should be deployed or updated into Expensa.
     private sealed record ProjectNavigationTag(string ProjectName, string ProjectFolder);
 
     private sealed record FolderNavigationTag(string FolderPath);
+
+    private sealed record AddinProjectDatabaseNavigationTag(
+        string ProjectName,
+        string ProjectFolder);
+
+    private sealed record AddinProjectTestNavigationTag(
+        string ProjectName,
+        string ProjectFolder);
 
     private sealed record ProjectDocumentNavigationTag(
         string ProjectName,

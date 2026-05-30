@@ -2,9 +2,9 @@ namespace CodexExpensa.ExtensionDevHost.CommandEngineIntegration.ExtensionManage
 
 public static class ExtensionManagerAddinTestTreeBuilder
 {
-    public const string LoadTestFormActionKey = "load-test-form";
-
-    public static void Populate(TreeView treeView, IReadOnlyList<ExtensionManagerAddinTestNode> addins)
+    public static void Populate(
+        TreeView treeView,
+        IReadOnlyList<ExtensionManagerAddinTestNode> addins)
     {
         ArgumentNullException.ThrowIfNull(treeView);
         ArgumentNullException.ThrowIfNull(addins);
@@ -30,18 +30,30 @@ public static class ExtensionManagerAddinTestTreeBuilder
                     Tag = addin
                 };
 
-                TreeNode loadTestFormNode = new()
+                TreeNode databaseNode = new()
                 {
-                    Name = $"{addin.AddinId}.{LoadTestFormActionKey}",
-                    Text = $"Load Test Form - {addin.TestFormName}",
+                    Name = $"{addin.AddinId}.database",
+                    Text = addin.DatabaseDisplayName,
                     Tag = new ExtensionManagerAddinTestAction
                     {
                         Addin = addin,
-                        ActionKey = LoadTestFormActionKey
+                        ActionKind = ExtensionManagerAddinTestActionKind.Database
                     }
                 };
 
-                addinNode.Nodes.Add(loadTestFormNode);
+                TreeNode testNode = new()
+                {
+                    Name = $"{addin.AddinId}.test",
+                    Text = $"Test - {addin.TestFormName}",
+                    Tag = new ExtensionManagerAddinTestAction
+                    {
+                        Addin = addin,
+                        ActionKind = ExtensionManagerAddinTestActionKind.Test
+                    }
+                };
+
+                addinNode.Nodes.Add(databaseNode);
+                addinNode.Nodes.Add(testNode);
                 rootNode.Nodes.Add(addinNode);
             }
 

@@ -9,7 +9,8 @@ public sealed partial class ExtensionManagerAddinTestSurfaceForm : Form
     {
     }
 
-    public ExtensionManagerAddinTestSurfaceForm(IExtensionManagerAddinTestCatalog catalog)
+    public ExtensionManagerAddinTestSurfaceForm(
+        IExtensionManagerAddinTestCatalog catalog)
     {
         ArgumentNullException.ThrowIfNull(catalog);
 
@@ -34,17 +35,18 @@ public sealed partial class ExtensionManagerAddinTestSurfaceForm : Form
 
     private void addinTreeView_AfterSelect(object? sender, TreeViewEventArgs e)
     {
-        detailsTextBox.Text = FormatSelectedNode(e.Node);
+        detailsTextBox.Text =
+            FormatSelectedNode(e.Node);
     }
 
     private void addinTreeView_DoubleClick(object? sender, EventArgs e)
     {
-        OpenSelectedTestForm();
+        OpenSelectedNode();
     }
 
     private void openSelectedButton_Click(object? sender, EventArgs e)
     {
-        OpenSelectedTestForm();
+        OpenSelectedNode();
     }
 
     private void refreshButton_Click(object? sender, EventArgs e)
@@ -57,13 +59,13 @@ public sealed partial class ExtensionManagerAddinTestSurfaceForm : Form
         Close();
     }
 
-    private void OpenSelectedTestForm()
+    private void OpenSelectedNode()
     {
         if (addinTreeView.SelectedNode?.Tag is not ExtensionManagerAddinTestAction action)
         {
             MessageBox.Show(
                 this,
-                "Select an add-in test action node first.",
+                "Select an add-in child node first.",
                 "Extension Manager Test Surface",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Information);
@@ -71,15 +73,20 @@ public sealed partial class ExtensionManagerAddinTestSurfaceForm : Form
             return;
         }
 
-        if (!string.Equals(
-                action.ActionKey,
-                ExtensionManagerAddinTestTreeBuilder.LoadTestFormActionKey,
-                StringComparison.OrdinalIgnoreCase))
+        if (action.ActionKind == ExtensionManagerAddinTestActionKind.Database)
         {
+            MessageBox.Show(
+                this,
+                $"Database page for '{action.Addin.DisplayName}' is not wired yet.",
+                "Extension Manager Database",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
+
             return;
         }
 
-        if (string.Equals(action.Addin.AddinId, "websites", StringComparison.OrdinalIgnoreCase))
+        if (action.ActionKind == ExtensionManagerAddinTestActionKind.Test &&
+            string.Equals(action.Addin.AddinId, "websites", StringComparison.OrdinalIgnoreCase))
         {
             using ExtensionTreeLoadTestForm form = new();
             form.ShowDialog(this);
@@ -107,15 +114,18 @@ public sealed partial class ExtensionManagerAddinTestSurfaceForm : Form
                 $"Add-in: {addin.DisplayName}{Environment.NewLine}" +
                 $"AddinId: {addin.AddinId}{Environment.NewLine}" +
                 $"SortOrder: {addin.SortOrder}{Environment.NewLine}" +
+                $"Database: {addin.DatabaseDisplayName}{Environment.NewLine}" +
                 $"TestForm: {addin.TestFormName}";
         }
 
         if (node.Tag is ExtensionManagerAddinTestAction action)
         {
             return
-                $"Action: {action.ActionKey}{Environment.NewLine}" +
+                $"Action: {action.ActionKind}{Environment.NewLine}" +
                 $"Add-in: {action.Addin.DisplayName}{Environment.NewLine}" +
                 $"AddinId: {action.Addin.AddinId}{Environment.NewLine}" +
+                $"SortOrder: {action.Addin.SortOrder}{Environment.NewLine}" +
+                $"Database: {action.Addin.DatabaseDisplayName}{Environment.NewLine}" +
                 $"TestForm: {action.Addin.TestFormName}";
         }
 

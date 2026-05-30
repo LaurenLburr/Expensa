@@ -11,7 +11,8 @@ public sealed class ExtensionManagerAddinTestCatalog : IExtensionManagerAddinTes
                 AddinId = "websites",
                 DisplayName = "Websites Add-in",
                 SortOrder = 100,
-                TestFormName = "Extension Tree Load Test"
+                DatabaseDisplayName = "Websites Database",
+                TestFormName = "Websites Tree Test"
             }
         ];
     }

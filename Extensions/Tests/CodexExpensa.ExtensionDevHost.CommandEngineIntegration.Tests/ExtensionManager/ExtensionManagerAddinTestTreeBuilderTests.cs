@@ -7,7 +7,7 @@ namespace CodexExpensa.ExtensionDevHost.CommandEngineIntegration.Tests.Extension
 public sealed class ExtensionManagerAddinTestTreeBuilderTests
 {
     [Fact]
-    public void Populate_SortsAddinsAndAddsLoadTestFormChild()
+    public void Populate_SortsAddinsAndAddsDatabaseAndTestChildren()
     {
         using TreeView treeView = new();
 
@@ -19,6 +19,7 @@ public sealed class ExtensionManagerAddinTestTreeBuilderTests
                     AddinId = "second",
                     DisplayName = "Second",
                     SortOrder = 200,
+                    DatabaseDisplayName = "Second Database",
                     TestFormName = "Second Test"
                 },
                 new ExtensionManagerAddinTestNode
@@ -26,15 +27,46 @@ public sealed class ExtensionManagerAddinTestTreeBuilderTests
                     AddinId = "first",
                     DisplayName = "First",
                     SortOrder = 100,
+                    DatabaseDisplayName = "First Database",
                     TestFormName = "First Test"
                 }
             ]);
 
-        Assert.Single(treeView.Nodes);
         TreeNode root = treeView.Nodes[0];
-        Assert.Equal("Add-ins", root.Text);
+
         Assert.Equal("first", root.Nodes[0].Name);
-        Assert.Single(root.Nodes[0].Nodes);
-        Assert.IsType<ExtensionManagerAddinTestAction>(root.Nodes[0].Nodes[0].Tag);
+        Assert.Equal(2, root.Nodes[0].Nodes.Count);
+        Assert.Equal("first.database", root.Nodes[0].Nodes[0].Name);
+        Assert.Equal("first.test", root.Nodes[0].Nodes[1].Name);
+    }
+
+    [Fact]
+    public void Populate_DatabaseAndTestChildrenHaveExpectedActionKinds()
+    {
+        using TreeView treeView = new();
+
+        ExtensionManagerAddinTestTreeBuilder.Populate(
+            treeView,
+            [
+                new ExtensionManagerAddinTestNode
+                {
+                    AddinId = "websites",
+                    DisplayName = "Websites",
+                    SortOrder = 100,
+                    DatabaseDisplayName = "Websites Database",
+                    TestFormName = "Websites Tree Test"
+                }
+            ]);
+
+        ExtensionManagerAddinTestAction databaseAction =
+            Assert.IsType<ExtensionManagerAddinTestAction>(
+                treeView.Nodes[0].Nodes[0].Nodes[0].Tag);
+
+        ExtensionManagerAddinTestAction testAction =
+            Assert.IsType<ExtensionManagerAddinTestAction>(
+                treeView.Nodes[0].Nodes[0].Nodes[1].Tag);
+
+        Assert.Equal(ExtensionManagerAddinTestActionKind.Database, databaseAction.ActionKind);
+        Assert.Equal(ExtensionManagerAddinTestActionKind.Test, testAction.ActionKind);
     }
 }

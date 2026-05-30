@@ -1,4 +1,4 @@
-﻿namespace CodexExpensa.ExtensionDevHost.CommandEngineIntegration;
+namespace CodexExpensa.ExtensionDevHost.CommandEngineIntegration;
 
 partial class ExtensionRuntimeDashboardForm
 {
@@ -199,6 +199,8 @@ partial class ExtensionRuntimeDashboardForm
             settingsMenuItem,
             commandMenuItem,
             queueMenuItem,
+            extensionManagerMenuItem,
+            websitesMenuItem,
             persistenceMenuItem,
             historyMenuItem
         });
@@ -415,6 +417,14 @@ partial class ExtensionRuntimeDashboardForm
         purgePersistedHistoryOlderThan30DaysMenuItem.Click += PurgePersistedHistoryOlderThan30Days;
         vacuumExecutionDatabaseMenuItem.Text = "&Vacuum Execution Database";
         vacuumExecutionDatabaseMenuItem.Click += VacuumExecutionDatabase;
+        extensionManagerMenuItem.Text = "Extension &Mgr";
+        extensionManagerMenuItem.DropDownItems.AddRange(new ToolStripItem[]
+        {
+            openExtensionManagerAddinTestSurfaceMenuItem
+        });
+        openExtensionManagerAddinTestSurfaceMenuItem.Text = "Open Add-in &Test Surface";
+        openExtensionManagerAddinTestSurfaceMenuItem.Click += OpenExtensionManagerAddinTestSurface;
+
         websitesMenuItem.Text = "&Websites";
         websitesMenuItem.DropDownItems.AddRange(new ToolStripItem[]
         {

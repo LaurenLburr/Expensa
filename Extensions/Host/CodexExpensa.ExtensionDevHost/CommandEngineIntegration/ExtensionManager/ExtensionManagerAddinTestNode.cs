@@ -3,7 +3,12 @@ namespace CodexExpensa.ExtensionDevHost.CommandEngineIntegration.ExtensionManage
 public sealed class ExtensionManagerAddinTestNode
 {
     public required string AddinId { get; init; }
+
     public required string DisplayName { get; init; }
+
     public int SortOrder { get; init; }
+
+    public string DatabaseDisplayName { get; init; } = "Database";
+
     public string TestFormName { get; init; } = string.Empty;
 }
