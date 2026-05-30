@@ -1,0 +1,19 @@
+PRAGMA foreign_keys = ON;
+
+CREATE TABLE IF NOT EXISTS [SqlQuery] (
+    [QueryName]   TEXT PRIMARY KEY,
+    [SqlText]     TEXT NOT NULL,
+    [Description] TEXT NOT NULL DEFAULT '',
+    [UpdatedUtc]  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS [Website] (
+    [WebsiteId]   TEXT PRIMARY KEY,
+    [DisplayName] TEXT NOT NULL,
+    [Url]         TEXT NOT NULL DEFAULT '',
+    [Category]    TEXT NOT NULL DEFAULT '',
+    [IsEnabled]   INTEGER NOT NULL DEFAULT 1,
+    [SortOrder]   INTEGER NOT NULL DEFAULT 0,
+    [CreatedUtc]  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    [UpdatedUtc]  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
