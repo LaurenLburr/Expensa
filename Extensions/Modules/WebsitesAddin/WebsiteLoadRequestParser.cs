@@ -11,7 +11,8 @@ public static class WebsiteLoadRequestParser
         {
             SearchText = GetString(parameters, "searchText"),
             IncludeDisabled = GetBool(parameters, "includeDisabled"),
-            MaximumRows = GetInt32(parameters, "maximumRows", 500)
+            MaximumRows = GetInt32(parameters, "maximumRows", 500),
+            DatabasePath = GetString(parameters, "databasePath")
         };
     }
 

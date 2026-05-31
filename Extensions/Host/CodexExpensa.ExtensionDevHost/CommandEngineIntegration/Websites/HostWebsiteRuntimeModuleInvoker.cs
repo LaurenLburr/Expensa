@@ -5,6 +5,21 @@ namespace CodexExpensa.ExtensionDevHost.CommandEngineIntegration.Websites;
 
 public sealed class HostWebsiteRuntimeModuleInvoker
 {
+    private readonly HostWebsiteRuntimeDatabaseSelectionService _databaseSelectionService;
+
+    public HostWebsiteRuntimeModuleInvoker()
+        : this(new HostWebsiteRuntimeDatabaseSelectionService())
+    {
+    }
+
+    public HostWebsiteRuntimeModuleInvoker(
+        HostWebsiteRuntimeDatabaseSelectionService databaseSelectionService)
+    {
+        ArgumentNullException.ThrowIfNull(databaseSelectionService);
+
+        _databaseSelectionService = databaseSelectionService;
+    }
+
     private const string WebsitesAddinAssemblyName = "WebsitesAddin.dll";
     private const string SmokeRunnerTypeName = "WebsitesAddin.WebsiteLoadRuntimeSmokeRunner";
     private const string RequestTypeName = "WebsitesAddin.WebsiteLoadRequest";
@@ -35,9 +50,13 @@ public sealed class HostWebsiteRuntimeModuleInvoker
             Activator.CreateInstance(requestType)
             ?? throw new InvalidOperationException("Could not create WebsiteLoadRequest.");
 
+        HostWebsiteDatabaseLocation activeDatabaseLocation =
+            _databaseSelectionService.GetActiveRuntimeDatabaseLocation();
+
         SetProperty(loadRequest, "SearchText", request.SearchText);
         SetProperty(loadRequest, "IncludeDisabled", request.IncludeDisabled);
         SetProperty(loadRequest, "MaximumRows", request.MaximumRows);
+        SetProperty(loadRequest, "DatabasePath", activeDatabaseLocation.DatabasePath);
 
         MethodInfo executeMethod =
             smokeRunnerType.GetMethod(

@@ -14,4 +14,9 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.5" />
   </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Remove="**\ExtensionRuntimeDashboardForm.resx" />
+  </ItemGroup>
+
 </Project>

@@ -7,4 +7,6 @@ public sealed class WebsiteLoadRequest
     public bool IncludeDisabled { get; init; }
 
     public int MaximumRows { get; init; } = 500;
+
+    public string DatabasePath { get; init; } = string.Empty;
 }

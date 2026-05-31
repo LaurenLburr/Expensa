@@ -25,8 +25,11 @@ public sealed class WebsiteLoadCommand
     {
         ArgumentNullException.ThrowIfNull(request);
 
+        IWebsiteRepository repository =
+            CreateRepositoryForRequest(request);
+
         IReadOnlyList<WebsiteTreeNode> nodes =
-            _repository.LoadWebsites(request);
+            repository.LoadWebsites(request);
 
         return new WebsiteLoadResult
         {
@@ -42,6 +45,22 @@ public sealed class WebsiteLoadCommand
 
         return Execute(
             WebsiteLoadRequestParser.Parse(parameters));
+    }
+
+    private IWebsiteRepository CreateRepositoryForRequest(
+        WebsiteLoadRequest request)
+    {
+        if (!string.IsNullOrWhiteSpace(request.DatabasePath) &&
+            File.Exists(request.DatabasePath))
+        {
+            return new SqliteWebsiteRepository(
+                new WebsiteDatabaseOptions
+                {
+                    DatabasePath = request.DatabasePath
+                });
+        }
+
+        return _repository;
     }
 
     private static IWebsiteRepository CreateDefaultRepository()
