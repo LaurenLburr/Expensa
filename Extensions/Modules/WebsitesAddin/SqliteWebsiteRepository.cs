@@ -3,117 +3,183 @@ using Microsoft.Data.Sqlite;
 
 namespace WebsitesAddin;
 
-public sealed class SqliteWebsiteRepository : IWebsiteRepository
+public sealed class SqliteWebsiteRepository : IWebsiteRepository, IDisposable
 {
-    private readonly string _databasePath;
-    private readonly WebsiteSqlQueryCatalog _queryCatalog;
+    private readonly WebsiteDatabaseOptions _options;
+    private SqliteConnection? _ownedConnection;
+    private bool _disposed;
 
-    public SqliteWebsiteRepository(
-        WebsiteDatabaseOptions options)
+    public SqliteWebsiteRepository(WebsiteDatabaseOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
-        ArgumentException.ThrowIfNullOrWhiteSpace(options.DatabasePath);
 
-        _databasePath = options.DatabasePath;
-        _queryCatalog = new WebsiteSqlQueryCatalog(options);
+        if (options.Connection is null && string.IsNullOrWhiteSpace(options.DatabasePath))
+        {
+            throw new ArgumentException(
+                "A database path or SQLite connection is required.",
+                nameof(options));
+        }
+
+        _options = options;
     }
 
-    public IReadOnlyList<WebsiteTreeNode> LoadWebsites(
-        WebsiteLoadRequest request)
+    public IReadOnlyList<WebsiteTreeNode> LoadWebsites(WebsiteLoadRequest request)
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(request);
 
-        string queryName =
-            GetQueryName(request);
+        using SqliteCommand command = CreateCommand(request);
 
-        string sqlText =
-            _queryCatalog.GetSqlText(queryName);
+        DataTable table = ExecuteToDataTable(command);
 
-        using SqliteConnection connection = OpenConnection();
-        using SqliteCommand command = connection.CreateCommand();
+        return BuildTreeNodes(table);
+    }
 
-        command.CommandText = sqlText;
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
 
-        if (!string.IsNullOrWhiteSpace(request.SearchText))
+        if (_options.OwnsConnection)
+        {
+            _options.Connection?.Dispose();
+            _ownedConnection?.Dispose();
+        }
+
+        _disposed = true;
+    }
+
+    private SqliteCommand CreateCommand(WebsiteLoadRequest request)
+    {
+        SqliteConnection connection = GetOpenConnection();
+
+        SqliteCommand command = connection.CreateCommand();
+
+        bool hasSearch = !string.IsNullOrWhiteSpace(request.SearchText);
+
+        command.CommandText = GetSqlText(request.IncludeDisabled, hasSearch);
+
+        if (hasSearch)
         {
             command.Parameters.AddWithValue(
                 "@SearchText",
                 $"%{request.SearchText.Trim()}%");
         }
 
-        DataTable table = new();
+        command.Parameters.AddWithValue(
+            "@MaximumRows",
+            request.MaximumRows);
 
+        return command;
+    }
+
+    private SqliteConnection GetOpenConnection()
+    {
+        SqliteConnection connection;
+
+        if (_options.Connection is not null)
+        {
+            connection = _options.Connection;
+        }
+        else
+        {
+            _ownedConnection ??= new SqliteConnection($"Data Source={_options.DatabasePath}");
+            connection = _ownedConnection;
+        }
+
+        if (connection.State != ConnectionState.Open)
+        {
+            connection.Open();
+        }
+
+        return connection;
+    }
+
+    private static DataTable ExecuteToDataTable(SqliteCommand command)
+    {
         using SqliteDataReader reader = command.ExecuteReader();
+
+        DataTable table = new();
 
         table.Load(reader);
 
-        return BuildTreeNodes(table, request.MaximumRows);
+        return table;
     }
 
-    private static string GetQueryName(
-        WebsiteLoadRequest request)
+    private static string GetSqlText(bool includeDisabled, bool hasSearch)
     {
-        bool hasSearch =
-            !string.IsNullOrWhiteSpace(request.SearchText);
+        string whereClause = includeDisabled ? string.Empty : "WHERE [IsEnabled] = 1";
 
-        if (hasSearch && request.IncludeDisabled)
-        {
-            return "Website.Select.Search.All";
-        }
+        string searchPrefix = hasSearch
+            ? includeDisabled ? "WHERE" : "AND"
+            : string.Empty;
 
-        if (hasSearch)
-        {
-            return "Website.Select.Search.Enabled";
-        }
+        string searchClause = hasSearch
+            ? $" {searchPrefix} ([DisplayName] LIKE @SearchText OR [Url] LIKE @SearchText OR [Category] LIKE @SearchText)"
+            : string.Empty;
 
-        if (request.IncludeDisabled)
-        {
-            return "Website.Select.All";
-        }
-
-        return "Website.Select.Enabled";
+        return $"""
+SELECT
+    [WebsiteId],
+    [DisplayName],
+    [Url],
+    [Category],
+    [IsEnabled],
+    [SortOrder]
+FROM [Website]
+{whereClause}
+{searchClause}
+ORDER BY
+    [Category],
+    [SortOrder],
+    [DisplayName]
+LIMIT @MaximumRows;
+""";
     }
 
-    private static IReadOnlyList<WebsiteTreeNode> BuildTreeNodes(
-        DataTable table,
-        int maximumRows)
+    private static IReadOnlyList<WebsiteTreeNode> BuildTreeNodes(DataTable table)
     {
-        int rowLimit =
-            Math.Max(1, maximumRows);
+        Dictionary<string, List<WebsiteTreeNode>> childrenByCategory =
+            new(StringComparer.OrdinalIgnoreCase);
 
-        List<WebsiteTreeNode> websiteNodes =
-            table.Rows
-                .Cast<DataRow>()
-                .Take(rowLimit)
-                .Select(static row => new WebsiteTreeNode
-                {
-                    NodeId = Convert.ToString(row["WebsiteId"]) ?? string.Empty,
-                    DisplayText = Convert.ToString(row["DisplayName"]) ?? string.Empty,
-                    Url = Convert.ToString(row["Url"]) ?? string.Empty,
-                    Category = Convert.ToString(row["Category"]) ?? string.Empty,
-                    IsEnabled = Convert.ToInt32(row["IsEnabled"]) == 1
-                })
-                .ToList();
+        foreach (DataRow row in table.Rows)
+        {
+            string category = Convert.ToString(row["Category"]) ?? string.Empty;
 
-        return websiteNodes
-            .GroupBy(static node => string.IsNullOrWhiteSpace(node.Category) ? "Websites" : node.Category)
-            .OrderBy(static group => group.Key)
-            .Select(static group => new WebsiteTreeNode
+            if (string.IsNullOrWhiteSpace(category))
             {
-                NodeId = $"category.{group.Key}",
-                DisplayText = group.Key,
-                Category = "Root",
-                Children = group
-                    .OrderBy(static node => node.DisplayText)
-                    .ToList()
+                category = "Uncategorized";
+            }
+
+            WebsiteTreeNode websiteNode = new()
+            {
+                NodeId = Convert.ToString(row["WebsiteId"]) ?? Guid.NewGuid().ToString("N"),
+                DisplayText = Convert.ToString(row["DisplayName"]) ?? string.Empty,
+                Url = Convert.ToString(row["Url"]) ?? string.Empty,
+                Category = category,
+                IsEnabled = Convert.ToInt32(row["IsEnabled"]) != 0
+            };
+
+            if (!childrenByCategory.TryGetValue(category, out List<WebsiteTreeNode>? children))
+            {
+                children = [];
+                childrenByCategory[category] = children;
+            }
+
+            children.Add(websiteNode);
+        }
+
+        return childrenByCategory
+            .OrderBy(static pair => pair.Key, StringComparer.OrdinalIgnoreCase)
+            .Select(static pair => new WebsiteTreeNode
+            {
+                NodeId = $"category:{pair.Key}",
+                DisplayText = pair.Key,
+                Category = pair.Key,
+                Children = pair.Value
             })
             .ToList();
-    }
-
-    private SqliteConnection OpenConnection()
-    {
-        SqliteConnection connection = new($"Data Source={_databasePath}");
-        connection.Open();
-        return connection;
     }
 }

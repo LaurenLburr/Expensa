@@ -25,7 +25,8 @@ public sealed class MainAddinProjectDatabaseTestActionTests
         Assert.Contains("new TreeNode(\"Test\")", text);
         Assert.Contains("ShowAddinDatabaseNode", text);
         Assert.Contains("OpenAddinTestNode", text);
-        Assert.Contains("ShowEmbeddedForm(new ExtensionTreeLoadTestForm())", text);
+        Assert.Contains("ShowEmbeddedForm(new WebsitesDatabasePanelForm())", text);
+        Assert.Contains("ShowEmbeddedForm(new WebsitesTreeLoadVerificationForm())", text);
         Assert.Contains("case AddinProjectDatabaseNavigationTag", text);
         Assert.Contains("case AddinProjectTestNavigationTag", text);
     }

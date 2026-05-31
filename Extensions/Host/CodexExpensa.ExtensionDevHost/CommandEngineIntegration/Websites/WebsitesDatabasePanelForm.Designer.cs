@@ -9,12 +9,12 @@ partial class WebsitesDatabasePanelForm
     private Label databaseLabel;
     private LinkLabel databaseNameLinkLabel;
     private TextBox databasePathTextBox;
+    private LinkLabel copyFromExpensaProdLinkLabel;
     private LinkLabel copyFromDevTemplateLinkLabel;
     private LinkLabel copyFromSandboxLinkLabel;
     private Label copiedDatabaseLabel;
     private TextBox copiedDatabasePathTextBox;
     private LinkLabel openCopiedDatabaseFolderLinkLabel;
-    private Button activateSelectedDatabaseButton;
     private ListView copiedDatabasesListView;
     private TableLayoutPanel filterLayoutPanel;
     private Label searchLabel;
@@ -51,13 +51,13 @@ partial class WebsitesDatabasePanelForm
         databaseLabel = new Label();
         databaseNameLinkLabel = new LinkLabel();
         databasePathTextBox = new TextBox();
+        copyFromExpensaProdLinkLabel = new LinkLabel();
         copyFromDevTemplateLinkLabel = new LinkLabel();
         copyFromSandboxLinkLabel = new LinkLabel();
         copiedDatabaseLabel = new Label();
         copiedDatabasePathTextBox = new TextBox();
         openCopiedDatabaseFolderLinkLabel = new LinkLabel();
         copiedDatabasesListView = new ListView();
-        activateSelectedDatabaseButton = new Button();
         filterLayoutPanel = new TableLayoutPanel();
         searchLabel = new Label();
         searchTextBox = new TextBox();
@@ -130,13 +130,13 @@ partial class WebsitesDatabasePanelForm
         databaseLayoutPanel.Controls.Add(databaseLabel, 0, 0);
         databaseLayoutPanel.Controls.Add(databaseNameLinkLabel, 1, 0);
         databaseLayoutPanel.Controls.Add(databasePathTextBox, 2, 0);
-        databaseLayoutPanel.Controls.Add(copyFromDevTemplateLinkLabel, 3, 0);
-        databaseLayoutPanel.Controls.Add(copyFromSandboxLinkLabel, 3, 1);
+        databaseLayoutPanel.Controls.Add(copyFromExpensaProdLinkLabel, 3, 0);
+        databaseLayoutPanel.Controls.Add(copyFromDevTemplateLinkLabel, 3, 1);
+        databaseLayoutPanel.Controls.Add(copyFromSandboxLinkLabel, 3, 2);
         databaseLayoutPanel.Controls.Add(copiedDatabaseLabel, 0, 2);
         databaseLayoutPanel.Controls.Add(copiedDatabasePathTextBox, 1, 2);
         databaseLayoutPanel.Controls.Add(openCopiedDatabaseFolderLinkLabel, 3, 2);
         databaseLayoutPanel.Controls.Add(copiedDatabasesListView, 0, 3);
-        databaseLayoutPanel.Controls.Add(activateSelectedDatabaseButton, 3, 2);
         databaseLayoutPanel.Dock = DockStyle.Fill;
         databaseLayoutPanel.RowCount = 4;
         databaseLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 30F));
@@ -160,6 +160,11 @@ partial class WebsitesDatabasePanelForm
         databasePathTextBox.Dock = DockStyle.Fill;
         databasePathTextBox.ReadOnly = true;
 
+        copyFromExpensaProdLinkLabel.Dock = DockStyle.Fill;
+        copyFromExpensaProdLinkLabel.Text = "Copy from Expensa Prod";
+        copyFromExpensaProdLinkLabel.TextAlign = ContentAlignment.MiddleLeft;
+        copyFromExpensaProdLinkLabel.LinkClicked += copyFromExpensaProdLinkLabel_LinkClicked;
+
         copyFromDevTemplateLinkLabel.Dock = DockStyle.Fill;
         copyFromDevTemplateLinkLabel.Text = "Copy new from dev template";
         copyFromDevTemplateLinkLabel.TextAlign = ContentAlignment.MiddleLeft;
@@ -179,11 +184,6 @@ partial class WebsitesDatabasePanelForm
 
         openCopiedDatabaseFolderLinkLabel.Dock = DockStyle.Fill;
         openCopiedDatabaseFolderLinkLabel.Text = "Open copied DB folder";
-
-        activateSelectedDatabaseButton.Dock = DockStyle.Right;
-        activateSelectedDatabaseButton.Width = 120;
-        activateSelectedDatabaseButton.Text = "Make Active";
-        activateSelectedDatabaseButton.Click += activateSelectedDatabaseButton_Click;
         openCopiedDatabaseFolderLinkLabel.TextAlign = ContentAlignment.MiddleLeft;
         openCopiedDatabaseFolderLinkLabel.LinkClicked += openCopiedDatabaseFolderLinkLabel_LinkClicked;
 

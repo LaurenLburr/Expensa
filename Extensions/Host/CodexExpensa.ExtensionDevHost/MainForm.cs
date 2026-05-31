@@ -680,7 +680,7 @@ private static TreeNode CreateCommandNode(string text, string commandKey)
     {
         if (IsWebsitesAddinProject(tag.ProjectName))
         {
-            ShowEmbeddedForm(new ExtensionTreeLoadTestForm());
+            ShowEmbeddedForm(new WebsitesTreeLoadVerificationForm());
             return;
         }
 

@@ -37,23 +37,23 @@ public sealed class HostWebsiteTreeContributionLoader
                 },
                 cancellationToken).ConfigureAwait(true);
 
-        HostWebsiteLoadResult websiteResult =
-            HostWebsiteLoadExecutionResultAdapter.FromExecutionResult(executionResult);
+        HostWebsiteLoadResult loadResult =
+            HostWebsiteLoadExecutionResultAdapter.FromExecutionResult(
+                executionResult);
 
-        TreeNode websitesRootNode =
-            HostWebsiteTreeContributionRenderer.RenderContribution(
-                treeView,
-                websiteResult);
+        HostWebsiteTreeViewRenderer.Render(
+            treeView,
+            loadResult);
 
         if (options.ExpandAll)
         {
-            websitesRootNode.ExpandAll();
+            treeView.ExpandAll();
         }
 
         return new HostWebsiteTreeLoadResult
         {
             ExecutionResult = executionResult,
-            WebsiteResult = websiteResult
+            WebsiteResult = loadResult
         };
     }
 }

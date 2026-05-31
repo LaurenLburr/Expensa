@@ -1,15 +1,16 @@
+using CodexExpensa.ExtensionDevHost.CommandEngineIntegration.Websites;
 using Xunit;
 
 namespace CodexExpensa.ExtensionDevHost.CommandEngineIntegration.Tests.Websites;
 
-public sealed class WebsitesDatabasePanelActiveDatabaseStructureTests
+public sealed class HostWebsiteRuntimeDatabaseSelectionServiceCopyTests
 {
     [Fact]
-    public void Designer_ContainsCopyFromExpensaProdAction()
+    public void SelectionService_SetActiveRuntimeDatabaseCopiesToCanonicalRuntimePath()
     {
         string repositoryRoot = FindRepositoryRoot();
 
-        string designerPath =
+        string servicePath =
             Path.Combine(
                 repositoryRoot,
                 "Extensions",
@@ -17,14 +18,17 @@ public sealed class WebsitesDatabasePanelActiveDatabaseStructureTests
                 "CodexExpensa.ExtensionDevHost",
                 "CommandEngineIntegration",
                 "Websites",
-                "WebsitesDatabasePanelForm.Designer.cs");
+                "HostWebsiteRuntimeDatabaseSelectionService.cs");
 
-        Assert.True(File.Exists(designerPath), $"File was not found: {designerPath}");
+        Assert.True(File.Exists(servicePath), $"File was not found: {servicePath}");
 
-        string text = File.ReadAllText(designerPath);
+        string text =
+            File.ReadAllText(servicePath);
 
-        Assert.Contains("copyFromExpensaProdLinkLabel", text);
-        Assert.Contains("Copy from Expensa Prod", text);
+        Assert.Contains("File.Copy(", text);
+        Assert.Contains("runtimeLocation.DatabasePath", text);
+        Assert.Contains("overwrite: true", text);
+        Assert.Contains("return runtimeLocation;", text);
     }
 
     private static string FindRepositoryRoot()

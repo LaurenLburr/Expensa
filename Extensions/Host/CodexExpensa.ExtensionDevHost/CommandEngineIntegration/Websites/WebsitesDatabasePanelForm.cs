@@ -8,7 +8,7 @@ public sealed partial class WebsitesDatabasePanelForm : Form
     private readonly HostWebsiteDatabasePathService _databasePathService;
     private readonly HostWebsiteDatabaseCopyService _databaseCopyService;
     private readonly HostWebsiteDatabaseCopyHistory _copyHistory = new();
-    private readonly HostWebsiteRuntimeDatabaseSelectionService _runtimeDatabaseSelectionService = new();
+    private readonly HostWebsiteExpensaProdDatabaseCopyService _expensaProdCopyService = new();
     private readonly ControlDisplayNameOverlayService _displayNameOverlayService = new();
     private bool _displayControlNames;
 
@@ -41,7 +41,7 @@ public sealed partial class WebsitesDatabasePanelForm : Form
     private void LoadDatabaseLocation()
     {
         HostWebsiteDatabaseLocation location =
-            _runtimeDatabaseSelectionService.GetActiveRuntimeDatabaseLocation();
+            _databasePathService.GetRuntimeDatabaseLocation();
 
         databaseNameLinkLabel.Text = location.DatabaseName;
         databasePathTextBox.Text = location.DatabasePath;
@@ -165,6 +165,44 @@ public sealed partial class WebsitesDatabasePanelForm : Form
         });
     }
 
+    private void copyFromExpensaProdLinkLabel_LinkClicked(
+        object? sender,
+        LinkLabelLinkClickedEventArgs e)
+    {
+        try
+        {
+            HostWebsiteExpensaProdDatabaseCopyResult result =
+                _expensaProdCopyService.CopyToDevAndRuntime();
+
+            _copyHistory.Add(
+                new HostWebsiteDatabaseCopyRecord
+                {
+                    SourceLabel = "Expensa production",
+                    DatabasePath = result.RuntimeDatabasePath
+                });
+
+            RefreshCopyHistoryList();
+            copiedDatabasePathTextBox.Text = result.RuntimeDatabasePath;
+            LoadDatabaseLocation();
+
+            MessageBox.Show(
+                this,
+                $"Copied Expensa production website data to:{Environment.NewLine}{Environment.NewLine}{result.RuntimeDatabasePath}",
+                "Websites Database",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(
+                this,
+                exception.Message,
+                "Copy From Expensa Production Failed",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
+        }
+    }
+
     private void copyFromDevTemplateLinkLabel_LinkClicked(
         object? sender,
         LinkLabelLinkClickedEventArgs e)
@@ -251,46 +289,6 @@ public sealed partial class WebsitesDatabasePanelForm : Form
         {
             copiedDatabasesListView.EndUpdate();
         }
-    }
-
-
-    private void activateSelectedDatabaseButton_Click(
-        object? sender,
-        EventArgs e)
-    {
-        ActivateSelectedDatabase();
-    }
-
-    private void ActivateSelectedDatabase()
-    {
-        if (copiedDatabasesListView.SelectedItems.Count == 0)
-        {
-            MessageBox.Show(
-                this,
-                "Select a copied database first.",
-                "Activate Runtime Database",
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Information);
-
-            return;
-        }
-
-        if (copiedDatabasesListView.SelectedItems[0].Tag is not HostWebsiteDatabaseCopyRecord record)
-        {
-            return;
-        }
-
-        _runtimeDatabaseSelectionService.SetActiveRuntimeDatabase(
-            record.DatabasePath);
-
-        LoadDatabaseLocation();
-
-        MessageBox.Show(
-            this,
-            $"Active runtime database set to:{Environment.NewLine}{Environment.NewLine}{record.DatabasePath}",
-            "Runtime Database Updated",
-            MessageBoxButtons.OK,
-            MessageBoxIcon.Information);
     }
 
     private void copiedDatabasesListView_SelectedIndexChanged(

@@ -1,3 +1,5 @@
+using Microsoft.Data.Sqlite;
+
 namespace WebsitesAddin;
 
 public sealed class WebsiteLoadCommand
@@ -9,54 +11,59 @@ public sealed class WebsiteLoadCommand
     {
     }
 
-    public WebsiteLoadCommand(
-        IWebsiteRepository repository)
+    public WebsiteLoadCommand(IWebsiteRepository repository)
     {
         ArgumentNullException.ThrowIfNull(repository);
 
         _repository = repository;
     }
 
-    public string Name =>
-        "websites.load";
+    public string Name => "websites.load";
 
-    public WebsiteLoadResult Execute(
-        WebsiteLoadRequest request)
+    public WebsiteLoadResult Execute(WebsiteLoadRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        IWebsiteRepository repository =
-            CreateRepositoryForRequest(request);
+        IWebsiteRepository repository = CreateRepositoryForRequest(request);
 
-        IReadOnlyList<WebsiteTreeNode> nodes =
-            repository.LoadWebsites(request);
-
-        return new WebsiteLoadResult
+        try
         {
-            Nodes = nodes,
-            Message = $"Loaded {nodes.Count} website root node(s)."
-        };
+            IReadOnlyList<WebsiteTreeNode> nodes = repository.LoadWebsites(request);
+
+            return new WebsiteLoadResult
+            {
+                Nodes = nodes,
+                Message = $"Loaded {nodes.Count} website root node(s)."
+            };
+        }
+        finally
+        {
+            if (repository is IDisposable disposable && !ReferenceEquals(repository, _repository))
+            {
+                disposable.Dispose();
+            }
+        }
     }
 
-    public WebsiteLoadResult Execute(
-        IReadOnlyDictionary<string, object?> parameters)
+    public WebsiteLoadResult Execute(IReadOnlyDictionary<string, object?> parameters)
     {
         ArgumentNullException.ThrowIfNull(parameters);
 
-        return Execute(
-            WebsiteLoadRequestParser.Parse(parameters));
+        return Execute(WebsiteLoadRequestParser.Parse(parameters));
     }
 
-    private IWebsiteRepository CreateRepositoryForRequest(
-        WebsiteLoadRequest request)
+    private IWebsiteRepository CreateRepositoryForRequest(WebsiteLoadRequest request)
     {
-        if (!string.IsNullOrWhiteSpace(request.DatabasePath) &&
-            File.Exists(request.DatabasePath))
+        if (!string.IsNullOrWhiteSpace(request.DatabasePath) && File.Exists(request.DatabasePath))
         {
+            SqliteConnection memoryConnection =
+                WebsiteInMemoryDatabaseFactory.OpenMemoryCopy(request.DatabasePath);
+
             return new SqliteWebsiteRepository(
                 new WebsiteDatabaseOptions
                 {
-                    DatabasePath = request.DatabasePath
+                    Connection = memoryConnection,
+                    OwnsConnection = true
                 });
         }
 
@@ -65,15 +72,18 @@ public sealed class WebsiteLoadCommand
 
     private static IWebsiteRepository CreateDefaultRepository()
     {
-        string devDatabasePath =
-            WebsiteDatabasePathResolver.ResolveDevDatabasePath();
+        string devDatabasePath = WebsiteDatabasePathResolver.ResolveDevDatabasePath();
 
         if (File.Exists(devDatabasePath))
         {
+            SqliteConnection memoryConnection =
+                WebsiteInMemoryDatabaseFactory.OpenMemoryCopy(devDatabasePath);
+
             return new SqliteWebsiteRepository(
                 new WebsiteDatabaseOptions
                 {
-                    DatabasePath = devDatabasePath
+                    Connection = memoryConnection,
+                    OwnsConnection = true
                 });
         }
 

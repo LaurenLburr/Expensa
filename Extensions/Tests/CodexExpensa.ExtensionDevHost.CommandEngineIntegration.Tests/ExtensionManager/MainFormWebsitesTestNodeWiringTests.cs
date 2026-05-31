@@ -2,12 +2,13 @@ using Xunit;
 
 namespace CodexExpensa.ExtensionDevHost.CommandEngineIntegration.Tests.ExtensionManager;
 
-public sealed class MainAddinProjectTreeNodeTests
+public sealed class MainFormWebsitesTestNodeWiringTests
 {
     [Fact]
-    public void MainForm_AddsDatabaseAndTestNodesToRegisteredProjects()
+    public void MainForm_WebsitesTestNodeOpensTreeLoadVerificationForm()
     {
-        string repositoryRoot = FindRepositoryRoot();
+        string repositoryRoot =
+            FindRepositoryRoot();
 
         string mainFormPath =
             Path.Combine(
@@ -19,13 +20,11 @@ public sealed class MainAddinProjectTreeNodeTests
 
         Assert.True(File.Exists(mainFormPath), $"File was not found: {mainFormPath}");
 
-        string text = File.ReadAllText(mainFormPath);
+        string text =
+            File.ReadAllText(mainFormPath);
 
-        Assert.Contains("new TreeNode(\"Database\")", text);
-        Assert.Contains("new TreeNode(\"Test\")", text);
-        Assert.Contains("AddinProjectDatabaseNavigationTag", text);
-        Assert.Contains("AddinProjectTestNavigationTag", text);
         Assert.Contains("WebsitesTreeLoadVerificationForm", text);
+        Assert.Contains("ShowEmbeddedForm(new WebsitesTreeLoadVerificationForm())", text);
     }
 
     private static string FindRepositoryRoot()
@@ -42,6 +41,6 @@ public sealed class MainAddinProjectTreeNodeTests
             directory = directory.Parent;
         }
 
-        throw new DirectoryNotFoundException("Could not find repository root containing Extensions folder.");
+        throw new DirectoryNotFoundException();
     }
 }

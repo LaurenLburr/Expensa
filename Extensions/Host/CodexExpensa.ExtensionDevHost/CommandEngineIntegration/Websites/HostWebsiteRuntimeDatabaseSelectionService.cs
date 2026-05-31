@@ -42,10 +42,27 @@ public sealed class HostWebsiteRuntimeDatabaseSelectionService
         };
     }
 
-    public void SetActiveRuntimeDatabase(
+    public HostWebsiteDatabaseLocation SetActiveRuntimeDatabase(
         string databasePath)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(databasePath);
+
+        if (!File.Exists(databasePath))
+        {
+            throw new FileNotFoundException(
+                $"Selected database was not found: {databasePath}",
+                databasePath);
+        }
+
+        HostWebsiteDatabaseLocation runtimeLocation =
+            _pathService.GetRuntimeDatabaseLocation();
+
+        Directory.CreateDirectory(runtimeLocation.DatabaseFolder);
+
+        File.Copy(
+            databasePath,
+            runtimeLocation.DatabasePath,
+            overwrite: true);
 
         string settingsPath =
             GetSettingsPath();
@@ -55,7 +72,9 @@ public sealed class HostWebsiteRuntimeDatabaseSelectionService
 
         File.WriteAllText(
             settingsPath,
-            databasePath);
+            runtimeLocation.DatabasePath);
+
+        return runtimeLocation;
     }
 
     private static string GetSettingsPath()

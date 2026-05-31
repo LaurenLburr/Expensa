@@ -90,50 +90,7 @@ public sealed class HostWebsiteRuntimeModuleInvoker
 
     public static string FindWebsitesAddinAssemblyPath()
     {
-        IReadOnlyList<string> candidatePaths =
-        [
-            Path.Combine(
-                AppContext.BaseDirectory,
-                "Modules",
-                "WebsitesAddin",
-                WebsitesAddinAssemblyName),
-
-            Path.Combine(
-                AppContext.BaseDirectory,
-                "..",
-                "..",
-                "..",
-                "..",
-                "..",
-                "Modules",
-                "WebsitesAddin",
-                "bin",
-                "Debug",
-                "net8.0",
-                WebsitesAddinAssemblyName),
-
-            Path.Combine(
-                AppContext.BaseDirectory,
-                "..",
-                "..",
-                "..",
-                "..",
-                "..",
-                "Modules",
-                "WebsitesAddin",
-                "bin",
-                "Release",
-                "net8.0",
-                WebsitesAddinAssemblyName),
-
-            Path.Combine(
-                Directory.GetCurrentDirectory(),
-                "Modules",
-                "WebsitesAddin",
-                WebsitesAddinAssemblyName)
-        ];
-
-        foreach (string candidatePath in candidatePaths)
+        foreach (string candidatePath in GetWebsitesAddinAssemblyCandidatePaths())
         {
             string fullPath =
                 Path.GetFullPath(candidatePath);
@@ -144,8 +101,100 @@ public sealed class HostWebsiteRuntimeModuleInvoker
             }
         }
 
+        string candidates =
+            string.Join(
+                Environment.NewLine,
+                GetWebsitesAddinAssemblyCandidatePaths()
+                    .Select(Path.GetFullPath));
+
         throw new FileNotFoundException(
-            $"Could not locate {WebsitesAddinAssemblyName}. Build WebsitesAddin first or copy it under the Modules folder.");
+            $"Could not locate {WebsitesAddinAssemblyName}. Build WebsitesAddin first or copy it under a Modules folder.{Environment.NewLine}{Environment.NewLine}Searched:{Environment.NewLine}{candidates}");
+    }
+
+    private static IReadOnlyList<string> GetWebsitesAddinAssemblyCandidatePaths()
+    {
+        List<string> candidatePaths =
+        [
+            Path.Combine(
+                AppContext.BaseDirectory,
+                "Modules",
+                "WebsitesAddin",
+                WebsitesAddinAssemblyName),
+
+            Path.Combine(
+                Directory.GetCurrentDirectory(),
+                "Modules",
+                "WebsitesAddin",
+                WebsitesAddinAssemblyName)
+        ];
+
+        foreach (string root in EnumerateAncestorFolders(AppContext.BaseDirectory))
+        {
+            candidatePaths.Add(
+                Path.Combine(
+                    root,
+                    "Modules",
+                    "WebsitesAddin",
+                    WebsitesAddinAssemblyName));
+
+            candidatePaths.Add(
+                Path.Combine(
+                    root,
+                    "Modules",
+                    "WebsitesAddin",
+                    "bin",
+                    "Debug",
+                    "net8.0-windows",
+                    WebsitesAddinAssemblyName));
+
+            candidatePaths.Add(
+                Path.Combine(
+                    root,
+                    "Modules",
+                    "WebsitesAddin",
+                    "bin",
+                    "Debug",
+                    "net8.0",
+                    WebsitesAddinAssemblyName));
+
+            candidatePaths.Add(
+                Path.Combine(
+                    root,
+                    "Modules",
+                    "WebsitesAddin",
+                    "bin",
+                    "Release",
+                    "net8.0-windows",
+                    WebsitesAddinAssemblyName));
+
+            candidatePaths.Add(
+                Path.Combine(
+                    root,
+                    "Modules",
+                    "WebsitesAddin",
+                    "bin",
+                    "Release",
+                    "net8.0",
+                    WebsitesAddinAssemblyName));
+        }
+
+        return candidatePaths
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static IEnumerable<string> EnumerateAncestorFolders(
+        string startPath)
+    {
+        DirectoryInfo? directory =
+            new DirectoryInfo(startPath);
+
+        while (directory is not null)
+        {
+            yield return directory.FullName;
+
+            directory = directory.Parent;
+        }
     }
 
     private static void SetProperty(

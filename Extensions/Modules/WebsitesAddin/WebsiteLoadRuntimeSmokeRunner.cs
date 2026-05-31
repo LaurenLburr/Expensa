@@ -32,7 +32,8 @@ public sealed class WebsiteLoadRuntimeSmokeRunner
             {
                 ["searchText"] = request.SearchText,
                 ["includeDisabled"] = request.IncludeDisabled,
-                ["maximumRows"] = request.MaximumRows
+                ["maximumRows"] = request.MaximumRows,
+                ["databasePath"] = request.DatabasePath
             }
         };
 
