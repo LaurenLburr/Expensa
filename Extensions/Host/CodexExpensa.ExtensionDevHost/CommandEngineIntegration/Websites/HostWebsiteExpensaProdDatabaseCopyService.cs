@@ -48,10 +48,18 @@ public sealed class HostWebsiteExpensaProdDatabaseCopyService
 
     private static string CreateStagingDatabasePath()
     {
-        string folder = Path.Combine(Path.GetTempPath(), "CodexExpensa", "WebsitesAddin", "Staging");
+        string folder =
+            Path.Combine(
+                Path.GetTempPath(),
+                "CodexExpensa",
+                "WebsitesAddin",
+                "Staging");
+
         Directory.CreateDirectory(folder);
 
-        return Path.Combine(folder, $"websites.import.{DateTime.Now:yyyyMMdd_HHmmss_ffff}.db");
+        return Path.Combine(
+            folder,
+            $"websites.import.{DateTime.Now:yyyyMMdd_HHmmss_ffff}.db");
     }
 
     private static void TryReplaceCurrentDatabase(
@@ -62,7 +70,9 @@ public sealed class HostWebsiteExpensaProdDatabaseCopyService
     {
         try
         {
-            ReplaceCurrentDatabase(stagingDatabasePath, targetDatabasePath);
+            ReplaceCurrentDatabase(
+                stagingDatabasePath,
+                targetDatabasePath);
         }
         catch (IOException exception)
         {
@@ -84,20 +94,32 @@ public sealed class HostWebsiteExpensaProdDatabaseCopyService
 
         if (File.Exists(targetDatabasePath))
         {
-            string archivePath = CreateArchivePath(targetDatabasePath);
+            string archivePath =
+                CreateArchivePath(targetDatabasePath);
 
-            File.Move(targetDatabasePath, archivePath);
+            File.Move(
+                targetDatabasePath,
+                archivePath);
         }
 
-        File.Copy(stagingDatabasePath, targetDatabasePath, overwrite: false);
+        File.Copy(
+            stagingDatabasePath,
+            targetDatabasePath,
+            overwrite: false);
     }
 
-    private static string CreateArchivePath(string databasePath)
+    private static string CreateArchivePath(
+        string databasePath)
     {
-        string folder = Path.GetDirectoryName(databasePath)!;
-        string name = Path.GetFileNameWithoutExtension(databasePath);
+        string folder =
+            Path.GetDirectoryName(databasePath)!;
 
-        return Path.Combine(folder, $"{name}.before-prod-copy.{DateTime.Now:yyyyMMdd_HHmmss}.db");
+        string name =
+            Path.GetFileNameWithoutExtension(databasePath);
+
+        return Path.Combine(
+            folder,
+            $"{name}.before-prod-copy.{DateTime.Now:yyyyMMdd_HHmmss}.db");
     }
 
     private static string GetDefaultExpensaProdDatabasePath()
@@ -147,177 +169,65 @@ public sealed class HostWebsiteExpensaProdDatabaseCopyService
     {
         File.Delete(targetDatabasePath);
 
-        using SqliteConnection connection = new($"Data Source={targetDatabasePath}");
+        ValidateRequiredSourceTables(prodDatabasePath);
+
+        using SqliteConnection connection =
+            new($"Data Source={targetDatabasePath}");
+
         connection.Open();
 
-        string sourceTableName =
-            FindSourceWebsiteTable(prodDatabasePath);
+        using SqliteCommand command =
+            connection.CreateCommand();
 
-        HashSet<string> sourceColumns =
-            GetSourceColumns(prodDatabasePath, sourceTableName);
+        command.CommandText =
+            BuildCopySql(prodDatabasePath);
 
-        string copySql =
-            BuildCopySql(
-                prodDatabasePath,
-                sourceTableName,
-                sourceColumns);
-
-        using SqliteCommand command = connection.CreateCommand();
-        command.CommandText = copySql;
         command.ExecuteNonQuery();
     }
 
-    private static string FindSourceWebsiteTable(
+    private static void ValidateRequiredSourceTables(
         string prodDatabasePath)
     {
-        string[] candidateTables =
+        string[] requiredTables =
         [
             "Website",
-            "Websites",
-            "AccountWebsite",
-            "AccountWebsites"
+            "Tag",
+            "TagAssignment"
         ];
 
-        using SqliteConnection connection = new($"Data Source={prodDatabasePath};Mode=ReadOnly");
+        using SqliteConnection connection =
+            new($"Data Source={prodDatabasePath};Mode=ReadOnly");
+
         connection.Open();
 
-        foreach (string tableName in candidateTables)
+        foreach (string tableName in requiredTables)
         {
-            using SqliteCommand command = connection.CreateCommand();
+            using SqliteCommand command =
+                connection.CreateCommand();
+
             command.CommandText =
-                "SELECT [name] FROM [sqlite_master] WHERE [type] = 'table' AND [name] = @TableName LIMIT 1;";
-            command.Parameters.AddWithValue("@TableName", tableName);
+                "SELECT 1 FROM [sqlite_master] WHERE [type] = 'table' AND [name] = @TableName LIMIT 1;";
+
+            command.Parameters.AddWithValue(
+                "@TableName",
+                tableName);
 
             object? result =
                 command.ExecuteScalar();
 
-            if (result is not null && result != DBNull.Value)
+            if (result is null || result == DBNull.Value)
             {
-                return tableName;
+                throw new InvalidOperationException(
+                    $"Expensa production database is missing required table [{tableName}].");
             }
         }
-
-        throw new InvalidOperationException(
-            $"No supported website source table was found in Expensa production DB. Checked: {string.Join(", ", candidateTables)}");
-    }
-
-    private static HashSet<string> GetSourceColumns(
-        string prodDatabasePath,
-        string sourceTableName)
-    {
-        using SqliteConnection connection = new($"Data Source={prodDatabasePath};Mode=ReadOnly");
-        connection.Open();
-
-        using SqliteCommand command = connection.CreateCommand();
-
-        string escapedSourceTableName =
-            sourceTableName.Replace("'", "''", StringComparison.Ordinal);
-
-        command.CommandText =
-            $"SELECT group_concat([name], '|') FROM pragma_table_info('{escapedSourceTableName}');";
-
-        object? result =
-            command.ExecuteScalar();
-
-        string columnList =
-            Convert.ToString(result) ?? string.Empty;
-
-        return columnList
-            .Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
     }
 
     private static string BuildCopySql(
-        string prodDatabasePath,
-        string sourceTableName,
-        HashSet<string> sourceColumns)
+        string prodDatabasePath)
     {
         string escapedProdDatabasePath =
             prodDatabasePath.Replace("'", "''", StringComparison.Ordinal);
-
-        string sourceTable =
-            EscapeIdentifier(sourceTableName);
-
-        string idExpression =
-            BuildFirstExistingColumnExpression(
-                sourceColumns,
-                [
-                    "WebsiteId",
-                    "WebsiteID",
-                    "Id",
-                    "ID",
-                    "AccountWebsiteId",
-                    "AccountWebsiteID"
-                ],
-                "lower(hex(randomblob(16)))",
-                castToText: true);
-
-        string displayNameExpression =
-            BuildFirstExistingColumnExpression(
-                sourceColumns,
-                [
-                    "DisplayName",
-                    "Name",
-                    "WebsiteName",
-                    "Description",
-                    "Title"
-                ],
-                "'Unnamed Website'",
-                castToText: true,
-                trimAndNullIfBlank: true);
-
-        string urlExpression =
-            BuildFirstExistingColumnExpression(
-                sourceColumns,
-                [
-                    "Url",
-                    "URL",
-                    "WebsiteUrl",
-                    "WebsiteURL",
-                    "Link",
-                    "Address"
-                ],
-                "''",
-                castToText: true);
-
-        string categoryExpression =
-            BuildFirstExistingColumnExpression(
-                sourceColumns,
-                [
-                    "Category",
-                    "GroupName",
-                    "WebsiteGroup",
-                    "Type",
-                    "Section"
-                ],
-                "'Uncategorized'",
-                castToText: true,
-                trimAndNullIfBlank: true);
-
-        string isEnabledExpression =
-            BuildFirstExistingColumnExpression(
-                sourceColumns,
-                [
-                    "IsEnabled",
-                    "Enabled",
-                    "IsActive",
-                    "Active",
-                    "Include"
-                ],
-                "1",
-                castToText: false);
-
-        string sortOrderExpression =
-            BuildFirstExistingColumnExpression(
-                sourceColumns,
-                [
-                    "SortOrder",
-                    "SortIndex",
-                    "DisplayOrder",
-                    "Sequence"
-                ],
-                "0",
-                castToText: false);
 
         return $"""
 PRAGMA foreign_keys = OFF;
@@ -331,121 +241,116 @@ CREATE TABLE IF NOT EXISTS [SqlQuery] (
 
 CREATE TABLE IF NOT EXISTS [Website] (
     [WebsiteId] TEXT PRIMARY KEY,
-    [DisplayName] TEXT NOT NULL,
+    [Name] TEXT NOT NULL,
     [Url] TEXT NOT NULL DEFAULT '',
-    [Category] TEXT NOT NULL DEFAULT '',
-    [IsEnabled] INTEGER NOT NULL DEFAULT 1,
-    [SortOrder] INTEGER NOT NULL DEFAULT 0,
-    [CreatedUtc] TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    [UpdatedUtc] TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    [SortIndex] INTEGER NOT NULL DEFAULT 0,
+    [Notes] TEXT NOT NULL DEFAULT '',
+    [IsActive] INTEGER NOT NULL DEFAULT 1
+);
+
+CREATE TABLE IF NOT EXISTS [Tag] (
+    [TagId] TEXT PRIMARY KEY,
+    [TagName] TEXT NOT NULL,
+    [SortIndex] INTEGER NOT NULL DEFAULT 0,
+    [IsActive] INTEGER NOT NULL DEFAULT 1,
+    [ParentTagId] TEXT NULL,
+    [TagKey] TEXT NULL,
+    [TagPath] TEXT NULL,
+    [NodeType] TEXT NOT NULL DEFAULT 'Normal'
+);
+
+CREATE TABLE IF NOT EXISTS [TagAssignment] (
+    [TagAssignmentId] TEXT PRIMARY KEY,
+    [TagId] TEXT NOT NULL,
+    [EntityType] TEXT NOT NULL,
+    [EntityId] TEXT NOT NULL,
+    [SortIndex] INTEGER NOT NULL DEFAULT 0,
+    [IsActive] INTEGER NOT NULL DEFAULT 1
 );
 
 ATTACH DATABASE '{escapedProdDatabasePath}' AS [prod];
 
 INSERT INTO [Website] (
     [WebsiteId],
-    [DisplayName],
+    [Name],
     [Url],
-    [Category],
-    [IsEnabled],
-    [SortOrder],
-    [CreatedUtc],
-    [UpdatedUtc]
+    [SortIndex],
+    [Notes],
+    [IsActive]
 )
 SELECT
-    {idExpression} AS [WebsiteId],
-    {displayNameExpression} AS [DisplayName],
-    {urlExpression} AS [Url],
-    {categoryExpression} AS [Category],
-    COALESCE({isEnabledExpression}, 1) AS [IsEnabled],
-    COALESCE({sortOrderExpression}, 0) AS [SortOrder],
-    CURRENT_TIMESTAMP AS [CreatedUtc],
-    CURRENT_TIMESTAMP AS [UpdatedUtc]
-FROM [prod].[{sourceTable}];
+    CAST([WebsiteId] AS TEXT),
+    COALESCE(NULLIF(TRIM(CAST([Name] AS TEXT)), ''), 'Unnamed Website'),
+    COALESCE(CAST([Url] AS TEXT), ''),
+    COALESCE([SortIndex], 0),
+    COALESCE(CAST([Notes] AS TEXT), ''),
+    COALESCE([IsActive], 1)
+FROM [prod].[Website];
+
+INSERT INTO [Tag] (
+    [TagId],
+    [TagName],
+    [SortIndex],
+    [IsActive],
+    [ParentTagId],
+    [TagKey],
+    [TagPath],
+    [NodeType]
+)
+SELECT
+    CAST([TagId] AS TEXT),
+    COALESCE(NULLIF(TRIM(CAST([TagName] AS TEXT)), ''), 'Unnamed Tag'),
+    COALESCE([SortIndex], 0),
+    COALESCE([IsActive], 1),
+    CAST([ParentTagId] AS TEXT),
+    CAST([TagKey] AS TEXT),
+    CAST([TagPath] AS TEXT),
+    COALESCE(CAST([NodeType] AS TEXT), 'Normal')
+FROM [prod].[Tag];
+
+INSERT INTO [TagAssignment] (
+    [TagAssignmentId],
+    [TagId],
+    [EntityType],
+    [EntityId],
+    [SortIndex],
+    [IsActive]
+)
+SELECT
+    CAST([TagAssignmentId] AS TEXT),
+    CAST([TagId] AS TEXT),
+    CAST([EntityType] AS TEXT),
+    CAST([EntityId] AS TEXT),
+    COALESCE([SortIndex], 0),
+    COALESCE([IsActive], 1)
+FROM [prod].[TagAssignment]
+WHERE [EntityType] = 'Website';
 
 DETACH DATABASE [prod];
 
 INSERT OR REPLACE INTO [SqlQuery] ([QueryName], [SqlText], [Description], [UpdatedUtc])
 VALUES
-('Website.Select.Enabled',
- 'SELECT [WebsiteId], [DisplayName], [Url], [Category], [IsEnabled], [SortOrder] FROM [Website] WHERE [IsEnabled] = 1 ORDER BY [SortOrder], [DisplayName];',
- 'Select enabled websites ordered for tree loading.',
- CURRENT_TIMESTAMP),
-('Website.Select.All',
- 'SELECT [WebsiteId], [DisplayName], [Url], [Category], [IsEnabled], [SortOrder] FROM [Website] ORDER BY [SortOrder], [DisplayName];',
- 'Select all websites ordered for tree loading.',
- CURRENT_TIMESTAMP),
-('Website.Select.Search.Enabled',
- 'SELECT [WebsiteId], [DisplayName], [Url], [Category], [IsEnabled], [SortOrder] FROM [Website] WHERE [IsEnabled] = 1 AND ([DisplayName] LIKE @SearchText OR [Url] LIKE @SearchText OR [Category] LIKE @SearchText) ORDER BY [SortOrder], [DisplayName];',
- 'Search enabled websites ordered for tree loading.',
- CURRENT_TIMESTAMP),
-('Website.Select.Search.All',
- 'SELECT [WebsiteId], [DisplayName], [Url], [Category], [IsEnabled], [SortOrder] FROM [Website] WHERE ([DisplayName] LIKE @SearchText OR [Url] LIKE @SearchText OR [Category] LIKE @SearchText) ORDER BY [SortOrder], [DisplayName];',
- 'Search all websites ordered for tree loading.',
- CURRENT_TIMESTAMP);
+(
+    'Website.Select.WithTags.Enabled',
+    'SELECT w.[WebsiteId], w.[Name], w.[Url], w.[SortIndex], w.[IsActive], t.[TagId], t.[TagName], t.[SortIndex] AS [TagSortIndex], ta.[SortIndex] AS [AssignmentSortIndex] FROM [Website] w LEFT JOIN [TagAssignment] ta ON ta.[EntityType] = ''Website'' AND ta.[EntityId] = w.[WebsiteId] AND ta.[IsActive] = 1 LEFT JOIN [Tag] t ON t.[TagId] = ta.[TagId] AND t.[IsActive] = 1 WHERE w.[IsActive] = 1 ORDER BY COALESCE(t.[SortIndex], 999999), COALESCE(t.[TagName], ''Uncategorized''), ta.[SortIndex], w.[SortIndex], w.[Name];',
+    'Select active websites with Expensa tag data for tree loading.',
+    CURRENT_TIMESTAMP
+),
+(
+    'Website.Select.WithTags.All',
+    'SELECT w.[WebsiteId], w.[Name], w.[Url], w.[SortIndex], w.[IsActive], t.[TagId], t.[TagName], t.[SortIndex] AS [TagSortIndex], ta.[SortIndex] AS [AssignmentSortIndex] FROM [Website] w LEFT JOIN [TagAssignment] ta ON ta.[EntityType] = ''Website'' AND ta.[EntityId] = w.[WebsiteId] AND ta.[IsActive] = 1 LEFT JOIN [Tag] t ON t.[TagId] = ta.[TagId] AND t.[IsActive] = 1 ORDER BY COALESCE(t.[SortIndex], 999999), COALESCE(t.[TagName], ''Uncategorized''), ta.[SortIndex], w.[SortIndex], w.[Name];',
+    'Select all websites with Expensa tag data for tree loading.',
+    CURRENT_TIMESTAMP
+);
 
 PRAGMA foreign_keys = ON;
 """;
     }
 
-    private static string BuildFirstExistingColumnExpression(
-        HashSet<string> sourceColumns,
-        IReadOnlyList<string> candidateColumns,
-        string fallbackExpression,
-        bool castToText,
-        bool trimAndNullIfBlank = false)
-    {
-        List<string> expressions = [];
-
-        foreach (string candidateColumn in candidateColumns)
-        {
-            if (!sourceColumns.Contains(candidateColumn))
-            {
-                continue;
-            }
-
-            string columnExpression =
-                $"[{EscapeIdentifier(candidateColumn)}]";
-
-            if (castToText)
-            {
-                columnExpression =
-                    $"CAST({columnExpression} AS TEXT)";
-            }
-
-            if (trimAndNullIfBlank)
-            {
-                columnExpression =
-                    $"NULLIF(TRIM({columnExpression}), '')";
-            }
-
-            expressions.Add(columnExpression);
-        }
-
-        if (expressions.Count == 0)
-        {
-            return fallbackExpression;
-        }
-
-        expressions.Add(fallbackExpression);
-
-        if (expressions.Count == 1)
-        {
-            return expressions[0];
-        }
-
-        return $"COALESCE({string.Join(", ", expressions)})";
-    }
-
-    private static string EscapeIdentifier(
-        string identifier)
-    {
-        return identifier.Replace("]", "]]", StringComparison.Ordinal);
-    }
-
     private static string FindExtensionsRoot()
     {
-        DirectoryInfo? directory = new(AppContext.BaseDirectory);
+        DirectoryInfo? directory =
+            new(AppContext.BaseDirectory);
 
         while (directory is not null)
         {

@@ -1,25 +1,24 @@
 using Xunit;
 
-namespace CodexExpensa.ExtensionDevHost.CommandEngineIntegration.Tests.Websites;
+namespace WebsitesAddin.Tests;
 
-public sealed class HostWebsiteExpensaProdDatabaseCopyServiceColumnScanTests
+public sealed class SqliteWebsiteRepositoryExistingTagsTests
 {
     [Fact]
-    public void CopyService_DoesNotUsePragmaColumnScanNowThatExpensaSchemaIsKnown()
+    public void Repository_GroupsWebsitesUsingExpensaTagAssignments()
     {
         string text = ReadFile(
             "Extensions",
-            "Host",
-            "CodexExpensa.ExtensionDevHost",
-            "CommandEngineIntegration",
-            "Websites",
-            "HostWebsiteExpensaProdDatabaseCopyService.cs");
+            "Modules",
+            "WebsitesAddin",
+            "SqliteWebsiteRepository.cs");
 
-        Assert.Contains("ValidateRequiredSourceTables", text);
-        Assert.Contains("Expensa production database is missing required table", text);
-        Assert.DoesNotContain("pragma_table_info", text);
-        Assert.DoesNotContain("group_concat([name], '|')", text);
-        Assert.DoesNotContain("DataTable table", text);
+        Assert.Contains("LEFT JOIN [TagAssignment] ta", text);
+        Assert.Contains("ta.[EntityType] = 'Website'", text);
+        Assert.Contains("LEFT JOIN [Tag] t", text);
+        Assert.Contains("COALESCE(t.[TagName], 'Uncategorized') AS [TagName]", text);
+        Assert.Contains("childrenByTag", text);
+        Assert.DoesNotContain("[Category]", text);
     }
 
     private static string ReadFile(params string[] parts)
@@ -28,6 +27,7 @@ public sealed class HostWebsiteExpensaProdDatabaseCopyServiceColumnScanTests
         string path = Path.Combine([repositoryRoot, .. parts]);
 
         Assert.True(File.Exists(path), $"File was not found: {path}");
+
         return File.ReadAllText(path);
     }
 

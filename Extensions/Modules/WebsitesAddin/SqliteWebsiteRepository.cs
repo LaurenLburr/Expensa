@@ -30,7 +30,7 @@ public sealed class SqliteWebsiteRepository : IWebsiteRepository, IDisposable
 
         using SqliteCommand command = CreateCommand(request);
 
-        DataTable table = ExecuteToDataTable(command);
+        DataTable table = ExecuteToUnconstrainedDataTable(command);
 
         return BuildTreeNodes(table);
     }
@@ -97,85 +97,118 @@ public sealed class SqliteWebsiteRepository : IWebsiteRepository, IDisposable
         return connection;
     }
 
-    private static DataTable ExecuteToDataTable(SqliteCommand command)
+    private static DataTable ExecuteToUnconstrainedDataTable(SqliteCommand command)
     {
         using SqliteDataReader reader = command.ExecuteReader();
 
         DataTable table = new();
 
-        table.Load(reader);
+        for (int index = 0; index < reader.FieldCount; index++)
+        {
+            table.Columns.Add(reader.GetName(index), typeof(object));
+        }
+
+        table.BeginLoadData();
+
+        while (reader.Read())
+        {
+            DataRow row = table.NewRow();
+
+            for (int index = 0; index < reader.FieldCount; index++)
+            {
+                row[index] = reader.IsDBNull(index)
+                    ? DBNull.Value
+                    : reader.GetValue(index);
+            }
+
+            table.Rows.Add(row);
+        }
+
+        table.EndLoadData();
 
         return table;
     }
 
     private static string GetSqlText(bool includeDisabled, bool hasSearch)
     {
-        string whereClause = includeDisabled ? string.Empty : "WHERE [IsEnabled] = 1";
+        string activeFilter = includeDisabled ? string.Empty : "WHERE w.[IsActive] = 1";
 
         string searchPrefix = hasSearch
             ? includeDisabled ? "WHERE" : "AND"
             : string.Empty;
 
         string searchClause = hasSearch
-            ? $" {searchPrefix} ([DisplayName] LIKE @SearchText OR [Url] LIKE @SearchText OR [Category] LIKE @SearchText)"
+            ? $" {searchPrefix} (w.[Name] LIKE @SearchText OR w.[Url] LIKE @SearchText OR t.[TagName] LIKE @SearchText)"
             : string.Empty;
 
         return $"""
 SELECT
-    [WebsiteId],
-    [DisplayName],
-    [Url],
-    [Category],
-    [IsEnabled],
-    [SortOrder]
-FROM [Website]
-{whereClause}
+    w.[WebsiteId],
+    w.[Name],
+    w.[Url],
+    w.[SortIndex],
+    w.[IsActive],
+    t.[TagId],
+    COALESCE(t.[TagName], 'Uncategorized') AS [TagName],
+    COALESCE(t.[SortIndex], 999999) AS [TagSortIndex],
+    COALESCE(ta.[SortIndex], 0) AS [AssignmentSortIndex]
+FROM [Website] w
+LEFT JOIN [TagAssignment] ta
+    ON ta.[EntityType] = 'Website'
+    AND ta.[EntityId] = w.[WebsiteId]
+    AND ta.[IsActive] = 1
+LEFT JOIN [Tag] t
+    ON t.[TagId] = ta.[TagId]
+    AND t.[IsActive] = 1
+{activeFilter}
 {searchClause}
 ORDER BY
-    [Category],
-    [SortOrder],
-    [DisplayName]
+    [TagSortIndex],
+    [TagName],
+    [AssignmentSortIndex],
+    w.[SortIndex],
+    w.[Name]
 LIMIT @MaximumRows;
 """;
     }
 
     private static IReadOnlyList<WebsiteTreeNode> BuildTreeNodes(DataTable table)
     {
-        Dictionary<string, List<WebsiteTreeNode>> childrenByCategory =
+        Dictionary<string, List<WebsiteTreeNode>> childrenByTag =
             new(StringComparer.OrdinalIgnoreCase);
 
         foreach (DataRow row in table.Rows)
         {
-            string category = Convert.ToString(row["Category"]) ?? string.Empty;
+            string tagName = Convert.ToString(row["TagName"]) ?? string.Empty;
 
-            if (string.IsNullOrWhiteSpace(category))
+            if (string.IsNullOrWhiteSpace(tagName))
             {
-                category = "Uncategorized";
+                tagName = "Uncategorized";
             }
 
             WebsiteTreeNode websiteNode = new()
             {
                 NodeId = Convert.ToString(row["WebsiteId"]) ?? Guid.NewGuid().ToString("N"),
-                DisplayText = Convert.ToString(row["DisplayName"]) ?? string.Empty,
+                DisplayText = Convert.ToString(row["Name"]) ?? string.Empty,
                 Url = Convert.ToString(row["Url"]) ?? string.Empty,
-                Category = category,
-                IsEnabled = Convert.ToInt32(row["IsEnabled"]) != 0
+                Category = tagName,
+                IsEnabled = Convert.ToInt32(row["IsActive"]) != 0
             };
 
-            if (!childrenByCategory.TryGetValue(category, out List<WebsiteTreeNode>? children))
+            if (!childrenByTag.TryGetValue(tagName, out List<WebsiteTreeNode>? children))
             {
                 children = [];
-                childrenByCategory[category] = children;
+                childrenByTag[tagName] = children;
             }
 
             children.Add(websiteNode);
         }
 
-        return childrenByCategory
+        return childrenByTag
             .OrderBy(static pair => pair.Key, StringComparer.OrdinalIgnoreCase)
             .Select(static pair => new WebsiteTreeNode
             {
-                NodeId = $"category:{pair.Key}",
+                NodeId = $"tag:{pair.Key}",
                 DisplayText = pair.Key,
                 Category = pair.Key,
                 Children = pair.Value

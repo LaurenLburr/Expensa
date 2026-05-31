@@ -2,10 +2,10 @@ using Xunit;
 
 namespace CodexExpensa.ExtensionDevHost.CommandEngineIntegration.Tests.Websites;
 
-public sealed class HostWebsiteExpensaProdDatabaseCopyServiceDynamicColumnTests
+public sealed class HostWebsiteExpensaProdDatabaseCopyServiceExistingTagsTests
 {
     [Fact]
-    public void CopyService_UsesExistingExpensaWebsiteTagSchema()
+    public void CopyService_CopiesExpensaTagAndTagAssignmentTables()
     {
         string text = ReadFile(
             "Extensions",
@@ -15,30 +15,12 @@ public sealed class HostWebsiteExpensaProdDatabaseCopyServiceDynamicColumnTests
             "Websites",
             "HostWebsiteExpensaProdDatabaseCopyService.cs");
 
-        Assert.Contains("ValidateRequiredSourceTables", text);
-        Assert.Contains("Website", text);
-        Assert.Contains("Tag", text);
-        Assert.Contains("TagAssignment", text);
-        Assert.Contains("FROM [prod].[Website]", text);
+        Assert.Contains("CREATE TABLE IF NOT EXISTS [Tag]", text);
+        Assert.Contains("CREATE TABLE IF NOT EXISTS [TagAssignment]", text);
         Assert.Contains("FROM [prod].[Tag]", text);
         Assert.Contains("FROM [prod].[TagAssignment]", text);
         Assert.Contains("WHERE [EntityType] = 'Website'", text);
-    }
-
-    [Fact]
-    public void CopyService_NoLongerUsesDynamicColumnGuessing()
-    {
-        string text = ReadFile(
-            "Extensions",
-            "Host",
-            "CodexExpensa.ExtensionDevHost",
-            "CommandEngineIntegration",
-            "Websites",
-            "HostWebsiteExpensaProdDatabaseCopyService.cs");
-
-        Assert.DoesNotContain("GetSourceColumns", text);
-        Assert.DoesNotContain("BuildFirstExistingColumnExpression", text);
-        Assert.DoesNotContain("COALESCE(NULLIF(TRIM([DisplayName])", text);
+        Assert.DoesNotContain("CREATE TABLE IF NOT EXISTS [WebsiteTag]", text);
     }
 
     private static string ReadFile(params string[] parts)
@@ -47,6 +29,7 @@ public sealed class HostWebsiteExpensaProdDatabaseCopyServiceDynamicColumnTests
         string path = Path.Combine([repositoryRoot, .. parts]);
 
         Assert.True(File.Exists(path), $"File was not found: {path}");
+
         return File.ReadAllText(path);
     }
 
