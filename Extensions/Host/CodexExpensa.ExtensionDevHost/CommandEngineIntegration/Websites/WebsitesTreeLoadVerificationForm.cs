@@ -10,18 +10,17 @@ public sealed partial class WebsitesTreeLoadVerificationForm : Form
     {
     }
 
-    public WebsitesTreeLoadVerificationForm(
-        HostWebsiteTreeContributionLoader loader)
+    public WebsitesTreeLoadVerificationForm(HostWebsiteTreeContributionLoader loader)
     {
         ArgumentNullException.ThrowIfNull(loader);
 
         _loader = loader;
 
         InitializeComponent();
+        EnsureWebsiteDetailsPanel();
     }
 
-    protected override async void OnShown(
-        EventArgs e)
+    protected override async void OnShown(EventArgs e)
     {
         base.OnShown(e);
 
@@ -35,9 +34,7 @@ public sealed partial class WebsitesTreeLoadVerificationForm : Form
         await LoadWebsitesTreeAsync().ConfigureAwait(true);
     }
 
-    private async void loadButton_Click(
-        object? sender,
-        EventArgs e)
+    private async void loadButton_Click(object? sender, EventArgs e)
     {
         await LoadWebsitesTreeAsync().ConfigureAwait(true);
     }
@@ -46,7 +43,7 @@ public sealed partial class WebsitesTreeLoadVerificationForm : Form
     {
         loadButton.Enabled = false;
         statusLabel.Text = "Loading Websites tree...";
-        detailsTextBox.Clear();
+        ShowSelectedTreeNodeDetails(null);
 
         try
         {
@@ -62,17 +59,15 @@ public sealed partial class WebsitesTreeLoadVerificationForm : Form
                     }).ConfigureAwait(true);
 
             statusLabel.Text =
-                $"{result.ExecutionResult.Status}: {result.RootNodeCount} root node(s), {result.WebsiteResult.TotalCount} website row(s).";
+                $"{result.ExecutionResult.Status}: {result.RootNodeCount} root node(s), {result.WebsiteResult.TotalCount} website row(s). {result.WebsiteResult.Message}";
 
-            detailsTextBox.Text =
-                $"Message: {result.WebsiteResult.Message}{Environment.NewLine}" +
-                $"Root nodes: {result.RootNodeCount}{Environment.NewLine}" +
-                $"Website rows: {result.WebsiteResult.TotalCount}{Environment.NewLine}{Environment.NewLine}" +
-                result.ExecutionResult.OutputJson;
+            detailsTextBox.Visible = true;
+            detailsTextBox.Text = result.ExecutionResult.OutputJson;
         }
         catch (Exception exception)
         {
             statusLabel.Text = "Failed.";
+            detailsTextBox.Visible = true;
             detailsTextBox.Text = exception.ToString();
 
             MessageBox.Show(
@@ -88,17 +83,30 @@ public sealed partial class WebsitesTreeLoadVerificationForm : Form
         }
     }
 
-    private void websitesTreeView_AfterSelect(
-        object? sender,
-        TreeViewEventArgs e)
+    private void websitesTreeView_NodeMouseClick(object? sender, TreeNodeMouseClickEventArgs e)
     {
-        detailsTextBox.Text =
-            e.Node?.Tag?.ToString() ?? e.Node?.Text ?? string.Empty;
+        if (e.Button == MouseButtons.Right)
+        {
+            websitesTreeView.SelectedNode = e.Node;
+        }
     }
 
-    private void closeButton_Click(
-        object? sender,
-        EventArgs e)
+    private void sortAscendingToolStripMenuItem_Click(object? sender, EventArgs e)
+    {
+        SortTreeNodesFromContextMenu(ascending: true);
+    }
+
+    private void sortDescendingToolStripMenuItem_Click(object? sender, EventArgs e)
+    {
+        SortTreeNodesFromContextMenu(ascending: false);
+    }
+
+    private void websitesTreeView_AfterSelect(object? sender, TreeViewEventArgs e)
+    {
+        ShowSelectedTreeNodeDetails(e.Node);
+    }
+
+    private void closeButton_Click(object? sender, EventArgs e)
     {
         Close();
     }

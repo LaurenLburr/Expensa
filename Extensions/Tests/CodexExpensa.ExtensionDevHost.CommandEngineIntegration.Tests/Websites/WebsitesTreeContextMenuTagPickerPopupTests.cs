@@ -2,10 +2,10 @@ using Xunit;
 
 namespace CodexExpensa.ExtensionDevHost.CommandEngineIntegration.Tests.Websites;
 
-public sealed class WebsitesTreeContextMenuRuntimeAttachTests
+public sealed class WebsitesTreeContextMenuTagPickerPopupTests
 {
     [Fact]
-    public void Form_AttachesRuntimeContextMenuOnLoad()
+    public void TagPicker_UsesPopupFormInsteadOfToolStripControlHost()
     {
         string text =
             ReadFile(
@@ -14,17 +14,18 @@ public sealed class WebsitesTreeContextMenuRuntimeAttachTests
                 "CodexExpensa.ExtensionDevHost",
                 "CommandEngineIntegration",
                 "Websites",
-                "WebsitesTreeLoadVerificationForm.ContextMenu.cs");
+                "WebsitesTreeLoadVerificationForm.TagPicker.cs");
 
-        Assert.Contains("protected override void OnLoad", text);
-        Assert.Contains("AttachRuntimeTreeContextMenu", text);
-        Assert.Contains("websitesTreeView.ContextMenuStrip", text);
-        Assert.Contains("Sort ASC", text);
-        Assert.Contains("Sort DESC", text);
+        Assert.Contains("ShowTagPickerPopup", text);
+        Assert.Contains("new Form", text);
+        Assert.Contains("WebsitesTreeTagPickerPanel", text);
+        Assert.Contains("_tagPickerPopupForm.Show(this)", text);
+        Assert.Contains("FocusTextBox", text);
+        Assert.DoesNotContain("ToolStripControlHost", text);
     }
 
     [Fact]
-    public void Form_ShowsContextMenuOnRightMouseUp()
+    public void ContextMenu_RemembersRightClickLocationBeforeShowingPopup()
     {
         string text =
             ReadFile(
@@ -35,28 +36,8 @@ public sealed class WebsitesTreeContextMenuRuntimeAttachTests
                 "Websites",
                 "WebsitesTreeLoadVerificationForm.ContextMenu.cs");
 
-        Assert.Contains("websitesTreeView_RuntimeMouseUp", text);
-        Assert.Contains("MouseButtons.Right", text);
-        Assert.Contains("websitesTreeView.GetNodeAt", text);
+        Assert.Contains("RememberTreeContextMenuLocation(e.Location)", text);
         Assert.Contains("_runtimeTreeContextMenuStrip?.Show", text);
-    }
-
-    [Fact]
-    public void Form_SortsContextMenuTargetNodes()
-    {
-        string text =
-            ReadFile(
-                "Extensions",
-                "Host",
-                "CodexExpensa.ExtensionDevHost",
-                "CommandEngineIntegration",
-                "Websites",
-                "WebsitesTreeLoadVerificationForm.ContextMenu.cs");
-
-        Assert.Contains("SortTreeNodesFromContextMenu", text);
-        Assert.Contains("websitesTreeView.SelectedNode?.Parent?.Nodes ?? websitesTreeView.Nodes", text);
-        Assert.Contains("OrderBy(", text);
-        Assert.Contains("sortedNodes.Reverse();", text);
     }
 
     private static string ReadFile(

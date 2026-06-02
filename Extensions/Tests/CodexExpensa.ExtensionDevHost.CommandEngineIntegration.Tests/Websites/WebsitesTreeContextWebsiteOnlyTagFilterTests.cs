@@ -2,10 +2,10 @@ using Xunit;
 
 namespace CodexExpensa.ExtensionDevHost.CommandEngineIntegration.Tests.Websites;
 
-public sealed class WebsitesTreeContextMenuRuntimeAttachTests
+public sealed class WebsitesTreeContextWebsiteOnlyTagFilterTests
 {
     [Fact]
-    public void Form_AttachesRuntimeContextMenuOnLoad()
+    public void ContextMenu_ShowsOnlyForWebsiteNodes()
     {
         string text =
             ReadFile(
@@ -16,15 +16,14 @@ public sealed class WebsitesTreeContextMenuRuntimeAttachTests
                 "Websites",
                 "WebsitesTreeLoadVerificationForm.ContextMenu.cs");
 
-        Assert.Contains("protected override void OnLoad", text);
-        Assert.Contains("AttachRuntimeTreeContextMenu", text);
-        Assert.Contains("websitesTreeView.ContextMenuStrip", text);
-        Assert.Contains("Sort ASC", text);
-        Assert.Contains("Sort DESC", text);
+        Assert.Contains("IsWebsiteTreeNode(clickedNode)", text);
+        Assert.Contains("Context menu is available only for website nodes.", text);
+        Assert.Contains("HostWebsiteTreeNodeTagReader.GetWebsiteId(node)", text);
+        Assert.Contains("websitesTreeView.ContextMenuStrip = null", text);
     }
 
     [Fact]
-    public void Form_ShowsContextMenuOnRightMouseUp()
+    public void TagPickerPopup_UsesTreeHeightAndFiltersAssignedTags()
     {
         string text =
             ReadFile(
@@ -33,16 +32,17 @@ public sealed class WebsitesTreeContextMenuRuntimeAttachTests
                 "CodexExpensa.ExtensionDevHost",
                 "CommandEngineIntegration",
                 "Websites",
-                "WebsitesTreeLoadVerificationForm.ContextMenu.cs");
+                "WebsitesTreeLoadVerificationForm.TagPicker.cs");
 
-        Assert.Contains("websitesTreeView_RuntimeMouseUp", text);
-        Assert.Contains("MouseButtons.Right", text);
-        Assert.Contains("websitesTreeView.GetNodeAt", text);
-        Assert.Contains("_runtimeTreeContextMenuStrip?.Show", text);
+        Assert.Contains("websitesTreeView.ClientSize.Height", text);
+        Assert.Contains("GetAvailableTreeTagNamesForWebsite", text);
+        Assert.Contains("GetAssignedTagNamesForWebsite", text);
+        Assert.Contains("assignedTags.Contains(tagName)", text);
+        Assert.Contains("SetTags(", text);
     }
 
     [Fact]
-    public void Form_SortsContextMenuTargetNodes()
+    public void TagAssignmentService_ReadsAssignedTagNames()
     {
         string text =
             ReadFile(
@@ -51,12 +51,12 @@ public sealed class WebsitesTreeContextMenuRuntimeAttachTests
                 "CodexExpensa.ExtensionDevHost",
                 "CommandEngineIntegration",
                 "Websites",
-                "WebsitesTreeLoadVerificationForm.ContextMenu.cs");
+                "HostWebsiteTagAssignmentService.cs");
 
-        Assert.Contains("SortTreeNodesFromContextMenu", text);
-        Assert.Contains("websitesTreeView.SelectedNode?.Parent?.Nodes ?? websitesTreeView.Nodes", text);
-        Assert.Contains("OrderBy(", text);
-        Assert.Contains("sortedNodes.Reverse();", text);
+        Assert.Contains("GetAssignedTagNames", text);
+        Assert.Contains("SELECT DISTINCT t.[TagName]", text);
+        Assert.Contains("INNER JOIN [Tag] t", text);
+        Assert.Contains("ta.[EntityType] = 'Website'", text);
     }
 
     private static string ReadFile(

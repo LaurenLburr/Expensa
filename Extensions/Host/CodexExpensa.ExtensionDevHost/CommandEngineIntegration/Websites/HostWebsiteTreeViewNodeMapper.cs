@@ -11,7 +11,7 @@ public static class HostWebsiteTreeViewNodeMapper
         {
             Name = websiteNode.NodeId,
             Text = websiteNode.DisplayText,
-            Tag = websiteNode
+            Tag = CreatePayload(websiteNode)
         };
 
         foreach (HostWebsiteTreeNode child in websiteNode.Children)
@@ -30,5 +30,28 @@ public static class HostWebsiteTreeViewNodeMapper
         return websiteNodes
             .Select(ToTreeNode)
             .ToList();
+    }
+
+    private static IHostWebsiteTreeNodePayload CreatePayload(
+        HostWebsiteTreeNode websiteNode)
+    {
+        if (websiteNode.Children.Count > 0)
+        {
+            return new HostWebsiteCategoryGroupTreeNodePayload
+            {
+                NodeId = websiteNode.NodeId,
+                DisplayText = websiteNode.DisplayText
+            };
+        }
+
+        return new HostWebsiteTreeNodePayload
+        {
+            NodeId = websiteNode.NodeId,
+            WebsiteId = websiteNode.NodeId,
+            DisplayText = websiteNode.DisplayText,
+            Url = websiteNode.Url,
+            TagName = websiteNode.Category,
+            IsActive = websiteNode.IsEnabled
+        };
     }
 }

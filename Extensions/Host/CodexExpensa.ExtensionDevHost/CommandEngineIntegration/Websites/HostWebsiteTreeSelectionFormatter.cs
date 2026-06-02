@@ -7,7 +7,7 @@ public static class HostWebsiteTreeSelectionFormatter
     {
         ArgumentNullException.ThrowIfNull(treeView);
 
-        HostWebsiteTreeNode? node =
+        IHostWebsiteTreeNodePayload? node =
             HostWebsiteTreeViewRenderer.GetSelectedWebsiteNode(treeView);
 
         if (node is null)
@@ -17,10 +17,11 @@ public static class HostWebsiteTreeSelectionFormatter
 
         return
             $"NodeId: {node.NodeId}{Environment.NewLine}" +
+            $"WebsiteId: {node.WebsiteId}{Environment.NewLine}" +
             $"DisplayText: {node.DisplayText}{Environment.NewLine}" +
-            $"Category: {node.Category}{Environment.NewLine}" +
+            $"Category: {node.TagName}{Environment.NewLine}" +
+            $"NodeType: {node.NodeType}{Environment.NewLine}" +
             $"Url: {node.Url}{Environment.NewLine}" +
-            $"Enabled: {node.IsEnabled}{Environment.NewLine}" +
-            $"Children: {node.Children.Count}";
+            $"Enabled: {node.IsActive}";
     }
 }
