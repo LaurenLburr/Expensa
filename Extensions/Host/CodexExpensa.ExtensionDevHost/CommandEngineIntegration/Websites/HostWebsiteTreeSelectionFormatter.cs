@@ -2,26 +2,33 @@ namespace CodexExpensa.ExtensionDevHost.CommandEngineIntegration.Websites;
 
 public static class HostWebsiteTreeSelectionFormatter
 {
-    public static string FormatSelectedNode(
-        TreeView treeView)
+    public static string FormatSelectedNode(TreeView treeView)
     {
         ArgumentNullException.ThrowIfNull(treeView);
 
-        IHostWebsiteTreeNodePayload? node =
-            HostWebsiteTreeViewRenderer.GetSelectedWebsiteNode(treeView);
+        TreeNode? selectedNode = treeView.SelectedNode;
 
-        if (node is null)
+        if (selectedNode is null)
+        {
+            return string.Empty;
+        }
+
+        IHostWebsiteTreeNodePayload? payload =
+            HostWebsiteTreeNodeTagReader.ReadPayload(selectedNode);
+
+        if (payload is null)
         {
             return string.Empty;
         }
 
         return
-            $"NodeId: {node.NodeId}{Environment.NewLine}" +
-            $"WebsiteId: {node.WebsiteId}{Environment.NewLine}" +
-            $"DisplayText: {node.DisplayText}{Environment.NewLine}" +
-            $"Category: {node.TagName}{Environment.NewLine}" +
-            $"NodeType: {node.NodeType}{Environment.NewLine}" +
-            $"Url: {node.Url}{Environment.NewLine}" +
-            $"Enabled: {node.IsActive}";
+            $"NodeType: {payload.NodeType}{Environment.NewLine}" +
+            $"NodeId: {payload.NodeId}{Environment.NewLine}" +
+            $"WebsiteId: {payload.WebsiteId}{Environment.NewLine}" +
+            $"DisplayText: {payload.DisplayText}{Environment.NewLine}" +
+            $"TagName: {payload.TagName}{Environment.NewLine}" +
+            $"Url: {payload.Url}{Environment.NewLine}" +
+            $"Enabled: {payload.IsActive}{Environment.NewLine}" +
+            $"Children: {selectedNode.Nodes.Count}";
     }
 }

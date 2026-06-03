@@ -1,5 +1,6 @@
 using Codex.CommandEngine.Core;
 using System.Reflection;
+using System.Runtime.Loader;
 
 namespace CodexExpensa.ExtensionDevHost.CommandEngineIntegration.Websites;
 
@@ -23,6 +24,7 @@ public sealed class HostWebsiteRuntimeModuleInvoker
     private const string WebsitesAddinAssemblyName = "WebsitesAddin.dll";
     private const string SmokeRunnerTypeName = "WebsitesAddin.WebsiteLoadRuntimeSmokeRunner";
     private const string RequestTypeName = "WebsitesAddin.WebsiteLoadRequest";
+    private const string DefaultCommandName = "Websites.Load";
 
     public async Task<CommandExecutionResult> ExecuteAsync(
         HostWebsiteRuntimeLoadRequest request,
@@ -33,8 +35,11 @@ public sealed class HostWebsiteRuntimeModuleInvoker
         string assemblyPath =
             FindWebsitesAddinAssemblyPath();
 
+        WebsiteAddinDependencyLoadContext loadContext =
+            new(assemblyPath);
+
         Assembly assembly =
-            Assembly.LoadFrom(assemblyPath);
+            loadContext.LoadMainAssembly(assemblyPath);
 
         Type smokeRunnerType =
             assembly.GetType(SmokeRunnerTypeName, throwOnError: true)!;
@@ -84,8 +89,12 @@ public sealed class HostWebsiteRuntimeModuleInvoker
         object? result =
             resultProperty.GetValue(task);
 
-        return result as CommandExecutionResult
-            ?? throw new InvalidOperationException("Website smoke runner did not return CommandExecutionResult.");
+        if (result is null)
+        {
+            throw new InvalidOperationException("Website smoke runner returned null.");
+        }
+
+        return MapCommandExecutionResult(result);
     }
 
     public static string FindWebsitesAddinAssemblyPath()
@@ -109,6 +118,24 @@ public sealed class HostWebsiteRuntimeModuleInvoker
 
         throw new FileNotFoundException(
             $"Could not locate {WebsitesAddinAssemblyName}. Build WebsitesAddin first or copy it under a Modules folder.{Environment.NewLine}{Environment.NewLine}Searched:{Environment.NewLine}{candidates}");
+    }
+
+    private static CommandExecutionResult MapCommandExecutionResult(
+        object result)
+    {
+        if (result is CommandExecutionResult sameContextResult)
+        {
+            return sameContextResult;
+        }
+
+        return new CommandExecutionResult
+        {
+            CorrelationId = GetPropertyString(result, "CorrelationId", Guid.NewGuid().ToString("N")),
+            CommandName = GetPropertyString(result, "CommandName", DefaultCommandName),
+            Status = GetPropertyEnum(result, "Status", CommandExecutionStatus.Failed),
+            Message = GetPropertyString(result, "Message", string.Empty),
+            OutputJson = GetPropertyString(result, "OutputJson", string.Empty)
+        };
     }
 
     private static IReadOnlyList<string> GetWebsitesAddinAssemblyCandidatePaths()
@@ -187,7 +214,7 @@ public sealed class HostWebsiteRuntimeModuleInvoker
         string startPath)
     {
         DirectoryInfo? directory =
-            new DirectoryInfo(startPath);
+            new(startPath);
 
         while (directory is not null)
         {
@@ -207,5 +234,103 @@ public sealed class HostWebsiteRuntimeModuleInvoker
             ?? throw new MissingMemberException(instance.GetType().FullName, propertyName);
 
         property.SetValue(instance, value);
+    }
+
+    private static string GetPropertyString(
+        object instance,
+        string propertyName,
+        string defaultValue)
+    {
+        PropertyInfo? property =
+            instance.GetType().GetProperty(propertyName);
+
+        if (property is null)
+        {
+            return defaultValue;
+        }
+
+        object? value =
+            property.GetValue(instance);
+
+        string? text =
+            Convert.ToString(value);
+
+        return string.IsNullOrWhiteSpace(text)
+            ? defaultValue
+            : text;
+    }
+
+    private static CommandExecutionStatus GetPropertyEnum(
+        object instance,
+        string propertyName,
+        CommandExecutionStatus defaultValue)
+    {
+        PropertyInfo? property =
+            instance.GetType().GetProperty(propertyName);
+
+        if (property is null)
+        {
+            return defaultValue;
+        }
+
+        object? value =
+            property.GetValue(instance);
+
+        if (value is CommandExecutionStatus status)
+        {
+            return status;
+        }
+
+        string? text =
+            Convert.ToString(value);
+
+        return Enum.TryParse(
+            text,
+            ignoreCase: true,
+            out CommandExecutionStatus parsedStatus)
+                ? parsedStatus
+                : defaultValue;
+    }
+
+    private sealed class WebsiteAddinDependencyLoadContext : AssemblyLoadContext
+    {
+        private readonly AssemblyDependencyResolver resolver;
+
+        public WebsiteAddinDependencyLoadContext(
+            string mainAssemblyPath)
+            : base(isCollectible: false)
+        {
+            resolver =
+                new AssemblyDependencyResolver(mainAssemblyPath);
+        }
+
+        public Assembly LoadMainAssembly(
+            string assemblyPath)
+        {
+            return LoadFromAssemblyPath(
+                assemblyPath);
+        }
+
+        protected override Assembly? Load(
+            AssemblyName assemblyName)
+        {
+            string? assemblyPath =
+                resolver.ResolveAssemblyToPath(assemblyName);
+
+            return assemblyPath is null
+                ? null
+                : LoadFromAssemblyPath(assemblyPath);
+        }
+
+        protected override IntPtr LoadUnmanagedDll(
+            string unmanagedDllName)
+        {
+            string? libraryPath =
+                resolver.ResolveUnmanagedDllToPath(unmanagedDllName);
+
+            return libraryPath is null
+                ? IntPtr.Zero
+                : LoadUnmanagedDllFromPath(libraryPath);
+        }
     }
 }

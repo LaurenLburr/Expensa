@@ -2,18 +2,17 @@ namespace CodexExpensa.ExtensionDevHost.CommandEngineIntegration.Websites;
 
 public sealed class HostWebsiteTreeNodePayload : IHostWebsiteTreeNodePayload
 {
-    public required string NodeId { get; init; }
+    public HostWebsiteTreeNodeType NodeType => HostWebsiteTreeNodeType.Website;
 
-    public required string WebsiteId { get; init; }
+    public required string NodeId { get; init; }
 
     public required string DisplayText { get; init; }
 
-    public required string Url { get; init; }
+    public required string WebsiteId { get; init; }
 
-    public required string TagName { get; init; }
+    public string TagName { get; init; } = string.Empty;
 
-    public HostWebsiteTreeNodeType NodeType { get; init; } =
-        HostWebsiteTreeNodeType.Website;
+    public string Url { get; init; } = string.Empty;
 
-    public required bool IsActive { get; init; }
+    public bool IsActive { get; init; } = true;
 }

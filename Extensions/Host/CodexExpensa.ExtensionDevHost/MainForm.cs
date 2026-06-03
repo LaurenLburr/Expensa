@@ -132,6 +132,7 @@ public MainForm()
             tools.Nodes.Add(CreateCommandNode("Query Catalog", "Tools.QueryCatalog"));
             tools.Nodes.Add(CreateCommandNode("Folder Watcher / Auto Unzip", "Tools.FolderWatcherAutoUnzip"));
             tools.Nodes.Add(CreateCommandNode("CommandEngine Runtime", "Tools.CommandEngineRuntime"));
+            tools.Nodes.Add(CreateCommandNode("Deploy Websites Add-in to Expensa", "Tools.DeployWebsitesAddinToExpensa"));
 
             TreeNode docs = new("Docs")
             {
@@ -580,6 +581,12 @@ private static TreeNode CreateCommandNode(string text, string commandKey)
                 ShowCommandEngineRuntimePanel();
                 break;
 
+            case "Tools.DeployWebsitesAddinToExpensa":
+                ShowLandingText(
+                    "Deploy Websites Add-in to Expensa" + Environment.NewLine + Environment.NewLine +
+                    "Double-click this node to build WebsitesAddin and copy its output into Expensa's Modules\\WebsitesAddin folder.");
+                break;
+
             case "Docs.UpdateStandardAiDocs":
                 ShowStandardAiDocsUpdatePanel();
                 break;
@@ -622,6 +629,10 @@ private static TreeNode CreateCommandNode(string text, string commandKey)
 
             case "Tools.CommandEngineRuntime":
                 ShowCommandEngineRuntimePanel();
+                break;
+
+            case "Tools.DeployWebsitesAddinToExpensa":
+                DeployWebsitesAddinToExpensa();
                 break;
 
             case "Docs.UpdateStandardAiDocs":
@@ -1032,6 +1043,289 @@ Describe how this add-in should be deployed or updated into Expensa.
     }
 
 
+    private void AddDeploymentMenu()
+    {
+        ToolStripMenuItem deployMenu = new("Deploy");
+
+        ToolStripMenuItem deployWebsitesAddinMenuItem = new("Deploy Websites Add-in to Expensa");
+        deployWebsitesAddinMenuItem.Click += (_, _) => DeployWebsitesAddinToExpensa();
+
+        deployMenu.DropDownItems.Add(deployWebsitesAddinMenuItem);
+        mainMenuStrip.Items.Add(deployMenu);
+    }
+
+    private void DeployWebsitesAddinToExpensa()
+    {
+        try
+        {
+            WebsitesAddinDeploymentResult result = DeployWebsitesAddinToExpensaCore();
+
+            MessageBox.Show(
+                this,
+                $"WebsitesAddin deployed successfully.{Environment.NewLine}{Environment.NewLine}" +
+                $"Source:{Environment.NewLine}{result.SourceFolder}{Environment.NewLine}{Environment.NewLine}" +
+                $"Destination:{Environment.NewLine}{result.DestinationFolder}{Environment.NewLine}{Environment.NewLine}" +
+                $"Files copied: {result.FileCount}",
+                "Deploy Websites Add-in to Expensa",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(
+                this,
+                exception.ToString(),
+                "Deploy Websites Add-in Failed",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
+        }
+    }
+
+    private static WebsitesAddinDeploymentResult DeployWebsitesAddinToExpensaCore()
+    {
+        string repositoryRoot = FindRepositoryRoot();
+        string projectFile = FindWebsitesAddinProjectFile(repositoryRoot);
+
+        BuildProject(projectFile);
+
+        string sourceFolder = FindWebsitesAddinOutputFolder(repositoryRoot);
+        string destinationFolder = GetExpensaWebsitesAddinDestinationFolder(repositoryRoot);
+
+        Directory.CreateDirectory(destinationFolder);
+
+        int copiedCount = CopyDirectoryContents(sourceFolder, destinationFolder);
+
+        string deployedDll = Path.Combine(destinationFolder, "WebsitesAddin.dll");
+        if (!File.Exists(deployedDll))
+        {
+            throw new FileNotFoundException(
+                "Deployment completed, but WebsitesAddin.dll was not found in the Expensa destination folder.",
+                deployedDll);
+        }
+
+        return new WebsitesAddinDeploymentResult(
+            sourceFolder,
+            destinationFolder,
+            copiedCount);
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        DirectoryInfo? directory = new(AppContext.BaseDirectory);
+
+        while (directory is not null)
+        {
+            bool hasExtensionsFolder =
+                Directory.Exists(Path.Combine(directory.FullName, "Extensions"));
+
+            bool hasExpensaFolder =
+                Directory.Exists(Path.Combine(directory.FullName, "Expensa"));
+
+            if (hasExtensionsFolder && hasExpensaFolder)
+            {
+                return directory.FullName;
+            }
+
+            directory = directory.Parent;
+        }
+
+        throw new DirectoryNotFoundException(
+            "Could not find the CodexExpensa repository root. Expected a parent folder containing both Extensions and Expensa folders.");
+    }
+
+    private static string FindWebsitesAddinProjectFile(
+        string repositoryRoot)
+    {
+        string[] candidateFiles =
+        [
+            Path.Combine(repositoryRoot, "Extensions", "Modules", "WebsitesAddin", "WebsitesAddin.csproj"),
+            Path.Combine(repositoryRoot, "Extensions", "WebsitesAddin", "WebsitesAddin.csproj"),
+            Path.Combine(repositoryRoot, "Extensions", "Addins", "WebsitesAddin", "WebsitesAddin.csproj")
+        ];
+
+        foreach (string candidateFile in candidateFiles)
+        {
+            if (File.Exists(candidateFile))
+            {
+                return candidateFile;
+            }
+        }
+
+        string extensionsFolder =
+            Path.Combine(repositoryRoot, "Extensions");
+
+        string? discoveredProject =
+            Directory.Exists(extensionsFolder)
+                ? Directory.GetFiles(extensionsFolder, "WebsitesAddin.csproj", SearchOption.AllDirectories)
+                    .OrderBy(static path => path, StringComparer.OrdinalIgnoreCase)
+                    .FirstOrDefault()
+                : null;
+
+        if (!string.IsNullOrWhiteSpace(discoveredProject))
+        {
+            return discoveredProject;
+        }
+
+        throw new FileNotFoundException(
+            "Could not find WebsitesAddin.csproj under the Extensions folder.");
+    }
+
+    private static void BuildProject(
+        string projectFile)
+    {
+        ProcessStartInfo startInfo = new()
+        {
+            FileName = "dotnet",
+            Arguments = $"build \"{projectFile}\" --configuration Debug",
+            WorkingDirectory = Path.GetDirectoryName(projectFile) ?? Environment.CurrentDirectory,
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true
+        };
+
+        using Process process = new()
+        {
+            StartInfo = startInfo
+        };
+
+        process.Start();
+
+        string output = process.StandardOutput.ReadToEnd();
+        string error = process.StandardError.ReadToEnd();
+
+        process.WaitForExit();
+
+        if (process.ExitCode == 0)
+        {
+            return;
+        }
+
+        throw new InvalidOperationException(
+            $"dotnet build failed for WebsitesAddin.{Environment.NewLine}{Environment.NewLine}" +
+            $"Project:{Environment.NewLine}{projectFile}{Environment.NewLine}{Environment.NewLine}" +
+            $"Output:{Environment.NewLine}{output}{Environment.NewLine}{Environment.NewLine}" +
+            $"Error:{Environment.NewLine}{error}");
+    }
+
+    private static string FindWebsitesAddinOutputFolder(
+        string repositoryRoot)
+    {
+        string[] candidateFolders =
+        [
+            Path.Combine(repositoryRoot, "Extensions", "Modules", "WebsitesAddin", "bin", "Debug", "net8.0-windows"),
+            Path.Combine(repositoryRoot, "Extensions", "WebsitesAddin", "bin", "Debug", "net8.0-windows"),
+            Path.Combine(repositoryRoot, "Extensions", "Addins", "WebsitesAddin", "bin", "Debug", "net8.0-windows")
+        ];
+
+        foreach (string candidateFolder in candidateFolders)
+        {
+            string candidateDll =
+                Path.Combine(candidateFolder, "WebsitesAddin.dll");
+
+            if (File.Exists(candidateDll))
+            {
+                return candidateFolder;
+            }
+        }
+
+        string extensionsFolder =
+            Path.Combine(repositoryRoot, "Extensions");
+
+        string? discoveredDll =
+            Directory.Exists(extensionsFolder)
+                ? Directory.GetFiles(extensionsFolder, "WebsitesAddin.dll", SearchOption.AllDirectories)
+                    .Where(static path =>
+                        path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase) &&
+                        path.Contains($"{Path.DirectorySeparatorChar}Debug{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase) &&
+                        !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase) &&
+                        !path.Contains($"{Path.DirectorySeparatorChar}ref{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
+                    .OrderBy(static path => path, StringComparer.OrdinalIgnoreCase)
+                    .FirstOrDefault()
+                : null;
+
+        if (!string.IsNullOrWhiteSpace(discoveredDll))
+        {
+            return Path.GetDirectoryName(discoveredDll) ?? throw new DirectoryNotFoundException(discoveredDll);
+        }
+
+        throw new FileNotFoundException(
+            "Could not find the built WebsitesAddin.dll. Build the WebsitesAddin project and try again.");
+    }
+
+    private static string GetExpensaWebsitesAddinDestinationFolder(
+        string repositoryRoot)
+    {
+        return Path.Combine(
+            repositoryRoot,
+            "Expensa",
+            "CodexExpensa.App.WinForms",
+            "bin",
+            "Debug",
+            "net8.0-windows",
+            "Modules",
+            "WebsitesAddin");
+    }
+
+    private static int CopyDirectoryContents(
+        string sourceFolder,
+        string destinationFolder)
+    {
+        int copiedCount = 0;
+
+        foreach (string sourceFile in Directory.GetFiles(sourceFolder, "*", SearchOption.AllDirectories))
+        {
+            string relativePath =
+                Path.GetRelativePath(sourceFolder, sourceFile);
+
+            if (ShouldSkipDeploymentFile(relativePath))
+            {
+                continue;
+            }
+
+            string destinationFile =
+                Path.Combine(destinationFolder, relativePath);
+
+            string? destinationDirectory =
+                Path.GetDirectoryName(destinationFile);
+
+            if (!string.IsNullOrWhiteSpace(destinationDirectory))
+            {
+                Directory.CreateDirectory(destinationDirectory);
+            }
+
+            File.Copy(sourceFile, destinationFile, overwrite: true);
+            copiedCount++;
+        }
+
+        return copiedCount;
+    }
+
+    private static bool ShouldSkipDeploymentFile(
+        string relativePath)
+    {
+        string normalized =
+            relativePath.Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
+
+        if (normalized.Contains($"{Path.DirectorySeparatorChar}ref{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        string extension =
+            Path.GetExtension(relativePath);
+
+        return string.Equals(extension, ".xml", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(extension, ".deps.json", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(extension, ".runtimeconfig.json", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private sealed record WebsitesAddinDeploymentResult(
+        string SourceFolder,
+        string DestinationFolder,
+        int FileCount);
+
+
     private void RestoreMainSplitterDistance()
     {
         MainFormSettings settings = LoadMainFormSettings();
@@ -1122,6 +1416,8 @@ Describe how this add-in should be deployed or updated into Expensa.
         _commandRegistry.PopulateMenu(
             mainMenuStrip,
             this);
+
+        AddDeploymentMenu();
 
         MainMenuStrip = mainMenuStrip;
     }

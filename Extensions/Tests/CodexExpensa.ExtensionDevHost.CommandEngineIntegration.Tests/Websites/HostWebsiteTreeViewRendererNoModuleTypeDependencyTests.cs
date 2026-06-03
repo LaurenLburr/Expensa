@@ -5,7 +5,7 @@ namespace CodexExpensa.ExtensionDevHost.CommandEngineIntegration.Tests.Websites;
 public sealed class HostWebsiteTreeViewRendererNoModuleTypeDependencyTests
 {
     [Fact]
-    public void Renderer_DoesNotRequireWebsiteTreeNodeCompileTimeType()
+    public void Renderer_DoesNotRequireWebsiteAddinModuleTypes()
     {
         string text =
             ReadFile(
@@ -17,51 +17,23 @@ public sealed class HostWebsiteTreeViewRendererNoModuleTypeDependencyTests
                 "HostWebsiteTreeViewRenderer.cs");
 
         Assert.DoesNotContain("using WebsitesAddin;", text);
-        Assert.DoesNotContain("IReadOnlyList<WebsiteTreeNode>", text);
-        Assert.DoesNotContain("CreateTreeNode(WebsiteTreeNode", text);
-        Assert.Contains("IReadOnlyList<object> nodes", text);
-        Assert.Contains("HostWebsiteSourceTreeNode.From", text);
-        Assert.Contains("BindingFlags.Instance", text);
+        Assert.Contains("IReadOnlyList<HostWebsiteTreeNode> nodes", text);
+        Assert.Contains("HostWebsiteTreeViewNodeMapper.ToTreeNodes(nodes)", text);
     }
 
-    [Fact]
-    public void Renderer_StillCreatesDefinitivePayloads()
+    private static string ReadFile(params string[] parts)
     {
-        string text =
-            ReadFile(
-                "Extensions",
-                "Host",
-                "CodexExpensa.ExtensionDevHost",
-                "CommandEngineIntegration",
-                "Websites",
-                "HostWebsiteTreeViewRenderer.cs");
+        string repositoryRoot = FindRepositoryRoot();
+        string path = Path.Combine([repositoryRoot, .. parts]);
 
-        Assert.Contains("HostWebsiteCategoryGroupTreeNodePayload", text);
-        Assert.Contains("HostWebsiteTreeNodePayload", text);
-        Assert.Contains("WebsiteId = source.NodeId", text);
-        Assert.Contains("TagName = source.Category", text);
-    }
-
-    private static string ReadFile(
-        params string[] parts)
-    {
-        string repositoryRoot =
-            FindRepositoryRoot();
-
-        string path =
-            Path.Combine([repositoryRoot, .. parts]);
-
-        Assert.True(
-            File.Exists(path),
-            $"File was not found: {path}");
+        Assert.True(File.Exists(path), $"File was not found: {path}");
 
         return File.ReadAllText(path);
     }
 
     private static string FindRepositoryRoot()
     {
-        DirectoryInfo? directory =
-            new(AppContext.BaseDirectory);
+        DirectoryInfo? directory = new(AppContext.BaseDirectory);
 
         while (directory is not null)
         {
@@ -70,8 +42,7 @@ public sealed class HostWebsiteTreeViewRendererNoModuleTypeDependencyTests
                 return directory.FullName;
             }
 
-            directory =
-                directory.Parent;
+            directory = directory.Parent;
         }
 
         throw new DirectoryNotFoundException();

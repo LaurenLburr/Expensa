@@ -2,49 +2,33 @@ namespace CodexExpensa.ExtensionDevHost.CommandEngineIntegration.Websites;
 
 public static class HostWebsiteTreeViewNodeMapper
 {
-    public static TreeNode ToTreeNode(
-        HostWebsiteTreeNode websiteNode)
+    public static TreeNode ToTreeNode(HostWebsiteTreeNode websiteNode)
     {
         ArgumentNullException.ThrowIfNull(websiteNode);
 
         TreeNode treeNode = new()
         {
             Name = websiteNode.NodeId,
-            Text = websiteNode.DisplayText,
-            Tag = CreatePayload(websiteNode)
+            Text = websiteNode.DisplayText
         };
 
-        foreach (HostWebsiteTreeNode child in websiteNode.Children)
-        {
-            treeNode.Nodes.Add(ToTreeNode(child));
-        }
-
-        return treeNode;
-    }
-
-    public static IReadOnlyList<TreeNode> ToTreeNodes(
-        IReadOnlyList<HostWebsiteTreeNode> websiteNodes)
-    {
-        ArgumentNullException.ThrowIfNull(websiteNodes);
-
-        return websiteNodes
-            .Select(ToTreeNode)
-            .ToList();
-    }
-
-    private static IHostWebsiteTreeNodePayload CreatePayload(
-        HostWebsiteTreeNode websiteNode)
-    {
         if (websiteNode.Children.Count > 0)
         {
-            return new HostWebsiteCategoryGroupTreeNodePayload
+            treeNode.Tag = new HostWebsiteCategoryGroupTreeNodePayload
             {
                 NodeId = websiteNode.NodeId,
                 DisplayText = websiteNode.DisplayText
             };
+
+            foreach (HostWebsiteTreeNode child in websiteNode.Children)
+            {
+                treeNode.Nodes.Add(ToTreeNode(child));
+            }
+
+            return treeNode;
         }
 
-        return new HostWebsiteTreeNodePayload
+        treeNode.Tag = new HostWebsiteTreeNodePayload
         {
             NodeId = websiteNode.NodeId,
             WebsiteId = websiteNode.NodeId,
@@ -53,5 +37,16 @@ public static class HostWebsiteTreeViewNodeMapper
             TagName = websiteNode.Category,
             IsActive = websiteNode.IsEnabled
         };
+
+        return treeNode;
+    }
+
+    public static IReadOnlyList<TreeNode> ToTreeNodes(IReadOnlyList<HostWebsiteTreeNode> websiteNodes)
+    {
+        ArgumentNullException.ThrowIfNull(websiteNodes);
+
+        return websiteNodes
+            .Select(ToTreeNode)
+            .ToList();
     }
 }

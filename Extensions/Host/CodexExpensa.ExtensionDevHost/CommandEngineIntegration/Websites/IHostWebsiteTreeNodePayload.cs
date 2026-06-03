@@ -2,17 +2,17 @@ namespace CodexExpensa.ExtensionDevHost.CommandEngineIntegration.Websites;
 
 public interface IHostWebsiteTreeNodePayload
 {
-    string NodeId { get; }
+    HostWebsiteTreeNodeType NodeType { get; }
 
-    string WebsiteId { get; }
+    string NodeId { get; }
 
     string DisplayText { get; }
 
-    string Url { get; }
+    string WebsiteId { get; }
 
     string TagName { get; }
 
-    HostWebsiteTreeNodeType NodeType { get; }
+    string Url { get; }
 
     bool IsActive { get; }
 }

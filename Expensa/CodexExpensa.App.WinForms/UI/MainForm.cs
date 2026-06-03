@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows.Forms;
@@ -6,6 +6,7 @@ using CodexExpensa.App.WinForms.Infrastructure;
 using CodexExpensa.App.WinForms.UI.Accounts;
 using CodexExpensa.App.WinForms.UI.Banks;
 using CodexExpensa.App.WinForms.UI.Budgets;
+using CodexExpensa.App.WinForms.UI.Websites;
 using CodexExpensa.Core.Abstractions;
 using CodexExpensa.Core.Domain.Accounts;
 using CodexExpensa.Core.Domain.Banks;
@@ -29,6 +30,7 @@ public partial class MainForm : Form
     private IReadOnlyList<Bank> _bankCache = Array.Empty<Bank>();
 
     private Form? _activeChildForm;
+    private readonly WebsiteAddinTreeLoader _websiteTreeLoader = new();
 
     private readonly ContextMenuStrip _ctxBanksRoot;
     private readonly ContextMenuStrip _ctxAccountsRoot;
@@ -152,12 +154,11 @@ public partial class MainForm : Form
         SetStatus("Ready");
     }
 
-    private void MainForm_Load(object? sender, EventArgs e)
+    private async void MainForm_Load(object? sender, EventArgs e)
     {
         try
         {
-            RefreshCaches();
-            BuildNavigationTree();
+            await LoadWebsiteAddinTreeAsync();
             SelectFirstNode();
         }
         catch (Exception ex)
@@ -179,13 +180,12 @@ public partial class MainForm : Form
         }
     }
 
-    private void MenuViewRefresh_Click(object? sender, EventArgs e)
+    private async void MenuViewRefresh_Click(object? sender, EventArgs e)
     {
         try
         {
-            RefreshCaches();
-            BuildNavigationTree();
-            SetStatus("Refreshed.");
+            await LoadWebsiteAddinTreeAsync();
+            SetStatus("Websites add-in refreshed.");
         }
         catch (Exception ex)
         {
@@ -228,120 +228,53 @@ public partial class MainForm : Form
 
     private void BuildNavigationTree()
     {
-        treeNav.BeginUpdate();
+        _ = LoadWebsiteAddinTreeAsync();
+    }
+
+    private async Task LoadWebsiteAddinTreeAsync()
+    {
         try
         {
-            treeNav.Nodes.Clear();
+            SetStatus("Loading Websites add-in...");
 
-            // Banks root
-            var banksRoot = new TreeNode("Banks") { Tag = NavTag.BanksRoot };
-            foreach (var b in _bankCache.OrderBy(b => b.BankName).ThenBy(b => b.RoutingNumber))
+            WebsiteTreeLoadResult result =
+                await _websiteTreeLoader.LoadIntoTreeViewAsync(
+                    treeNav,
+                    new WebsiteTreeLoadOptions
+                    {
+                        SearchText = string.Empty,
+                        IncludeDisabled = false,
+                        MaximumRows = 500,
+                        ExpandAll = false
+                    });
+
+            if (treeNav.Nodes.Count > 0 && treeNav.SelectedNode is null)
             {
-                var label = $"{b.BankName} ({b.RoutingNumber})";
-                banksRoot.Nodes.Add(new TreeNode(label) { Tag = b.BankId });
-            }
-            banksRoot.Expand();
-            treeNav.Nodes.Add(banksRoot);
-
-            // Accounts root: Accounts -> Bank (tag=bankId) -> Account leaf (tag=accountId)
-            var accountsRoot = new TreeNode("Accounts") { Tag = NavTag.AccountsRoot };
-
-            var bankAccounts = new Dictionary<string, List<Account>>(StringComparer.Ordinal);
-            foreach (var acct in _accountCache)
-            {
-                var bankId = acct.BankId;
-                if (string.IsNullOrWhiteSpace(bankId))
-                    continue;
-
-                if (!bankAccounts.TryGetValue(bankId, out var list))
-                {
-                    list = new List<Account>();
-                    bankAccounts[bankId] = list;
-                }
-
-                list.Add(acct);
+                treeNav.SelectedNode = treeNav.Nodes[0];
             }
 
-            foreach (var kvp in bankAccounts.OrderBy(k => GetBankDisplayName(k.Key), StringComparer.OrdinalIgnoreCase))
-            {
-                var bankId = kvp.Key;
-                var accountsForBank = kvp.Value;
-
-                var bankDisplay = GetBankDisplayName(bankId);
-                var bankNode = new TreeNode(bankDisplay) { Tag = bankId };
-
-                foreach (var acct in accountsForBank
-                             .OrderBy(a => a.SortIndex)
-                             .ThenBy(a => a.AccountNickname)
-                             .ThenBy(a => a.AccountNumber))
-                {
-                    var last4 = Last4(acct.AccountNumber);
-                    var label = $"{acct.AccountNickname} - {last4}";
-                    bankNode.Nodes.Add(new TreeNode(label) { Tag = acct.AccountId });
-                }
-
-                bankNode.Expand();
-                accountsRoot.Nodes.Add(bankNode);
-            }
-
-            accountsRoot.Expand();
-            treeNav.Nodes.Add(accountsRoot);
-
-            // Budgets root
-            var budgetsRoot = new TreeNode("Budgets") { Tag = NavTag.BudgetsRoot };
-
-            // Template node immediately under Budgets
-            budgetsRoot.Nodes.Add(new TreeNode("Template") { Tag = BudgetNav.Template });
-
-            // Current node immediately under Template
-            var today = DateTime.Today;
-            budgetsRoot.Nodes.Add(new TreeNode($"Current ({today:MMM/yyyy})")
-            {
-                Tag = BudgetNav.Current(today.Year, today.Month)
-            });
-
-            // Years and months scaffold
-            var currentYear = today.Year;
-            var currentMonth = today.Month;
-
-            // Keep a simple rolling range for now.
-            var years = Enumerable.Range(currentYear - 4, 5).Reverse().ToList();
-
-            foreach (var year in years)
-            {
-                var yearNode = new TreeNode(year.ToString()) { Tag = BudgetNav.Year(year) };
-
-                List<int> months;
-
-                if (year == currentYear)
-                {
-                    // Current year: only months before Current.
-                    var count = Math.Max(0, currentMonth - 1);
-                    months = Enumerable.Range(1, count).ToList();
-                    months.Reverse(); // show most recent first
-                }
-                else
-                {
-                    // Past years: show all months Jan..Dec
-                    months = Enumerable.Range(1, 12).ToList();
-                }
-
-                foreach (var m in months)
-                {
-                    var monthName = new DateTime(year, m, 1).ToString("MMM");
-                    yearNode.Nodes.Add(new TreeNode(monthName) { Tag = BudgetNav.Month(year, m) });
-                }
-
-                yearNode.Expand();
-                budgetsRoot.Nodes.Add(yearNode);
-            }
-
-            budgetsRoot.Expand();
-            treeNav.Nodes.Add(budgetsRoot);
+            SetStatus($"Websites add-in loaded: {result.TotalCount} website row(s). {result.Message}");
         }
-        finally
+        catch (Exception ex)
         {
-            treeNav.EndUpdate();
+            treeNav.BeginUpdate();
+
+            try
+            {
+                treeNav.Nodes.Clear();
+                treeNav.Nodes.Add(
+                    new TreeNode("Websites add-in failed")
+                    {
+                        Tag = null
+                    });
+            }
+            finally
+            {
+                treeNav.EndUpdate();
+            }
+
+            SetStatus("Websites add-in failed.");
+            ShowError("Websites add-in failed", ex);
         }
     }
 
@@ -375,6 +308,14 @@ public partial class MainForm : Form
     {
         if (e.Node is null)
             return;
+
+        if (WebsiteTreeNodeTagReader.TryReadPayload(e.Node, out var websitePayload) &&
+            websitePayload is not null)
+        {
+            ShowWebsiteNode(websitePayload);
+            SetStatus($"Websites: {websitePayload.DisplayText}");
+            return;
+        }
 
         if (e.Node.Tag is NavTag tag)
         {
@@ -661,6 +602,14 @@ public partial class MainForm : Form
 
         menu.Items.Add(del);
         return menu;
+    }
+
+    private void ShowWebsiteNode(IHostWebsiteTreeNodePayload payload)
+    {
+        ArgumentNullException.ThrowIfNull(payload);
+
+        var form = new WebsiteDetailsForm(payload);
+        ShowChildForm(form);
     }
 
     private void ShowBanksLanding()

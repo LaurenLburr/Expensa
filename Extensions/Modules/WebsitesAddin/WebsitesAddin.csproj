@@ -3,12 +3,13 @@
     <TargetFramework>net8.0-windows</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
   </PropertyGroup>
-	
+
   <ItemGroup>
     <ProjectReference Include="..\..\Core\CodexExpensa.Navigation.Abstractions\CodexExpensa.Navigation.Abstractions.csproj" />
     <ProjectReference Include="..\..\..\Codex.CommandEngine\Core\Codex.CommandEngine.Core\Codex.CommandEngine.Core.csproj" />
-	  <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.0" />
   </ItemGroup>
 
   <ItemGroup>

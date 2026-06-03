@@ -5,44 +5,34 @@ namespace CodexExpensa.ExtensionDevHost.CommandEngineIntegration.Tests.Websites;
 public sealed class HostWebsiteTreeViewRendererNamespaceTests
 {
     [Fact]
-    public void Renderer_DoesNotImportWebsitesAddinForWebsiteNodes()
+    public void Renderer_DoesNotImportWebsitesAddin()
     {
-        string text =
-            ReadFile(
-                "Extensions",
-                "Host",
-                "CodexExpensa.ExtensionDevHost",
-                "CommandEngineIntegration",
-                "Websites",
-                "HostWebsiteTreeViewRenderer.cs");
+        string text = ReadFile(
+            "Extensions",
+            "Host",
+            "CodexExpensa.ExtensionDevHost",
+            "CommandEngineIntegration",
+            "Websites",
+            "HostWebsiteTreeViewRenderer.cs");
 
         Assert.DoesNotContain("using WebsitesAddin;", text);
-        Assert.DoesNotContain("IReadOnlyList<WebsiteTreeNode>", text);
-        Assert.DoesNotContain("CreateTreeNode(WebsiteTreeNode sourceNode)", text);
-        Assert.Contains("IReadOnlyList<object> nodes", text);
-        Assert.Contains("CreateTreeNode(object sourceNode)", text);
+        Assert.Contains("HostWebsiteTreeNode", text);
+        Assert.Contains("HostWebsiteTreeViewNodeMapper.ToTreeNodes", text);
     }
 
-    private static string ReadFile(
-        params string[] parts)
+    private static string ReadFile(params string[] parts)
     {
-        string repositoryRoot =
-            FindRepositoryRoot();
+        string repositoryRoot = FindRepositoryRoot();
+        string path = Path.Combine([repositoryRoot, .. parts]);
 
-        string path =
-            Path.Combine([repositoryRoot, .. parts]);
-
-        Assert.True(
-            File.Exists(path),
-            $"File was not found: {path}");
+        Assert.True(File.Exists(path), $"File was not found: {path}");
 
         return File.ReadAllText(path);
     }
 
     private static string FindRepositoryRoot()
     {
-        DirectoryInfo? directory =
-            new(AppContext.BaseDirectory);
+        DirectoryInfo? directory = new(AppContext.BaseDirectory);
 
         while (directory is not null)
         {
@@ -51,8 +41,7 @@ public sealed class HostWebsiteTreeViewRendererNamespaceTests
                 return directory.FullName;
             }
 
-            directory =
-                directory.Parent;
+            directory = directory.Parent;
         }
 
         throw new DirectoryNotFoundException();

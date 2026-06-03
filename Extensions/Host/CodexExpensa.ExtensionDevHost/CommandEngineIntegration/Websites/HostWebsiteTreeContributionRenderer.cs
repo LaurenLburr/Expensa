@@ -4,9 +4,7 @@ public static class HostWebsiteTreeContributionRenderer
 {
     public const string WebsitesRootNodeName = "websites";
 
-    public static TreeNode RenderContribution(
-        TreeView treeView,
-        HostWebsiteLoadResult result)
+    public static TreeNode RenderContribution(TreeView treeView, HostWebsiteLoadResult result)
     {
         ArgumentNullException.ThrowIfNull(treeView);
         ArgumentNullException.ThrowIfNull(result);
@@ -24,8 +22,7 @@ public static class HostWebsiteTreeContributionRenderer
         return websitesRootNode;
     }
 
-    private static TreeNode FindOrCreateWebsitesRootNode(
-        TreeView treeView)
+    private static TreeNode FindOrCreateWebsitesRootNode(TreeView treeView)
     {
         TreeNode[] existingNodes =
             treeView.Nodes.Find(WebsitesRootNodeName, searchAllChildren: false);
@@ -39,7 +36,12 @@ public static class HostWebsiteTreeContributionRenderer
         TreeNode websitesRootNode = new()
         {
             Name = WebsitesRootNodeName,
-            Text = "Websites"
+            Text = "Websites",
+            Tag = new HostWebsiteCategoryGroupTreeNodePayload
+            {
+                NodeId = WebsitesRootNodeName,
+                DisplayText = "Websites"
+            }
         };
 
         treeView.Nodes.Add(websitesRootNode);
