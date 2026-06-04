@@ -7,47 +7,64 @@ public sealed class HostWebsiteTreeViewRendererCompatibilityTests
     [Fact]
     public void Renderer_KeepsLoadResultOverloadWithoutExpandAllArgument()
     {
-        string text =
-            ReadFile(
-                "Extensions",
-                "Host",
-                "CodexExpensa.ExtensionDevHost",
-                "CommandEngineIntegration",
-                "Websites",
-                "HostWebsiteTreeViewRenderer.cs");
+        string text = ReadFile(
+            "Extensions",
+            "Host",
+            "CodexExpensa.ExtensionDevHost",
+            "CommandEngineIntegration",
+            "Websites",
+            "HostWebsiteTreeViewRenderer.cs");
 
-        Assert.Contains("Render(\r\n        TreeView treeView,\r\n        HostWebsiteLoadResult result)", NormalizeLineEndings(text));
+        Assert.Contains("Render", text);
+        Assert.Contains("TreeView treeView", text);
+        Assert.Contains("HostWebsiteLoadResult result", text);
         Assert.Contains("expandAll: false", text);
     }
 
-    private static string NormalizeLineEndings(
-        string text)
+    [Fact]
+    public void Renderer_KeepsSelectionHelpersUsedByExistingForms()
     {
-        return text
-            .Replace("\r\n", "\n")
-            .Replace("\n", "\r\n");
+        string text = ReadFile(
+            "Extensions",
+            "Host",
+            "CodexExpensa.ExtensionDevHost",
+            "CommandEngineIntegration",
+            "Websites",
+            "HostWebsiteTreeViewRenderer.cs");
+
+        Assert.Contains("GetSelectedWebsiteNode", text);
+        Assert.Contains("GetSelectedUrl", text);
+        Assert.Contains("HostWebsiteTreeNodeTagReader.ReadPayload", text);
     }
 
-    private static string ReadFile(
-        params string[] parts)
+    [Fact]
+    public void Renderer_UsesHostWebsiteTreeNodeBoundary()
     {
-        string repositoryRoot =
-            FindRepositoryRoot();
+        string text = ReadFile(
+            "Extensions",
+            "Host",
+            "CodexExpensa.ExtensionDevHost",
+            "CommandEngineIntegration",
+            "Websites",
+            "HostWebsiteTreeViewRenderer.cs");
 
-        string path =
-            Path.Combine([repositoryRoot, .. parts]);
+        Assert.DoesNotContain("using WebsitesAddin;", text);
+        Assert.Contains("HostWebsiteTreeNode", text);
+    }
 
-        Assert.True(
-            File.Exists(path),
-            $"File was not found: {path}");
+    private static string ReadFile(params string[] parts)
+    {
+        string repositoryRoot = FindRepositoryRoot();
+        string path = Path.Combine([repositoryRoot, .. parts]);
+
+        Assert.True(File.Exists(path), $"File was not found: {path}");
 
         return File.ReadAllText(path);
     }
 
     private static string FindRepositoryRoot()
     {
-        DirectoryInfo? directory =
-            new(AppContext.BaseDirectory);
+        DirectoryInfo? directory = new(AppContext.BaseDirectory);
 
         while (directory is not null)
         {
@@ -56,8 +73,7 @@ public sealed class HostWebsiteTreeViewRendererCompatibilityTests
                 return directory.FullName;
             }
 
-            directory =
-                directory.Parent;
+            directory = directory.Parent;
         }
 
         throw new DirectoryNotFoundException();

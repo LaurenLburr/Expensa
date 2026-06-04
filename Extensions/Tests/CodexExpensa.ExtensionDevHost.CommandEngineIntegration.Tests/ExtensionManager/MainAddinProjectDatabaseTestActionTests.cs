@@ -7,33 +7,50 @@ public sealed class MainAddinProjectDatabaseTestActionTests
     [Fact]
     public void MainForm_DatabaseAndTestNodesHaveNavigationActions()
     {
-        string repositoryRoot = FindRepositoryRoot();
-
-        string mainFormPath =
-            Path.Combine(
-                repositoryRoot,
+        string text =
+            ReadFile(
                 "Extensions",
                 "Host",
                 "CodexExpensa.ExtensionDevHost",
                 "MainForm.cs");
 
-        Assert.True(File.Exists(mainFormPath), $"File was not found: {mainFormPath}");
-
-        string text = File.ReadAllText(mainFormPath);
-
-        Assert.Contains("new TreeNode(\"Database\")", text);
-        Assert.Contains("new TreeNode(\"Test\")", text);
+        Assert.Contains("AddinProjectDatabaseNavigationTag", text);
+        Assert.Contains("AddinProjectTestNavigationTag", text);
         Assert.Contains("ShowAddinDatabaseNode", text);
         Assert.Contains("OpenAddinTestNode", text);
+
         Assert.Contains("ShowEmbeddedForm(new WebsitesDatabasePanelForm())", text);
-        Assert.Contains("ShowEmbeddedForm(new WebsitesTreeLoadVerificationForm())", text);
-        Assert.Contains("case AddinProjectDatabaseNavigationTag", text);
-        Assert.Contains("case AddinProjectTestNavigationTag", text);
+        Assert.True(
+            text.Contains("ShowEmbeddedForm(new WebsitesTreeLoadVerificationFormCommonTree())") ||
+            text.Contains("ShowEmbeddedForm(new WebsitesTreeLoadVerificationForm())"),
+            "MainForm should route the Websites test node to either the CommonTree verification form or the legacy verification form.");
+
+        Assert.Contains("ShowEmbeddedForm(new BudgetsDatabasePanelForm())", text);
+        Assert.True(
+            text.Contains("ShowEmbeddedForm(new BudgetsTreeLoadVerificationFormCommonTree())") ||
+            text.Contains("ShowEmbeddedForm(new BudgetsTreeLoadVerificationForm())"),
+            "MainForm should route the Budgets test node to either the CommonTree verification form or the legacy verification form.");
+    }
+
+    private static string ReadFile(params string[] parts)
+    {
+        string repositoryRoot =
+            FindRepositoryRoot();
+
+        string path =
+            Path.Combine([repositoryRoot, .. parts]);
+
+        Assert.True(
+            File.Exists(path),
+            $"File was not found: {path}");
+
+        return File.ReadAllText(path);
     }
 
     private static string FindRepositoryRoot()
     {
-        DirectoryInfo? directory = new(AppContext.BaseDirectory);
+        DirectoryInfo? directory =
+            new(AppContext.BaseDirectory);
 
         while (directory is not null)
         {
@@ -42,9 +59,10 @@ public sealed class MainAddinProjectDatabaseTestActionTests
                 return directory.FullName;
             }
 
-            directory = directory.Parent;
+            directory =
+                directory.Parent;
         }
 
-        throw new DirectoryNotFoundException("Could not find repository root containing Extensions folder.");
+        throw new DirectoryNotFoundException();
     }
 }

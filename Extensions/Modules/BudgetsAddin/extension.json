@@ -1,0 +1,7 @@
+{
+  "name": "BudgetsAddin",
+  "displayName": "Budgets Add-in",
+  "description": "Loads budget year and month nodes for Expensa.",
+  "version": "0.1.0",
+  "entryAssembly": "BudgetsAddin.dll"
+}

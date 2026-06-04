@@ -5,6 +5,8 @@ using CodexExpensa.ExtensionDevHost.Commands.Services;
 using CodexExpensa.ExtensionDevHost.CommandEngineIntegration;
 using CodexExpensa.ExtensionDevHost.CommandEngineIntegration.ExtensionManager;
 using CodexExpensa.ExtensionDevHost.CommandEngineIntegration.Websites;
+using CodexExpensa.ExtensionDevHost.CommandEngineIntegration.Budgets;
+using CodexExpensa.ExtensionDevHost.CommandEngineIntegration.ExpensaLoader;
 using CodexExpensa.ExtensionDevHost.Models;
 using CodexExpensa.ExtensionDevHost.Services;
 using CodexExpensa.ExtensionDevHost.UI;
@@ -133,6 +135,7 @@ public MainForm()
             tools.Nodes.Add(CreateCommandNode("Folder Watcher / Auto Unzip", "Tools.FolderWatcherAutoUnzip"));
             tools.Nodes.Add(CreateCommandNode("CommandEngine Runtime", "Tools.CommandEngineRuntime"));
             tools.Nodes.Add(CreateCommandNode("Deploy Websites Add-in to Expensa", "Tools.DeployWebsitesAddinToExpensa"));
+            tools.Nodes.Add(CreateCommandNode("Expensa Add-in Loader Test", "Tools.ExpensaAddinLoaderTest"));
 
             TreeNode docs = new("Docs")
             {
@@ -591,6 +594,10 @@ private static TreeNode CreateCommandNode(string text, string commandKey)
                 ShowStandardAiDocsUpdatePanel();
                 break;
 
+            case "Tools.ExpensaAddinLoaderTest":
+                ShowEmbeddedForm(new ExpensaAddinLoaderTestForm());
+                break;
+
             default:
                 ShowLandingText(
                     $"Command:{Environment.NewLine}{commandTag.CommandKey}{Environment.NewLine}{Environment.NewLine}" +
@@ -635,9 +642,12 @@ private static TreeNode CreateCommandNode(string text, string commandKey)
                 DeployWebsitesAddinToExpensa();
                 break;
 
+
             case "Docs.UpdateStandardAiDocs":
                 ShowStandardAiDocsUpdatePanel();
                 break;
+
+          
 
             default:
                 InvokeCommand(commandTag.CommandKey);
@@ -681,6 +691,12 @@ private static TreeNode CreateCommandNode(string text, string commandKey)
             return;
         }
 
+        if (IsBudgetsAddinProject(tag.ProjectName))
+        {
+            ShowEmbeddedForm(new BudgetsDatabasePanelForm());
+            return;
+        }
+
         ShowLandingText(
             $"{tag.ProjectName} Database{Environment.NewLine}{Environment.NewLine}" +
             $"Project folder:{Environment.NewLine}{tag.ProjectFolder}{Environment.NewLine}{Environment.NewLine}" +
@@ -691,7 +707,13 @@ private static TreeNode CreateCommandNode(string text, string commandKey)
     {
         if (IsWebsitesAddinProject(tag.ProjectName))
         {
-            ShowEmbeddedForm(new WebsitesTreeLoadVerificationForm());
+            ShowEmbeddedForm(new WebsitesTreeLoadVerificationFormCommonTree());
+            return;
+        }
+
+        if (IsBudgetsAddinProject(tag.ProjectName))
+        {
+            ShowEmbeddedForm(new BudgetsTreeLoadVerificationFormCommonTree());
             return;
         }
 
@@ -706,6 +728,14 @@ private static TreeNode CreateCommandNode(string text, string commandKey)
         return string.Equals(projectName, "WebsitesAddin", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(projectName, "Websites Add-in", StringComparison.OrdinalIgnoreCase) ||
             projectName.Contains("Website", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsBudgetsAddinProject(
+        string projectName)
+    {
+        return string.Equals(projectName, "BudgetsAddin", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(projectName, "Budgets Add-in", StringComparison.OrdinalIgnoreCase) ||
+            projectName.Contains("Budget", StringComparison.OrdinalIgnoreCase);
     }
 
     private void ShowCommandEngineRuntimePanel()

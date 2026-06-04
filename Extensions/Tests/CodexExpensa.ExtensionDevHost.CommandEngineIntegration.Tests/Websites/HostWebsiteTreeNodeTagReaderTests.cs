@@ -1,4 +1,3 @@
-using System.Windows.Forms;
 using CodexExpensa.ExtensionDevHost.CommandEngineIntegration.Websites;
 using Xunit;
 
@@ -7,67 +6,85 @@ namespace CodexExpensa.ExtensionDevHost.CommandEngineIntegration.Tests.Websites;
 public sealed class HostWebsiteTreeNodeTagReaderTests
 {
     [Fact]
-    public void Reader_ReadsWebsiteIdFromPayloadInterface()
+    public void Reader_ReturnsWebsiteIdFromPayloadInterface()
     {
-        TreeNode treeNode =
-            new("Banking")
+        TreeNode node = new("Website")
+        {
+            Tag = new HostWebsiteTreeNodePayload
             {
-                Tag =
-                    new HostWebsiteTreeNodePayload
-                    {
-                        NodeId = "website-123",
-                        WebsiteId = "website-123",
-                        DisplayText = "Banking Demo",
-                        Url = "https://example.com/bank",
-                        TagName = "banking.demo",
-                        IsActive = true
-                    }
-            };
+                NodeId = "website-123",
+                WebsiteId = "website-123",
+                DisplayText = "Website",
+                TagName = "Banking",
+                Url = "https://example.test",
+                IsActive = true
+            }
+        };
 
-        string websiteId =
-            HostWebsiteTreeNodeTagReader.ReadWebsiteId(treeNode);
-
-        Assert.Equal("website-123", websiteId);
+        Assert.Equal("website-123", HostWebsiteTreeNodeTagReader.ReadWebsiteId(node));
     }
 
     [Fact]
-    public void Reader_ReadsWebsiteIdFromNodeMappedPayload()
+    public void Reader_ReturnsEmptyWebsiteIdForGroupNode()
     {
-        HostWebsiteTreeNode websiteNode =
-            new()
+        TreeNode node = new("Banking")
+        {
+            Tag = new HostWebsiteCategoryGroupTreeNodePayload
             {
-                NodeId = "website-456",
-                DisplayText = "Demo Bank",
-                Url = "https://example.com/bank",
-                Category = "Banking"
-            };
+                NodeId = "tag:Banking",
+                DisplayText = "Banking"
+            }
+        };
 
-        TreeNode treeNode =
-            HostWebsiteTreeViewNodeMapper.ToTreeNode(websiteNode);
-
-        string websiteId =
-            HostWebsiteTreeNodeTagReader.ReadWebsiteId(treeNode);
-
-        Assert.Equal("website-456", websiteId);
+        Assert.Equal(string.Empty, HostWebsiteTreeNodeTagReader.ReadWebsiteId(node));
     }
 
     [Fact]
-    public void Reader_ReturnsEmptyWebsiteIdWhenTagIsNotPayloadInterface()
+    public void Reader_UsesCompatibilityFallbackWhenTagIsNotPayloadInterface()
     {
-        TreeNode treeNode =
-            new("Banking")
+        TreeNode parent = new("Group")
+        {
+            Name = "tag:Banking"
+        };
+
+        TreeNode node = new("Website")
+        {
+            Name = "website-789",
+            Tag = "not a payload"
+        };
+
+        parent.Nodes.Add(node);
+
+        Assert.Equal("website-789", HostWebsiteTreeNodeTagReader.ReadWebsiteId(node));
+    }
+
+    [Fact]
+    public void Reader_DetectsWebsiteAndGroupNodeTypes()
+    {
+        TreeNode websiteNode = new("Website")
+        {
+            Tag = new HostWebsiteTreeNodePayload
             {
-                Tag =
-                    new
-                    {
-                        NodeId = "website-789",
-                        Url = "https://example.com/bank"
-                    }
-            };
+                NodeId = "website-123",
+                WebsiteId = "website-123",
+                DisplayText = "Website",
+                TagName = "Banking",
+                Url = "https://example.test",
+                IsActive = true
+            }
+        };
 
-        string websiteId =
-            HostWebsiteTreeNodeTagReader.ReadWebsiteId(treeNode);
+        TreeNode groupNode = new("Banking")
+        {
+            Tag = new HostWebsiteCategoryGroupTreeNodePayload
+            {
+                NodeId = "tag:Banking",
+                DisplayText = "Banking"
+            }
+        };
 
-        Assert.Equal(string.Empty, websiteId);
+        Assert.True(HostWebsiteTreeNodeTagReader.IsWebsiteNode(websiteNode));
+        Assert.False(HostWebsiteTreeNodeTagReader.IsWebsiteNode(groupNode));
+        Assert.True(HostWebsiteTreeNodeTagReader.IsCategoryGroupNode(groupNode));
     }
 }
