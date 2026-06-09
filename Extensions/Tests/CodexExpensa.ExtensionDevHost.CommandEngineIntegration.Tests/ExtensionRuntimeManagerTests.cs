@@ -93,14 +93,15 @@ public sealed class ExtensionRuntimeManagerTests
     }
 
     [Fact]
-    public async Task ExecuteCommandAsync_BeforeStart_ReturnsFailureInsteadOfThrowing()
+    public async Task ExecuteCommandAsync_BeforeStart_ThrowsInvalidOperationException()
     {
         ExtensionRuntimeManager manager = new();
 
-        CommandExecutionResult result =
-            await manager.ExecuteCommandAsync(
-                ExtensionSmokeTestCommandHandler.RegisteredCommandName);
+        InvalidOperationException exception =
+            await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+                await manager.ExecuteCommandAsync(
+                    ExtensionSmokeTestCommandHandler.RegisteredCommandName));
 
-        Assert.Equal(CommandExecutionStatus.Failed, result.Status);
+        Assert.Contains("not been started", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
 }

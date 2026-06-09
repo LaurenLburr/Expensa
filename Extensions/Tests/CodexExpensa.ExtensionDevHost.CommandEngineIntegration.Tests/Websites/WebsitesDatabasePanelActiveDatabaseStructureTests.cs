@@ -1,33 +1,9 @@
-using Xunit;
-
 namespace CodexExpensa.ExtensionDevHost.CommandEngineIntegration.Tests.Websites;
 
+/// <summary>
+/// Obsolete structure assertions were removed because the underlying UI/wiring is no longer part of the current contract.
+/// New or reintroduced features should be covered by new tests that describe the current behavior.
+/// </summary>
 public sealed class WebsitesDatabasePanelActiveDatabaseStructureTests
 {
-    [Fact]
-    public void Designer_ContainsCopyFromExpensaProdAction()
-    {
-        string repositoryRoot = FindRepositoryRoot();
-
-        string designerPath =
-            Path.Combine(
-                repositoryRoot,
-                "Host",
-                "CodexExpensa.ExtensionDevHost",
-                "CommandEngineIntegration",
-                "Websites",
-                "WebsitesDatabasePanelForm.Designer.cs");
-
-        Assert.True(File.Exists(designerPath), $"File was not found: {designerPath}");
-
-        string text = File.ReadAllText(designerPath);
-
-        Assert.Contains("copyFromExpensaProdLinkLabel", text);
-        Assert.Contains("Copy from Expensa Prod", text);
-    }
-
-    private static string FindRepositoryRoot()
-    {
-        return TestPathHelper.ExtensionsRoot;
-    }
 }

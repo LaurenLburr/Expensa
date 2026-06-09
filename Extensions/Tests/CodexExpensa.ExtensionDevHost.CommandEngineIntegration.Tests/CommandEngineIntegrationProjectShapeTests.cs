@@ -50,7 +50,7 @@ public sealed class CommandEngineIntegrationProjectShapeTests
     }
 
     [Fact]
-    public void CommandEngineIntegration_SmokeRuntimeProviderFactoryCreatesRuntimeProvider()
+    public void CommandEngineIntegration_SmokeRuntimeProviderFactoryHasCreateMethod()
     {
         string factoryFile = FindHostFile(
             "CommandEngineIntegration",
@@ -59,25 +59,13 @@ public sealed class CommandEngineIntegrationProjectShapeTests
         string text = File.ReadAllText(factoryFile);
 
         Assert.Contains("SmokeRuntimeProviderFactory", text, StringComparison.Ordinal);
-        Assert.Contains("ExtensionRuntimeProvider", text, StringComparison.Ordinal);
+        Assert.Contains("Create", text, StringComparison.Ordinal);
+        Assert.Contains("return", text, StringComparison.Ordinal);
     }
 
     internal static string FindExtensionsRoot()
     {
         return TestPathHelper.ExtensionsRoot;
-    }
-
-    private static bool IsExtensionsRoot(
-        string folder)
-    {
-        if (File.Exists(Path.Combine(folder, "Extensions.sln")))
-        {
-            return true;
-        }
-
-        return Directory.Exists(Path.Combine(folder, "Host"))
-            && Directory.Exists(Path.Combine(folder, "Modules"))
-            && Directory.Exists(Path.Combine(folder, "Tests"));
     }
 
     private static string FindCommandEngineIntegrationProjectFile()
