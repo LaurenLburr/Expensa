@@ -12,7 +12,6 @@ public sealed class CommandExecutionQueueDesignerWiringTests
         string designerPath =
             Path.Combine(
                 repositoryRoot,
-                "Extensions",
                 "Host",
                 "CodexExpensa.ExtensionDevHost",
                 "CommandEngineIntegration",
@@ -31,30 +30,6 @@ public sealed class CommandExecutionQueueDesignerWiringTests
 
     private static string FindRepositoryRoot()
     {
-        DirectoryInfo? directory = new(AppContext.BaseDirectory);
-
-        while (directory is not null)
-        {
-            if (Directory.Exists(Path.Combine(directory.FullName, "Extensions")))
-            {
-                return directory.FullName;
-            }
-
-            directory = directory.Parent;
-        }
-
-        DirectoryInfo? currentDirectory = new(Directory.GetCurrentDirectory());
-
-        while (currentDirectory is not null)
-        {
-            if (Directory.Exists(Path.Combine(currentDirectory.FullName, "Extensions")))
-            {
-                return currentDirectory.FullName;
-            }
-
-            currentDirectory = currentDirectory.Parent;
-        }
-
-        throw new DirectoryNotFoundException("Could not find repository root containing Extensions folder.");
+        return TestPathHelper.ExtensionsRoot;
     }
 }

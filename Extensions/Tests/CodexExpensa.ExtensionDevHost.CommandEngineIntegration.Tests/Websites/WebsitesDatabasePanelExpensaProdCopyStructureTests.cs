@@ -7,9 +7,9 @@ public sealed class WebsitesDatabasePanelExpensaProdCopyStructureTests
     [Fact]
     public void DatabasePanel_HasCopyFromExpensaProdLink()
     {
-        string designerText = ReadFile("Extensions", "Host", "CodexExpensa.ExtensionDevHost", "CommandEngineIntegration", "Websites", "WebsitesDatabasePanelForm.Designer.cs");
-        string formText = ReadFile("Extensions", "Host", "CodexExpensa.ExtensionDevHost", "CommandEngineIntegration", "Websites", "WebsitesDatabasePanelForm.cs");
-        string serviceText = ReadFile("Extensions", "Host", "CodexExpensa.ExtensionDevHost", "CommandEngineIntegration", "Websites", "HostWebsiteExpensaProdDatabaseCopyService.cs");
+        string designerText = ReadFile("Host", "CodexExpensa.ExtensionDevHost", "CommandEngineIntegration", "Websites", "WebsitesDatabasePanelForm.Designer.cs");
+        string formText = ReadFile("Host", "CodexExpensa.ExtensionDevHost", "CommandEngineIntegration", "Websites", "WebsitesDatabasePanelForm.cs");
+        string serviceText = ReadFile("Host", "CodexExpensa.ExtensionDevHost", "CommandEngineIntegration", "Websites", "HostWebsiteExpensaProdDatabaseCopyService.cs");
 
         Assert.Contains("copyFromExpensaProdLinkLabel", designerText);
         Assert.Contains("Copy from Expensa Prod", designerText);
@@ -30,18 +30,6 @@ public sealed class WebsitesDatabasePanelExpensaProdCopyStructureTests
 
     private static string FindRepositoryRoot()
     {
-        DirectoryInfo? directory = new(AppContext.BaseDirectory);
-
-        while (directory is not null)
-        {
-            if (Directory.Exists(Path.Combine(directory.FullName, "Extensions")))
-            {
-                return directory.FullName;
-            }
-
-            directory = directory.Parent;
-        }
-
-        throw new DirectoryNotFoundException();
+        return TestPathHelper.ExtensionsRoot;
     }
 }

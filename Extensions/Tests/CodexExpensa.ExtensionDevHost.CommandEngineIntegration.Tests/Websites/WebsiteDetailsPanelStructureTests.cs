@@ -8,7 +8,7 @@ public sealed class WebsiteDetailsPanelStructureTests
     public void DetailsPanel_LoadsWebsitePayloadDetails()
     {
         string text = ReadFile(
-            "Extensions", "Host", "CodexExpensa.ExtensionDevHost",
+            "Host", "CodexExpensa.ExtensionDevHost",
             "CommandEngineIntegration", "Websites", "WebsitesDetailsPanel.cs");
 
         Assert.Contains("ShowWebsite", text);
@@ -22,11 +22,11 @@ public sealed class WebsiteDetailsPanelStructureTests
     public void Form_LoadsDetailsOnTreeSelection()
     {
         string formText = ReadFile(
-            "Extensions", "Host", "CodexExpensa.ExtensionDevHost",
+            "Host", "CodexExpensa.ExtensionDevHost",
             "CommandEngineIntegration", "Websites", "WebsitesTreeLoadVerificationForm.cs");
 
         string detailsText = ReadFile(
-            "Extensions", "Host", "CodexExpensa.ExtensionDevHost",
+            "Host", "CodexExpensa.ExtensionDevHost",
             "CommandEngineIntegration", "Websites", "WebsitesTreeLoadVerificationForm.Details.cs");
 
         Assert.Contains("websitesTreeView_AfterSelect", formText);
@@ -46,15 +46,6 @@ public sealed class WebsiteDetailsPanelStructureTests
 
     private static string FindRepositoryRoot()
     {
-        DirectoryInfo? directory = new(AppContext.BaseDirectory);
-        while (directory is not null)
-        {
-            if (Directory.Exists(Path.Combine(directory.FullName, "Extensions")))
-            {
-                return directory.FullName;
-            }
-            directory = directory.Parent;
-        }
-        throw new DirectoryNotFoundException();
+        return TestPathHelper.ExtensionsRoot;
     }
 }

@@ -1,0 +1,2 @@
+dotnet test D:\Git\CodexExpensa\Extensions\Tests\CodexExpensa.ExtensionDevHost.CommandEngineIntegration.Tests\CodexExpensa.ExtensionDevHost.CommandEngineIntegration.Tests.csproj --logger "trx;LogFileName=D:\Git\CodexExpensa\Extensions\TestResults\CommandEngineIntegrationTests.trx" --results-directory TestResults
+pause

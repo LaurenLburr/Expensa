@@ -27,6 +27,16 @@ public static class ExpensaAddinRuntimeDescriptorFactory
                 DefaultCommandName = "Budgets.LoadTree"
             },
 
+            ExpensaAddinLoaderKind.Payees => new ExpensaAddinRuntimeDescriptor
+            {
+                Kind = kind,
+                AddinName = "PayeesAddin",
+                AssemblyFileName = "PayeesAddin.dll",
+                SmokeRunnerTypeName = "PayeesAddin.PayeeLoadRuntimeSmokeRunner",
+                RequestTypeName = "PayeesAddin.PayeeLoadRequest",
+                DefaultCommandName = "Payees.LoadTree"
+            },
+
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unsupported Expensa add-in loader kind.")
         };
     }

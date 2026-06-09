@@ -10,4 +10,5 @@
   <Project Path="D:/Git/CodexExpensa/Expensa/CodexExpensa.Data.Sqlite/CodexExpensa.Data.Sqlite.csproj" />
   <Project Path="D:/Git/CodexExpensa/Expensa/CodexExpensa.Security.Windows/CodexExpensa.Security.Windows.csproj" />
   <Project Path="D:/Git/CodexExpensa/Expensa/Schema/CodexExpensa.Db.Schema/CodexExpensa.Db.Schema.csproj" />
+  <Project Path="Tests/CodexExpensa.App.WinForms.Tests/CodexExpensa.App.WinForms.Tests.csproj" />
 </Solution>

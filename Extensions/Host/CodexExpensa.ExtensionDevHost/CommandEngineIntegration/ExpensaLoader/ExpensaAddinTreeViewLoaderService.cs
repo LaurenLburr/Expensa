@@ -134,7 +134,8 @@ public sealed class ExpensaAddinTreeViewLoaderService
         return
         [
             ExpensaAddinLoaderKind.Websites,
-            ExpensaAddinLoaderKind.Budgets
+            ExpensaAddinLoaderKind.Budgets,
+            ExpensaAddinLoaderKind.Payees
         ];
     }
 }

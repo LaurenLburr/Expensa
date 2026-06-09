@@ -106,7 +106,7 @@ public sealed partial class ExpensaAddinLoaderTestForm : Form
     {
         SetLoadingState(
             isLoading: true,
-            "Loading Websites and Budgets under one Expensa Add-ins root...");
+            "Loading Websites, Budgets, and Payees under one Expensa Add-ins root...");
 
         try
         {
@@ -198,6 +198,7 @@ public sealed partial class ExpensaAddinLoaderTestForm : Form
         return addinComboBox.SelectedItem?.ToString() switch
         {
             "Budgets" => ExpensaAddinLoaderKind.Budgets,
+            "Payees" => ExpensaAddinLoaderKind.Payees,
             _ => ExpensaAddinLoaderKind.Websites
         };
     }

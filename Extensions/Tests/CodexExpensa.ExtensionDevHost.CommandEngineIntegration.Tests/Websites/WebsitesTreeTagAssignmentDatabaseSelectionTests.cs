@@ -9,7 +9,6 @@ public sealed class WebsitesTreeTagAssignmentDatabaseSelectionTests
     {
         string text =
             ReadFile(
-                "Extensions",
                 "Host",
                 "CodexExpensa.ExtensionDevHost",
                 "CommandEngineIntegration",
@@ -34,18 +33,6 @@ public sealed class WebsitesTreeTagAssignmentDatabaseSelectionTests
 
     private static string FindRepositoryRoot()
     {
-        DirectoryInfo? directory = new(AppContext.BaseDirectory);
-
-        while (directory is not null)
-        {
-            if (Directory.Exists(Path.Combine(directory.FullName, "Extensions")))
-            {
-                return directory.FullName;
-            }
-
-            directory = directory.Parent;
-        }
-
-        throw new DirectoryNotFoundException();
+        return TestPathHelper.ExtensionsRoot;
     }
 }

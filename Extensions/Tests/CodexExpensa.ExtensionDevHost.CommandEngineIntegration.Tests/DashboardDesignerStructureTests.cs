@@ -11,7 +11,6 @@ public sealed class DashboardDesignerStructureTests
     {
         string formPath = Path.Combine(
             RepositoryRoot,
-            "Extensions",
             "Host",
             "CodexExpensa.ExtensionDevHost",
             "CommandEngineIntegration",
@@ -32,7 +31,6 @@ public sealed class DashboardDesignerStructureTests
     {
         string designerPath = Path.Combine(
             RepositoryRoot,
-            "Extensions",
             "Host",
             "CodexExpensa.ExtensionDevHost",
             "CommandEngineIntegration",
@@ -54,7 +52,6 @@ public sealed class DashboardDesignerStructureTests
     {
         string resxPath = Path.Combine(
             RepositoryRoot,
-            "Extensions",
             "Host",
             "CodexExpensa.ExtensionDevHost",
             "CommandEngineIntegration",
@@ -65,31 +62,6 @@ public sealed class DashboardDesignerStructureTests
 
     private static string FindRepositoryRoot()
     {
-        DirectoryInfo? directory = new(AppContext.BaseDirectory);
-
-        while (directory is not null)
-        {
-            if (Directory.Exists(Path.Combine(directory.FullName, "Extensions")))
-            {
-                return directory.FullName;
-            }
-
-            directory = directory.Parent;
-        }
-
-        DirectoryInfo? currentDirectory = new(Directory.GetCurrentDirectory());
-
-        while (currentDirectory is not null)
-        {
-            if (Directory.Exists(Path.Combine(currentDirectory.FullName, "Extensions")))
-            {
-                return currentDirectory.FullName;
-            }
-
-            currentDirectory = currentDirectory.Parent;
-        }
-
-        throw new DirectoryNotFoundException(
-            "Could not find repository root containing the Extensions folder.");
+        return TestPathHelper.ExtensionsRoot;
     }
 }

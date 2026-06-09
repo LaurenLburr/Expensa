@@ -119,7 +119,7 @@ partial class ExpensaAddinLoaderTestForm
         addinComboBox.Dock = DockStyle.Fill;
         addinComboBox.DropDownStyle = ComboBoxStyle.DropDownList;
         addinComboBox.FormattingEnabled = true;
-        addinComboBox.Items.AddRange(new object[] { "Websites", "Budgets" });
+        addinComboBox.Items.AddRange(new object[] { "Websites", "Budgets", "Payees" });
         addinComboBox.Location = new Point(113, 3);
         addinComboBox.Name = "addinComboBox";
         addinComboBox.Size = new Size(214, 23);

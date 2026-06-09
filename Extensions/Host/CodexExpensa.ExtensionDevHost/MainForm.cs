@@ -4,8 +4,6 @@ using CodexExpensa.ExtensionDevHost.Commands;
 using CodexExpensa.ExtensionDevHost.Commands.Services;
 using CodexExpensa.ExtensionDevHost.CommandEngineIntegration;
 using CodexExpensa.ExtensionDevHost.CommandEngineIntegration.ExtensionManager;
-using CodexExpensa.ExtensionDevHost.CommandEngineIntegration.Websites;
-using CodexExpensa.ExtensionDevHost.CommandEngineIntegration.Budgets;
 using CodexExpensa.ExtensionDevHost.CommandEngineIntegration.ExpensaLoader;
 using CodexExpensa.ExtensionDevHost.Models;
 using CodexExpensa.ExtensionDevHost.Services;
@@ -24,6 +22,10 @@ public partial class MainForm : Form
     private readonly string _mainFormSettingsPath;
     private readonly ExtensionProjectRegistrationStore _registrationStore = new();
     private readonly WorkspaceDocumentService _workspaceDocuments = new();
+    private readonly AddinProjectUiSurfaceResolver _addinUiSurfaceResolver = new();
+
+    private readonly ContextMenuStrip _addinProjectContextMenu = new();
+    private string _contextMenuProjectName = string.Empty;
 
     private DocsEditorForm? _docsEditorForm;
 
@@ -68,11 +70,39 @@ public MainForm()
         mainSplitContainer.SplitterMoved += (_, _) => SaveMainSplitterDistance();
         navigationTreeView.AfterExpand += NavigationTreeView_ExpansionChanged;
         navigationTreeView.AfterCollapse += NavigationTreeView_ExpansionChanged;
+
+        ConfigureAddinProjectContextMenu();
     }
 
     public CommandRegistry CommandRegistry => _commandRegistry;
 
     public string CommandConfigPath => _commandConfigPath;
+
+    private void ConfigureAddinProjectContextMenu()
+    {
+        _addinProjectContextMenu.Items.Clear();
+
+        ToolStripMenuItem enableMenuItem = new("Enable Add-in");
+        enableMenuItem.Click += (_, _) => SetContextAddinEnabled(isEnabled: true);
+
+        ToolStripMenuItem disableMenuItem = new("Disable Add-in");
+        disableMenuItem.Click += (_, _) => SetContextAddinEnabled(isEnabled: false);
+
+        _addinProjectContextMenu.Items.Add(enableMenuItem);
+        _addinProjectContextMenu.Items.Add(disableMenuItem);
+    }
+
+    private void SetContextAddinEnabled(bool isEnabled)
+    {
+        if (string.IsNullOrWhiteSpace(_contextMenuProjectName))
+        {
+            return;
+        }
+
+        SetAddinProjectEnabled(_contextMenuProjectName, isEnabled);
+        BuildNavigationTree();
+        RebuildMenu();
+    }
 
     private void RegisterCommands()
     {
@@ -134,7 +164,7 @@ public MainForm()
             tools.Nodes.Add(CreateCommandNode("Query Catalog", "Tools.QueryCatalog"));
             tools.Nodes.Add(CreateCommandNode("Folder Watcher / Auto Unzip", "Tools.FolderWatcherAutoUnzip"));
             tools.Nodes.Add(CreateCommandNode("CommandEngine Runtime", "Tools.CommandEngineRuntime"));
-            tools.Nodes.Add(CreateCommandNode("Deploy Websites Add-in to Expensa", "Tools.DeployWebsitesAddinToExpensa"));
+            tools.Nodes.Add(CreateCommandNode("Deploy All Enabled Add-ins to Expensa", "Tools.DeployAllAddinsToExpensa"));
             tools.Nodes.Add(CreateCommandNode("Expensa Add-in Loader Test", "Tools.ExpensaAddinLoaderTest"));
 
             TreeNode docs = new("Docs")
@@ -315,11 +345,24 @@ public MainForm()
         string projectFolder = ResolveProjectFolder(registration);
         string docsFolder = Path.Combine(projectFolder, "Docs");
 
-        TreeNode projectNode = new(registration.ProjectName)
+        bool isEnabled =
+            IsAddinProjectEnabled(registration.ProjectName);
+
+        TreeNode projectNode = new(isEnabled ? registration.ProjectName : $"{registration.ProjectName} (Disabled)")
         {
             Name = $"addin.{CreateSafeTreeNodeName(registration.ProjectName)}",
             Tag = new ProjectNavigationTag(registration.ProjectName, projectFolder)
         };
+
+        projectNode.ForeColor =
+            isEnabled
+                ? SystemColors.WindowText
+                : SystemColors.GrayText;
+
+        projectNode.ToolTipText =
+            isEnabled
+                ? "Add-in is enabled."
+                : "Add-in is disabled. Disabled add-ins are excluded from Deploy All and the Deploy menu.";
 
         projectNode.Nodes.Add(CreateProjectDocNode(
             "Catch-Up Doc",
@@ -445,7 +488,31 @@ private static TreeNode CreateCommandNode(string text, string commandKey)
         }
 
         navigationTreeView.SelectedNode = e.Node;
+
+        if (e.Button == MouseButtons.Right &&
+            e.Node.Tag is ProjectNavigationTag projectTag)
+        {
+            ShowAddinProjectContextMenu(e.Node, projectTag, e.Location);
+            return;
+        }
+
         ShowNavigationNode(e.Node);
+    }
+
+    private void ShowAddinProjectContextMenu(TreeNode node, ProjectNavigationTag projectTag, Point location)
+    {
+        _contextMenuProjectName = projectTag.ProjectName;
+
+        bool isEnabled =
+            IsAddinProjectEnabled(projectTag.ProjectName);
+
+        if (_addinProjectContextMenu.Items.Count >= 2)
+        {
+            _addinProjectContextMenu.Items[0].Enabled = !isEnabled;
+            _addinProjectContextMenu.Items[1].Enabled = isEnabled;
+        }
+
+        _addinProjectContextMenu.Show(navigationTreeView, location);
     }
 
     private void NavigationTreeView_AfterSelect(object? sender, TreeViewEventArgs e)
@@ -584,18 +651,25 @@ private static TreeNode CreateCommandNode(string text, string commandKey)
                 ShowCommandEngineRuntimePanel();
                 break;
 
+            case "Tools.DeployAllAddinsToExpensa":
+                ShowLandingText(
+                    "Deploy All Enabled Add-ins to Expensa" + Environment.NewLine + Environment.NewLine +
+                    "Right-click an add-in project node to enable or disable it." + Environment.NewLine + Environment.NewLine +
+                    "Only enabled add-ins appear in the Deploy menu and Deploy All operation.");
+                break;
+
             case "Tools.DeployWebsitesAddinToExpensa":
                 ShowLandingText(
                     "Deploy Websites Add-in to Expensa" + Environment.NewLine + Environment.NewLine +
-                    "Double-click this node to build WebsitesAddin and copy its output into Expensa's Modules\\WebsitesAddin folder.");
-                break;
-
-            case "Docs.UpdateStandardAiDocs":
-                ShowStandardAiDocsUpdatePanel();
+                    "This legacy command now routes through the generic enabled add-in deployment pipeline.");
                 break;
 
             case "Tools.ExpensaAddinLoaderTest":
                 ShowEmbeddedForm(new ExpensaAddinLoaderTestForm());
+                break;
+
+            case "Docs.UpdateStandardAiDocs":
+                ShowStandardAiDocsUpdatePanel();
                 break;
 
             default:
@@ -638,16 +712,21 @@ private static TreeNode CreateCommandNode(string text, string commandKey)
                 ShowCommandEngineRuntimePanel();
                 break;
 
-            case "Tools.DeployWebsitesAddinToExpensa":
-                DeployWebsitesAddinToExpensa();
+            case "Tools.DeployAllAddinsToExpensa":
+                DeployAllAddinsToExpensa();
                 break;
 
+            case "Tools.DeployWebsitesAddinToExpensa":
+                DeployRegisteredAddinByName("WebsitesAddin");
+                break;
+
+            case "Tools.ExpensaAddinLoaderTest":
+                ShowEmbeddedForm(new ExpensaAddinLoaderTestForm());
+                break;
 
             case "Docs.UpdateStandardAiDocs":
                 ShowStandardAiDocsUpdatePanel();
                 break;
-
-          
 
             default:
                 InvokeCommand(commandTag.CommandKey);
@@ -683,59 +762,68 @@ private static TreeNode CreateCommandNode(string text, string commandKey)
 
 
 
+    private bool IsAddinProjectEnabled(string projectName)
+    {
+        if (string.IsNullOrWhiteSpace(projectName))
+        {
+            return true;
+        }
+
+        MainFormSettings settings = LoadMainFormSettings();
+
+        if (settings.AddinProjectEnabledStates is null ||
+            !settings.AddinProjectEnabledStates.TryGetValue(projectName, out bool isEnabled))
+        {
+            return true;
+        }
+
+        return isEnabled;
+    }
+
+    private void SetAddinProjectEnabled(string projectName, bool isEnabled)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(projectName);
+
+        MainFormSettings settings = LoadMainFormSettings();
+
+        settings.AddinProjectEnabledStates ??=
+            new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+
+        settings.AddinProjectEnabledStates[projectName] = isEnabled;
+
+        SaveMainFormSettings(settings);
+    }
+
+    private IReadOnlyList<ExtensionProjectRegistration> GetEnabledAddinRegistrations()
+    {
+        return _registrationStore.GetAll()
+            .Where(registration => IsAddinProjectEnabled(registration.ProjectName))
+            .OrderBy(static registration => registration.ProjectName, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
     private void ShowAddinDatabaseNode(AddinProjectDatabaseNavigationTag tag)
     {
-        if (IsWebsitesAddinProject(tag.ProjectName))
+        if (_addinUiSurfaceResolver.TryCreateDatabaseForm(tag.ProjectName, tag.ProjectFolder, out Form? form) &&
+            form is not null)
         {
-            ShowEmbeddedForm(new WebsitesDatabasePanelForm());
+            ShowEmbeddedForm(form);
             return;
         }
 
-        if (IsBudgetsAddinProject(tag.ProjectName))
-        {
-            ShowEmbeddedForm(new BudgetsDatabasePanelForm());
-            return;
-        }
-
-        ShowLandingText(
-            $"{tag.ProjectName} Database{Environment.NewLine}{Environment.NewLine}" +
-            $"Project folder:{Environment.NewLine}{tag.ProjectFolder}{Environment.NewLine}{Environment.NewLine}" +
-            "Database page is not wired yet.");
+        ShowEmbeddedForm(new GenericAddinDatabasePanelForm(tag.ProjectName, tag.ProjectFolder));
     }
 
     private void OpenAddinTestNode(AddinProjectTestNavigationTag tag)
     {
-        if (IsWebsitesAddinProject(tag.ProjectName))
+        if (_addinUiSurfaceResolver.TryCreateTestForm(tag.ProjectName, tag.ProjectFolder, out Form? form) &&
+            form is not null)
         {
-            ShowEmbeddedForm(new WebsitesTreeLoadVerificationFormCommonTree());
+            ShowEmbeddedForm(form);
             return;
         }
 
-        if (IsBudgetsAddinProject(tag.ProjectName))
-        {
-            ShowEmbeddedForm(new BudgetsTreeLoadVerificationFormCommonTree());
-            return;
-        }
-
-        ShowLandingText(
-            $"{tag.ProjectName} Test{Environment.NewLine}{Environment.NewLine}" +
-            "No add-in-specific test form is wired yet.");
-    }
-
-    private static bool IsWebsitesAddinProject(
-        string projectName)
-    {
-        return string.Equals(projectName, "WebsitesAddin", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(projectName, "Websites Add-in", StringComparison.OrdinalIgnoreCase) ||
-            projectName.Contains("Website", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static bool IsBudgetsAddinProject(
-        string projectName)
-    {
-        return string.Equals(projectName, "BudgetsAddin", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(projectName, "Budgets Add-in", StringComparison.OrdinalIgnoreCase) ||
-            projectName.Contains("Budget", StringComparison.OrdinalIgnoreCase);
+        ShowEmbeddedForm(new GenericAddinTreeLoadVerificationForm(tag.ProjectName, tag.ProjectFolder));
     }
 
     private void ShowCommandEngineRuntimePanel()
@@ -1077,11 +1165,263 @@ Describe how this add-in should be deployed or updated into Expensa.
     {
         ToolStripMenuItem deployMenu = new("Deploy");
 
-        ToolStripMenuItem deployWebsitesAddinMenuItem = new("Deploy Websites Add-in to Expensa");
-        deployWebsitesAddinMenuItem.Click += (_, _) => DeployWebsitesAddinToExpensa();
+        ToolStripMenuItem deployAllAddinsMenuItem = new("Deploy All Enabled Add-ins to Expensa");
+        deployAllAddinsMenuItem.Click += (_, _) => DeployAllAddinsToExpensa();
 
-        deployMenu.DropDownItems.Add(deployWebsitesAddinMenuItem);
+        deployMenu.DropDownItems.Add(deployAllAddinsMenuItem);
+        deployMenu.DropDownItems.Add(new ToolStripSeparator());
+
+        IReadOnlyList<ExtensionProjectRegistration> enabledRegistrations =
+            GetEnabledAddinRegistrations();
+
+        if (enabledRegistrations.Count == 0)
+        {
+            deployAllAddinsMenuItem.Enabled = false;
+
+            deployMenu.DropDownItems.Add(
+                new ToolStripMenuItem("No enabled add-ins")
+                {
+                    Enabled = false
+                });
+        }
+        else
+        {
+            foreach (ExtensionProjectRegistration registration in enabledRegistrations)
+            {
+                ToolStripMenuItem deployAddinMenuItem =
+                    new($"Deploy {registration.ProjectName} to Expensa");
+
+                deployAddinMenuItem.Click += (_, _) => DeployRegisteredAddinToExpensa(registration);
+
+                deployMenu.DropDownItems.Add(deployAddinMenuItem);
+            }
+        }
+
         mainMenuStrip.Items.Add(deployMenu);
+    }
+
+    private void DeployAllAddinsToExpensa()
+    {
+        IReadOnlyList<ExtensionProjectRegistration> enabledRegistrations =
+            GetEnabledAddinRegistrations();
+
+        if (enabledRegistrations.Count == 0)
+        {
+            MessageBox.Show(
+                this,
+                "There are no enabled add-ins to deploy. Right-click an add-in project node and enable at least one add-in.",
+                "Deploy All Enabled Add-ins to Expensa",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
+
+            return;
+        }
+
+        List<GenericAddinDeploymentResult> successes = [];
+        List<string> failures = [];
+
+        foreach (ExtensionProjectRegistration registration in enabledRegistrations)
+        {
+            try
+            {
+                successes.Add(DeployRegisteredAddinToExpensaCore(registration));
+            }
+            catch (Exception exception)
+            {
+                failures.Add($"{registration.ProjectName}:{Environment.NewLine}{exception.Message}");
+            }
+        }
+
+        string successText =
+            successes.Count == 0
+                ? "No add-ins were deployed successfully."
+                : string.Join(
+                    Environment.NewLine + Environment.NewLine,
+                    successes.Select(static result =>
+                        $"{result.ProjectName}{Environment.NewLine}" +
+                        $"Source: {result.SourceFolder}{Environment.NewLine}" +
+                        $"Destination: {result.DestinationFolder}{Environment.NewLine}" +
+                        $"Files copied: {result.FileCount}"));
+
+        string failureText =
+            failures.Count == 0
+                ? string.Empty
+                : $"{Environment.NewLine}{Environment.NewLine}Failures:{Environment.NewLine}{string.Join(Environment.NewLine + Environment.NewLine, failures)}";
+
+        MessageBox.Show(
+            this,
+            successText + failureText,
+            "Deploy All Enabled Add-ins to Expensa",
+            MessageBoxButtons.OK,
+            failures.Count == 0 ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
+    }
+
+    private void DeployRegisteredAddinByName(string projectName)
+    {
+        ExtensionProjectRegistration? registration =
+            GetEnabledAddinRegistrations()
+                .FirstOrDefault(candidate =>
+                    string.Equals(candidate.ProjectName, projectName, StringComparison.OrdinalIgnoreCase) ||
+                    candidate.ProjectName.Contains(projectName, StringComparison.OrdinalIgnoreCase) ||
+                    projectName.Contains(candidate.ProjectName, StringComparison.OrdinalIgnoreCase));
+
+        if (registration is null)
+        {
+            MessageBox.Show(
+                this,
+                $"Could not find enabled registered add-in: {projectName}",
+                "Deploy Add-in to Expensa",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Warning);
+
+            return;
+        }
+
+        DeployRegisteredAddinToExpensa(registration);
+    }
+
+    private void DeployRegisteredAddinToExpensa(ExtensionProjectRegistration registration)
+    {
+        ArgumentNullException.ThrowIfNull(registration);
+
+        if (!IsAddinProjectEnabled(registration.ProjectName))
+        {
+            MessageBox.Show(
+                this,
+                $"{registration.ProjectName} is disabled. Enable it from the add-in project context menu before deploying.",
+                $"Deploy {registration.ProjectName} to Expensa",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
+
+            return;
+        }
+
+        try
+        {
+            GenericAddinDeploymentResult result =
+                DeployRegisteredAddinToExpensaCore(registration);
+
+            MessageBox.Show(
+                this,
+                $"{registration.ProjectName} deployed successfully.{Environment.NewLine}{Environment.NewLine}" +
+                $"Source:{Environment.NewLine}{result.SourceFolder}{Environment.NewLine}{Environment.NewLine}" +
+                $"Destination:{Environment.NewLine}{result.DestinationFolder}{Environment.NewLine}{Environment.NewLine}" +
+                $"Files copied: {result.FileCount}",
+                $"Deploy {registration.ProjectName} to Expensa",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(
+                this,
+                exception.ToString(),
+                $"Deploy {registration.ProjectName} Failed",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
+        }
+    }
+
+    private static GenericAddinDeploymentResult DeployRegisteredAddinToExpensaCore(ExtensionProjectRegistration registration)
+    {
+        ArgumentNullException.ThrowIfNull(registration);
+
+        string repositoryRoot = FindRepositoryRoot();
+        string projectFolder = ResolveProjectFolder(registration);
+        string projectFile = FindGenericAddinProjectFile(projectFolder, registration.ProjectName);
+        string sourceFolder = FindGenericAddinOutputFolder(projectFile, registration.ProjectName);
+        string destinationFolder = GetGenericExpensaAddinDestinationFolder(repositoryRoot, registration.ProjectName);
+
+        Directory.CreateDirectory(destinationFolder);
+
+        int copiedCount = CopyDirectoryContents(sourceFolder, destinationFolder);
+
+        string deployedDll = Path.Combine(destinationFolder, $"{registration.ProjectName}.dll");
+
+        if (!File.Exists(deployedDll))
+        {
+            throw new FileNotFoundException(
+                $"Deployment completed, but {registration.ProjectName}.dll was not found in the Expensa destination folder.",
+                deployedDll);
+        }
+
+        return new GenericAddinDeploymentResult(
+            registration.ProjectName,
+            sourceFolder,
+            destinationFolder,
+            copiedCount);
+    }
+
+    private static string FindGenericAddinProjectFile(string projectFolder, string projectName)
+    {
+        string directProjectFile = Path.Combine(projectFolder, $"{projectName}.csproj");
+
+        if (File.Exists(directProjectFile))
+        {
+            return directProjectFile;
+        }
+
+        string? discoveredProject =
+            Directory.Exists(projectFolder)
+                ? Directory.GetFiles(projectFolder, "*.csproj", SearchOption.TopDirectoryOnly)
+                    .OrderBy(static path => path, StringComparer.OrdinalIgnoreCase)
+                    .FirstOrDefault()
+                : null;
+
+        if (!string.IsNullOrWhiteSpace(discoveredProject))
+        {
+            return discoveredProject;
+        }
+
+        throw new FileNotFoundException($"Could not find a project file for {projectName} in {projectFolder}.");
+    }
+
+    private static string FindGenericAddinOutputFolder(string projectFile, string projectName)
+    {
+        string projectFolder =
+            Path.GetDirectoryName(projectFile) ??
+            throw new DirectoryNotFoundException(projectFile);
+
+        string[] candidateFrameworks = [ "net8.0-windows", "net8.0" ];
+
+        foreach (string framework in candidateFrameworks)
+        {
+            string candidateFolder = Path.Combine(projectFolder, "bin", "Debug", framework);
+            string candidateDll = Path.Combine(candidateFolder, $"{projectName}.dll");
+
+            if (File.Exists(candidateDll))
+            {
+                return candidateFolder;
+            }
+        }
+
+        BuildProject(projectFile);
+
+        foreach (string framework in candidateFrameworks)
+        {
+            string candidateFolder = Path.Combine(projectFolder, "bin", "Debug", framework);
+            string candidateDll = Path.Combine(candidateFolder, $"{projectName}.dll");
+
+            if (File.Exists(candidateDll))
+            {
+                return candidateFolder;
+            }
+        }
+
+        throw new FileNotFoundException($"Could not find the built {projectName}.dll. Build {projectName} and try again.");
+    }
+
+    private static string GetGenericExpensaAddinDestinationFolder(string repositoryRoot, string projectName)
+    {
+        return Path.Combine(
+            repositoryRoot,
+            "Expensa",
+            "CodexExpensa.App.WinForms",
+            "bin",
+            "Debug",
+            "net8.0-windows",
+            "Modules",
+            projectName);
     }
 
     private void DeployWebsitesAddinToExpensa()
@@ -1345,10 +1685,14 @@ Describe how this add-in should be deployed or updated into Expensa.
         string extension =
             Path.GetExtension(relativePath);
 
-        return string.Equals(extension, ".xml", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(extension, ".deps.json", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(extension, ".runtimeconfig.json", StringComparison.OrdinalIgnoreCase);
+        return string.Equals(extension, ".xml", StringComparison.OrdinalIgnoreCase);
     }
+
+    private sealed record GenericAddinDeploymentResult(
+        string ProjectName,
+        string SourceFolder,
+        string DestinationFolder,
+        int FileCount);
 
     private sealed record WebsitesAddinDeploymentResult(
         string SourceFolder,
@@ -1486,5 +1830,8 @@ Describe how this add-in should be deployed or updated into Expensa.
         public int MainSplitterDistance { get; set; }
 
         public List<string> NavigationExpandedNodeNames { get; set; } = [];
+
+        public Dictionary<string, bool> AddinProjectEnabledStates { get; set; } =
+            new(StringComparer.OrdinalIgnoreCase);
     }
 }

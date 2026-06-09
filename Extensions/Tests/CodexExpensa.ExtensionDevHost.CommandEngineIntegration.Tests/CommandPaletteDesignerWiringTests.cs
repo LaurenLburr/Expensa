@@ -7,12 +7,11 @@ public sealed class CommandPaletteDesignerWiringTests
     [Fact]
     public void DashboardDesigner_IncludesCommandPaletteMenuItem()
     {
-        string repositoryRoot = FindRepositoryRoot();
+        string repositoryRoot = FindExtensionsRoot();
 
         string designerPath =
             Path.Combine(
                 repositoryRoot,
-                "Extensions",
                 "Host",
                 "CodexExpensa.ExtensionDevHost",
                 "CommandEngineIntegration",
@@ -30,11 +29,23 @@ public sealed class CommandPaletteDesignerWiringTests
 
     private static string FindRepositoryRoot()
     {
+        return TestPathHelper.ExtensionsRoot;
+    }
+
+    private static string FindExtensionsRoot()
+    {
         DirectoryInfo? directory = new(AppContext.BaseDirectory);
 
         while (directory is not null)
         {
-            if (Directory.Exists(Path.Combine(directory.FullName, "Extensions")))
+            if (File.Exists(Path.Combine(directory.FullName, "Extensions.sln")))
+            {
+                return directory.FullName;
+            }
+
+            if (Directory.Exists(Path.Combine(directory.FullName, "Host"))
+                && Directory.Exists(Path.Combine(directory.FullName, "Modules"))
+                && Directory.Exists(Path.Combine(directory.FullName, "Tests")))
             {
                 return directory.FullName;
             }
@@ -46,7 +57,14 @@ public sealed class CommandPaletteDesignerWiringTests
 
         while (currentDirectory is not null)
         {
-            if (Directory.Exists(Path.Combine(currentDirectory.FullName, "Extensions")))
+            if (File.Exists(Path.Combine(currentDirectory.FullName, "Extensions.sln")))
+            {
+                return currentDirectory.FullName;
+            }
+
+            if (Directory.Exists(Path.Combine(currentDirectory.FullName, "Host"))
+                && Directory.Exists(Path.Combine(currentDirectory.FullName, "Modules"))
+                && Directory.Exists(Path.Combine(currentDirectory.FullName, "Tests")))
             {
                 return currentDirectory.FullName;
             }
@@ -54,6 +72,7 @@ public sealed class CommandPaletteDesignerWiringTests
             currentDirectory = currentDirectory.Parent;
         }
 
-        throw new DirectoryNotFoundException("Could not find repository root containing Extensions folder.");
+        throw new DirectoryNotFoundException(
+            "Could not find Extensions solution root containing Extensions.sln or Host/Modules/Tests folders.");
     }
 }

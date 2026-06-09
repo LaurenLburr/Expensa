@@ -8,6 +8,7 @@
   <Project Path="Host/CodexExpensa.ExtensionDevHost/CommandEngineIntegration/CodexExpensa.ExtensionDevHost.CommandEngineIntegration.csproj" />
   <Project Path="Modules/BudgetsAddin/BudgetsAddin.csproj" />
   <Project Path="Modules/CodexExpensa.Feature.Websites/CodexExpensa.Feature.Websites.csproj" />
+  <Project Path="Modules/PayeesAddin/PayeesAddin.csproj" />
   <Project Path="Modules/WebsitesAddin/WebsitesAddin.csproj" />
   <Project Path="Tests/CodexExpensa.ExtensionDevHost.CommandEngineIntegration.Tests/CodexExpensa.ExtensionDevHost.CommandEngineIntegration.Tests.csproj" />
   <Project Path="Tests/CodexExpensa.Navigation.Hosting.Tests/CodexExpensa.Navigation.Hosting.Tests.csproj" />

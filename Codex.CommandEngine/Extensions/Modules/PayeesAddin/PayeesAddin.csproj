@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Codex.CommandEngine\src\Codex.CommandEngine.Core\Codex.CommandEngine.Core.csproj" Condition="Exists('..\..\..\Codex.CommandEngine\src\Codex.CommandEngine.Core\Codex.CommandEngine.Core.csproj')" />
+  </ItemGroup>
+</Project>

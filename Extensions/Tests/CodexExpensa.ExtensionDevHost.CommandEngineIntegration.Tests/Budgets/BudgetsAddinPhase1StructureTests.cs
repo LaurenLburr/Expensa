@@ -8,7 +8,7 @@ public sealed class BudgetsAddinPhase1StructureTests
     public void BudgetsAddinProject_ReferencesCommandEngineAndSqlite()
     {
         string text = ReadFile(
-            "Extensions",
+           
             "Modules",
             "BudgetsAddin",
             "BudgetsAddin.csproj");
@@ -22,7 +22,7 @@ public sealed class BudgetsAddinPhase1StructureTests
     public void BudgetRepository_LoadsBudgetYearsAndMonthsFromBudgetMonth()
     {
         string text = ReadFile(
-            "Extensions",
+            
             "Modules",
             "BudgetsAddin",
             "SqliteBudgetRepository.cs");
@@ -39,7 +39,7 @@ public sealed class BudgetsAddinPhase1StructureTests
     public void BudgetSmokeRunner_ReturnsCommandExecutionResult()
     {
         string text = ReadFile(
-            "Extensions",
+          
             "Modules",
             "BudgetsAddin",
             "BudgetLoadRuntimeSmokeRunner.cs");
@@ -62,18 +62,6 @@ public sealed class BudgetsAddinPhase1StructureTests
 
     private static string FindRepositoryRoot()
     {
-        DirectoryInfo? directory = new(AppContext.BaseDirectory);
-
-        while (directory is not null)
-        {
-            if (Directory.Exists(Path.Combine(directory.FullName, "Extensions")))
-            {
-                return directory.FullName;
-            }
-
-            directory = directory.Parent;
-        }
-
-        throw new DirectoryNotFoundException();
+        return TestPathHelper.ExtensionsRoot;
     }
 }

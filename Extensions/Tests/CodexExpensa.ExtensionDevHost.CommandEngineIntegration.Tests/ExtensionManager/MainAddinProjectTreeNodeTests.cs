@@ -12,7 +12,6 @@ public sealed class MainAddinProjectTreeNodeTests
         string mainFormPath =
             Path.Combine(
                 repositoryRoot,
-                "Extensions",
                 "Host",
                 "CodexExpensa.ExtensionDevHost",
                 "MainForm.cs");
@@ -30,18 +29,6 @@ public sealed class MainAddinProjectTreeNodeTests
 
     private static string FindRepositoryRoot()
     {
-        DirectoryInfo? directory = new(AppContext.BaseDirectory);
-
-        while (directory is not null)
-        {
-            if (Directory.Exists(Path.Combine(directory.FullName, "Extensions")))
-            {
-                return directory.FullName;
-            }
-
-            directory = directory.Parent;
-        }
-
-        throw new DirectoryNotFoundException("Could not find repository root containing Extensions folder.");
+        return TestPathHelper.ExtensionsRoot;
     }
 }

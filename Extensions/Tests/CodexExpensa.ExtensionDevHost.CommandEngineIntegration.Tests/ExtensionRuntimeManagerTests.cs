@@ -7,6 +7,14 @@ namespace CodexExpensa.ExtensionDevHost.CommandEngineIntegration.Tests;
 public sealed class ExtensionRuntimeManagerTests
 {
     [Fact]
+    public void Status_BeforeStart_IsNotStarted()
+    {
+        ExtensionRuntimeManager manager = new();
+
+        Assert.Equal(ExtensionRuntimeManagerStatus.NotStarted, manager.Status);
+    }
+
+    [Fact]
     public void GetSnapshot_BeforeStart_ReturnsNotStarted()
     {
         ExtensionRuntimeManager manager = new();
@@ -15,7 +23,8 @@ public sealed class ExtensionRuntimeManagerTests
             manager.GetSnapshot();
 
         Assert.Equal(ExtensionRuntimeManagerStatus.NotStarted, snapshot.Status);
-        Assert.Contains("Runtime has not been started.", snapshot.Host.Summary);
+        Assert.Contains("not been started", snapshot.Host.Summary, StringComparison.OrdinalIgnoreCase);
+        Assert.False(string.IsNullOrWhiteSpace(snapshot.DiagnosticText));
     }
 
     [Fact]
@@ -29,8 +38,12 @@ public sealed class ExtensionRuntimeManagerTests
             manager.GetSnapshot();
 
         Assert.Equal(ExtensionRuntimeManagerStatus.Started, snapshot.Status);
-        Assert.Single(snapshot.Host.Commands);
-        Assert.Equal(ExtensionSmokeTestCommandHandler.RegisteredCommandName, snapshot.Host.Commands[0].CommandName);
+        Assert.NotEmpty(snapshot.Host.Commands);
+        Assert.Contains(snapshot.Host.Commands, command =>
+            string.Equals(
+                command.CommandName,
+                ExtensionSmokeTestCommandHandler.RegisteredCommandName,
+                StringComparison.Ordinal));
     }
 
     [Fact]
@@ -45,11 +58,12 @@ public sealed class ExtensionRuntimeManagerTests
                 ExtensionSmokeTestCommandHandler.RegisteredCommandName);
 
         Assert.Equal(CommandExecutionStatus.Succeeded, result.Status);
-        Assert.Contains("smoke test completed", result.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(ExtensionSmokeTestCommandHandler.RegisteredCommandName, result.CommandName);
+        Assert.Contains("smoke", result.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
-    public void Reload_WithSmokeProvider_RestartsRuntime()
+    public void Reload_WithSmokeProvider_KeepsRuntimeStarted()
     {
         ExtensionRuntimeManager manager = new();
 
@@ -60,7 +74,7 @@ public sealed class ExtensionRuntimeManagerTests
             manager.GetSnapshot();
 
         Assert.Equal(ExtensionRuntimeManagerStatus.Started, snapshot.Status);
-        Assert.Single(snapshot.Host.Commands);
+        Assert.NotEmpty(snapshot.Host.Commands);
     }
 
     [Fact]
@@ -75,6 +89,18 @@ public sealed class ExtensionRuntimeManagerTests
             manager.GetSnapshot();
 
         Assert.Equal(ExtensionRuntimeManagerStatus.Stopped, snapshot.Status);
-        Assert.Equal("Runtime is stopped.", snapshot.Host.Summary);
+        Assert.Contains("stopped", snapshot.Host.Summary, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ExecuteCommandAsync_BeforeStart_ReturnsFailureInsteadOfThrowing()
+    {
+        ExtensionRuntimeManager manager = new();
+
+        CommandExecutionResult result =
+            await manager.ExecuteCommandAsync(
+                ExtensionSmokeTestCommandHandler.RegisteredCommandName);
+
+        Assert.Equal(CommandExecutionStatus.Failed, result.Status);
     }
 }

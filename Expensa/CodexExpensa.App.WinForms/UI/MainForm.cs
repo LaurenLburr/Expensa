@@ -4,6 +4,7 @@ using System.Linq;
 using System.Windows.Forms;
 using CodexExpensa.App.WinForms.Infrastructure;
 using CodexExpensa.App.WinForms.UI.Accounts;
+using CodexExpensa.App.WinForms.UI.Addins;
 using CodexExpensa.App.WinForms.UI.Banks;
 using CodexExpensa.App.WinForms.UI.Budgets;
 using CodexExpensa.App.WinForms.UI.Websites;
@@ -30,7 +31,7 @@ public partial class MainForm : Form
     private IReadOnlyList<Bank> _bankCache = Array.Empty<Bank>();
 
     private Form? _activeChildForm;
-    private readonly WebsiteAddinTreeLoader _websiteTreeLoader = new();
+    private readonly TreeAddinTreeViewLoader _treeAddinLoader = new();
 
     private readonly ContextMenuStrip _ctxBanksRoot;
     private readonly ContextMenuStrip _ctxAccountsRoot;
@@ -158,7 +159,7 @@ public partial class MainForm : Form
     {
         try
         {
-            await LoadWebsiteAddinTreeAsync();
+            await LoadTreeAddinsAsync();
             SelectFirstNode();
         }
         catch (Exception ex)
@@ -184,8 +185,8 @@ public partial class MainForm : Form
     {
         try
         {
-            await LoadWebsiteAddinTreeAsync();
-            SetStatus("Websites add-in refreshed.");
+            await LoadTreeAddinsAsync();
+            SetStatus("Tree add-ins refreshed.");
         }
         catch (Exception ex)
         {
@@ -228,22 +229,22 @@ public partial class MainForm : Form
 
     private void BuildNavigationTree()
     {
-        _ = LoadWebsiteAddinTreeAsync();
+        _ = LoadTreeAddinsAsync();
     }
 
-    private async Task LoadWebsiteAddinTreeAsync()
+    private async Task LoadTreeAddinsAsync()
     {
         try
         {
-            SetStatus("Loading Websites add-in...");
+            SetStatus("Loading tree add-ins...");
 
-            WebsiteTreeLoadResult result =
-                await _websiteTreeLoader.LoadIntoTreeViewAsync(
+            TreeAddinAggregateLoadResult result =
+                await _treeAddinLoader.LoadAllIntoTreeViewAsync(
                     treeNav,
-                    new WebsiteTreeLoadOptions
+                    new TreeAddinLoadOptions
                     {
                         SearchText = string.Empty,
-                        IncludeDisabled = false,
+                        IncludeInactive = false,
                         MaximumRows = 500,
                         ExpandAll = false
                     });
@@ -253,7 +254,7 @@ public partial class MainForm : Form
                 treeNav.SelectedNode = treeNav.Nodes[0];
             }
 
-            SetStatus($"Websites add-in loaded: {result.TotalCount} website row(s). {result.Message}");
+            SetStatus($"Tree add-ins loaded: {result.LoadedAddinCount} loaded, {result.FailedAddinCount} failed. {result.Message}");
         }
         catch (Exception ex)
         {
@@ -263,7 +264,7 @@ public partial class MainForm : Form
             {
                 treeNav.Nodes.Clear();
                 treeNav.Nodes.Add(
-                    new TreeNode("Websites add-in failed")
+                    new TreeNode("Tree add-ins failed")
                     {
                         Tag = null
                     });
@@ -273,8 +274,8 @@ public partial class MainForm : Form
                 treeNav.EndUpdate();
             }
 
-            SetStatus("Websites add-in failed.");
-            ShowError("Websites add-in failed", ex);
+            SetStatus("Tree add-ins failed.");
+            ShowError("Tree add-ins failed", ex);
         }
     }
 
@@ -341,6 +342,13 @@ public partial class MainForm : Form
         // Budgets
         if (e.Node.Tag is string budgetTag)
         {
+            if (string.Equals(budgetTag, "Budget.Root", StringComparison.OrdinalIgnoreCase))
+            {
+                ShowBudgetsLanding();
+                SetStatus("Budgets");
+                return;
+            }
+
             if (string.Equals(budgetTag, BudgetNav.Template, StringComparison.OrdinalIgnoreCase))
             {
                 ShowBudgetTemplate();
