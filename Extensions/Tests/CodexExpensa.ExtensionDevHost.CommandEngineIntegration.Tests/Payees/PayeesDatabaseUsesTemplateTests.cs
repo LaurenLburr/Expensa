@@ -11,6 +11,7 @@ public sealed class PayeesDatabaseUsesTemplateTests
             "Host",
             "CodexExpensa.ExtensionDevHost",
             "CommandEngineIntegration",
+            "Templates",
             "DatabasePanelTemplate.Designer.cs");
 
         Assert.Contains("protected Panel panel1", designerText);

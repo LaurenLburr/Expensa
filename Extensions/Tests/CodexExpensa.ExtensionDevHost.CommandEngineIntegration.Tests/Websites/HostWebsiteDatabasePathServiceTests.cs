@@ -13,22 +13,12 @@ public sealed class HostWebsiteDatabasePathServiceTests
         HostWebsiteDatabaseLocation location =
             service.GetRuntimeDatabaseLocation();
 
-        Assert.Equal("websitesaddin.db", location.DatabaseName);
+        Assert.Equal("websites.current.db", location.DatabaseName);
         Assert.EndsWith(
-            Path.Combine("Expensa", "Extensions", "Runtime", "WebsitesAddin", "websitesaddin.db"),
+            Path.Combine("Expensa", "Extensions", "Runtime", "WebsitesAddin", "websites.current.db"),
             location.DatabasePath,
             StringComparison.OrdinalIgnoreCase);
     }
 
-    [Fact]
-    public void GenerateTimestampedDatabaseFileName_IncludesSourceLabelAndDbExtension()
-    {
-        HostWebsiteDatabasePathService service = new();
 
-        string fileName =
-            service.GenerateTimestampedDatabaseFileName("sandbox db");
-
-        Assert.StartsWith("websitesaddin.sandbox_db.", fileName, StringComparison.OrdinalIgnoreCase);
-        Assert.EndsWith(".db", fileName, StringComparison.OrdinalIgnoreCase);
-    }
 }

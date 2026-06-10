@@ -13,8 +13,6 @@ public sealed partial class WebsitesTreeLoadVerificationForm
 
         _websitesDetailsPanel = new WebsitesDetailsPanel();
 
-        detailsTextBox.Visible = false;
-
         splitContainer.Panel2.Controls.Add(_websitesDetailsPanel);
         _websitesDetailsPanel.BringToFront();
     }

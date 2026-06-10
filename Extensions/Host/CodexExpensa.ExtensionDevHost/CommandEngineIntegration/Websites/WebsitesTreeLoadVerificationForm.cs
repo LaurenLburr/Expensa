@@ -1,9 +1,17 @@
+using CodexExpensa.ExtensionDevHost.CommandEngineIntegration.Templates;
+
 namespace CodexExpensa.ExtensionDevHost.CommandEngineIntegration.Websites;
 
-public sealed partial class WebsitesTreeLoadVerificationForm : Form
+public sealed partial class WebsitesTreeLoadVerificationForm : TreeTestTemplate
 {
     private readonly HostWebsiteTreeContributionLoader _loader;
     private bool _hasAutoLoaded;
+
+    private TreeView websitesTreeView => TestTreeView;
+
+    private TextBox detailsTextBox => NotesTextBox;
+
+    private SplitContainer splitContainer => ContentSplitContainer;
 
     public WebsitesTreeLoadVerificationForm()
         : this(new HostWebsiteTreeContributionLoader())
@@ -17,6 +25,17 @@ public sealed partial class WebsitesTreeLoadVerificationForm : Form
         _loader = loader;
 
         InitializeComponent();
+
+        ConfigureTreeTestTemplate(
+            "Websites Tree Load Verification",
+            "Load the Websites tree to verify the add-in contribution that Extension Manager will display.");
+
+        websitesTreeView.Name = "websitesTreeView";
+        detailsTextBox.Name = "detailsTextBox";
+
+        websitesTreeView.AfterSelect += websitesTreeView_AfterSelect;
+        websitesTreeView.NodeMouseClick += websitesTreeView_NodeMouseClick;
+
         EnsureWebsiteDetailsPanel();
     }
 
@@ -34,15 +53,9 @@ public sealed partial class WebsitesTreeLoadVerificationForm : Form
         await LoadWebsitesTreeAsync().ConfigureAwait(true);
     }
 
-    private async void loadButton_Click(object? sender, EventArgs e)
-    {
-        await LoadWebsitesTreeAsync().ConfigureAwait(true);
-    }
-
     private async Task LoadWebsitesTreeAsync()
     {
-        loadButton.Enabled = false;
-        statusLabel.Text = "Loading Websites tree...";
+        SetStatus("Loading Websites tree...");
         ShowSelectedTreeNodeDetails(null);
 
         try
@@ -50,23 +63,15 @@ public sealed partial class WebsitesTreeLoadVerificationForm : Form
             HostWebsiteTreeLoadResult result =
                 await _loader.LoadContributionAsync(
                     websitesTreeView,
-                    new HostWebsiteTreeLoadOptions
-                    {
-                        SearchText = searchTextBox.Text.Trim(),
-                        IncludeDisabled = includeDisabledCheckBox.Checked,
-                        MaximumRows = (int)maximumRowsNumericUpDown.Value,
-                        ExpandAll = expandAllCheckBox.Checked
-                    }).ConfigureAwait(true);
+                    new HostWebsiteTreeLoadOptions()).ConfigureAwait(true);
 
-            statusLabel.Text =
-                $"{result.ExecutionResult.Status}: {result.RootNodeCount} root node(s), {result.WebsiteResult.TotalCount} website row(s). {result.WebsiteResult.Message}";
-
-            detailsTextBox.Visible = true;
-            detailsTextBox.Text = result.ExecutionResult.OutputJson;
+            SetStatus(
+                $"{result.ExecutionResult.Status}: {result.RootNodeCount} root node(s), {result.WebsiteResult.TotalCount} website row(s). {result.WebsiteResult.Message}");
         }
         catch (Exception exception)
         {
-            statusLabel.Text = "Failed.";
+            SetStatus("Failed.");
+
             detailsTextBox.Visible = true;
             detailsTextBox.Text = exception.ToString();
 
@@ -77,10 +82,12 @@ public sealed partial class WebsitesTreeLoadVerificationForm : Form
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Error);
         }
-        finally
-        {
-            loadButton.Enabled = true;
-        }
+    }
+
+    private void SetStatus(string message)
+    {
+        detailsTextBox.Visible = true;
+        detailsTextBox.Text = message;
     }
 
     private void websitesTreeView_NodeMouseClick(object? sender, TreeNodeMouseClickEventArgs e)
@@ -104,10 +111,5 @@ public sealed partial class WebsitesTreeLoadVerificationForm : Form
     private void websitesTreeView_AfterSelect(object? sender, TreeViewEventArgs e)
     {
         ShowSelectedTreeNodeDetails(e.Node);
-    }
-
-    private void closeButton_Click(object? sender, EventArgs e)
-    {
-        Close();
     }
 }

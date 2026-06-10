@@ -39,12 +39,12 @@ public sealed class SqliteBudgetRepository
             LoadBudgetMonthRows(connection, request);
 
         IReadOnlyList<BudgetTreeNode> nodes =
-            BuildBudgetTree(budgetMonths);
+            BuildBudgetTree(budgetMonths, DateTime.Today);
 
         return new BudgetLoadResult
         {
             Status = "Succeeded",
-            Message = $"Loaded {nodes.Count} budget year node(s).",
+            Message = $"Loaded {nodes.Count} budget node(s).",
             Nodes = nodes
         };
     }
@@ -74,9 +74,12 @@ public sealed class SqliteBudgetRepository
         return table;
     }
 
-    private static IReadOnlyList<BudgetTreeNode> BuildBudgetTree(DataTable budgetMonths)
+    private static IReadOnlyList<BudgetTreeNode> BuildBudgetTree(
+        DataTable budgetMonths,
+        DateTime today)
     {
         Dictionary<int, List<BudgetTreeNode>> monthsByYear = [];
+        Dictionary<string, BudgetTreeNode> monthNodesByKey = [];
 
         foreach (DataRow row in budgetMonths.Rows)
         {
@@ -109,20 +112,86 @@ public sealed class SqliteBudgetRepository
             }
 
             monthNodes.Add(monthNode);
+            monthNodesByKey[$"{year:D4}-{month:D2}"] = monthNode;
         }
 
-        return monthsByYear
-            .OrderByDescending(pair => pair.Key)
-            .Select(pair => new BudgetTreeNode
+        List<BudgetTreeNode> topLevelNodes =
+        [
+            CreateRelativeMonthNode(
+                "budget-current",
+                "Current",
+                BudgetTreeNodeTypes.BudgetCurrentMonth,
+                today,
+                monthNodesByKey),
+
+            CreateRelativeMonthNode(
+                "budget-previous",
+                "Previous",
+                BudgetTreeNodeTypes.BudgetPreviousMonth,
+                today.AddMonths(-1),
+                monthNodesByKey),
+
+            new BudgetTreeNode
             {
-                NodeId = $"budget-year:{pair.Key:D4}",
-                DisplayText = pair.Key.ToString(CultureInfo.InvariantCulture),
-                NodeType = BudgetTreeNodeTypes.BudgetYear,
-                BudgetYear = pair.Key,
-                Children = pair.Value
-                    .OrderBy(monthNode => monthNode.BudgetMonth)
-                    .ToList()
-            })
-            .ToList();
+                NodeId = "budget-templates",
+                DisplayText = "Templates",
+                NodeType = BudgetTreeNodeTypes.BudgetTemplates,
+                Children = []
+            }
+        ];
+
+        topLevelNodes.AddRange(
+            monthsByYear
+                .OrderByDescending(pair => pair.Key)
+                .Select(pair => new BudgetTreeNode
+                {
+                    NodeId = $"budget-year:{pair.Key:D4}",
+                    DisplayText = pair.Key.ToString(CultureInfo.InvariantCulture),
+                    NodeType = BudgetTreeNodeTypes.BudgetYear,
+                    BudgetYear = pair.Key,
+                    Children = pair.Value
+                        .OrderBy(monthNode => monthNode.BudgetMonth)
+                        .ToList()
+                }));
+
+        return topLevelNodes;
+    }
+
+    private static BudgetTreeNode CreateRelativeMonthNode(
+        string nodeId,
+        string label,
+        string nodeType,
+        DateTime monthDate,
+        IReadOnlyDictionary<string, BudgetTreeNode> monthNodesByKey)
+    {
+        int year = monthDate.Year;
+        int month = monthDate.Month;
+        string lookupKey = $"{year:D4}-{month:D2}";
+        string monthAbbreviation = CultureInfo.CurrentCulture.DateTimeFormat.GetAbbreviatedMonthName(month);
+
+        if (monthNodesByKey.TryGetValue(lookupKey, out BudgetTreeNode? existingMonthNode))
+        {
+            return new BudgetTreeNode
+            {
+                NodeId = nodeId,
+                DisplayText = $"{label} ({monthAbbreviation})",
+                NodeType = nodeType,
+                BudgetYear = existingMonthNode.BudgetYear,
+                BudgetMonth = existingMonthNode.BudgetMonth,
+                MonthKey = existingMonthNode.MonthKey,
+                Children = []
+            };
+        }
+
+        return new BudgetTreeNode
+        {
+            NodeId = nodeId,
+            DisplayText = $"{label} ({monthAbbreviation})",
+            NodeType = nodeType,
+            BudgetYear = year,
+            BudgetMonth = month,
+            MonthKey = lookupKey,
+            Children = []
+        };
     }
 }

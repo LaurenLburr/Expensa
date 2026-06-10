@@ -5,19 +5,32 @@ namespace CodexExpensa.ExtensionDevHost.CommandEngineIntegration.Tests.Websites;
 public sealed class WebsitesTreeLoadVerificationFormStructureTests
 {
     [Fact]
-    public void VerificationForm_HasTreeLoadControls()
+    public void VerificationForm_UsesTreeTestTemplateWithoutAddingDerivedControls()
     {
-        string text = ReadFile(
+        string formText = ReadFile(
+            "Host",
+            "CodexExpensa.ExtensionDevHost",
+            "CommandEngineIntegration",
+            "Websites",
+            "WebsitesTreeLoadVerificationForm.cs");
+
+        string designerText = ReadFile(
             "Host",
             "CodexExpensa.ExtensionDevHost",
             "CommandEngineIntegration",
             "Websites",
             "WebsitesTreeLoadVerificationForm.Designer.cs");
 
-        Assert.Contains("websitesTreeView", text);
-        Assert.Contains("loadButton", text);
-        Assert.Contains("statusLabel", text);
-        Assert.Contains("detailsTextBox", text);
+        Assert.Contains("WebsitesTreeLoadVerificationForm : TreeTestTemplate", formText);
+        Assert.Contains("TestTreeView", formText);
+        Assert.Contains("NotesTextBox", formText);
+        Assert.Contains("ContentSplitContainer", formText);
+
+        Assert.DoesNotContain("filterLayoutPanel", designerText);
+        Assert.DoesNotContain("loadButton", designerText);
+        Assert.DoesNotContain("statusLabel", designerText);
+        Assert.DoesNotContain("closeButton", designerText);
+        Assert.DoesNotContain("Controls.Add", designerText);
     }
 
     private static string ReadFile(params string[] parts)

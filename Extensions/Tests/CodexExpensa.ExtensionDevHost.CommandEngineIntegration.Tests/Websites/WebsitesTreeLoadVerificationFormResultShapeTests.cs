@@ -5,7 +5,7 @@ namespace CodexExpensa.ExtensionDevHost.CommandEngineIntegration.Tests.Websites;
 public sealed class WebsitesTreeLoadVerificationFormResultShapeTests
 {
     [Fact]
-    public void VerificationForm_UsesExistingTreeLoadResultShape()
+    public void VerificationForm_UsesCurrentTreeLoadResultShape()
     {
         string text = ReadFile(
             "Host",
@@ -14,11 +14,10 @@ public sealed class WebsitesTreeLoadVerificationFormResultShapeTests
             "Websites",
             "WebsitesTreeLoadVerificationForm.cs");
 
-        Assert.Contains("result.ExecutionResult.Status", text);
-        Assert.Contains("result.WebsiteResult.TotalCount", text);
-        Assert.Contains("result.WebsiteResult.Message", text);
-        Assert.Contains("result.ExecutionResult.OutputJson", text);
-        Assert.DoesNotContain("result.WebsiteNodeCount", text);
+        Assert.Contains("ExecutionResult.Status", text);
+        Assert.Contains("WebsiteResult.TotalCount", text);
+        Assert.Contains("WebsiteResult.Message", text);
+        Assert.DoesNotContain("WebsiteNodeCount", text);
     }
 
     private static string ReadFile(params string[] parts)

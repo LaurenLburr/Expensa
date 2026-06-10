@@ -3,6 +3,7 @@ namespace CodexExpensa.ExtensionDevHost.CommandEngineIntegration.ExtensionManage
 public sealed partial class ExtensionManagerAddinTestSurfaceForm : Form
 {
     private readonly IExtensionManagerAddinTestCatalog _catalog;
+    private readonly AddinProjectUiSurfaceResolver _surfaceResolver = new();
 
     public ExtensionManagerAddinTestSurfaceForm()
         : this(new ExtensionManagerAddinTestCatalog())
@@ -73,32 +74,30 @@ public sealed partial class ExtensionManagerAddinTestSurfaceForm : Form
             return;
         }
 
-        if (action.ActionKind == ExtensionManagerAddinTestActionKind.Database)
+        Form? form;
+
+        bool created =
+            action.ActionKind == ExtensionManagerAddinTestActionKind.Database
+                ? _surfaceResolver.TryCreateDatabaseForm(action.Addin.DisplayName, string.Empty, out form)
+                : _surfaceResolver.TryCreateTestForm(action.Addin.DisplayName, string.Empty, out form);
+
+        if (!created || form is null)
         {
             MessageBox.Show(
                 this,
-                $"Database page for '{action.Addin.DisplayName}' is not wired yet.",
-                "Extension Manager Database",
+                $"No {action.ActionKind} form is registered for add-in '{action.Addin.DisplayName}'.",
+                "Extension Manager Test Surface",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Information);
 
             return;
         }
 
-        if (action.ActionKind == ExtensionManagerAddinTestActionKind.Test &&
-            string.Equals(action.Addin.AddinId, "websites", StringComparison.OrdinalIgnoreCase))
+        using (form)
         {
-            using ExtensionTreeLoadTestForm form = new();
+            form.StartPosition = FormStartPosition.CenterParent;
             form.ShowDialog(this);
-            return;
         }
-
-        MessageBox.Show(
-            this,
-            $"No test form is registered for add-in '{action.Addin.DisplayName}'.",
-            "Extension Manager Test Surface",
-            MessageBoxButtons.OK,
-            MessageBoxIcon.Information);
     }
 
     private static string FormatSelectedNode(TreeNode? node)

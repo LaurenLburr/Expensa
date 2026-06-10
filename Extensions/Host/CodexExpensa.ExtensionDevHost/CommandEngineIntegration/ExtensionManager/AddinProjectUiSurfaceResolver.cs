@@ -65,10 +65,10 @@ public sealed class AddinProjectUiSurfaceResolver
             yield break;
         }
 
-        yield return $"{baseNamespace}.{pluralName}.{pluralName}TreeLoadVerificationFormCommonTree";
         yield return $"{baseNamespace}.{pluralName}.{pluralName}TreeLoadVerificationForm";
-        yield return $"{baseNamespace}.{normalizedName}.{normalizedName}TreeLoadVerificationFormCommonTree";
+        //yield return $"{baseNamespace}.{pluralName}.{pluralName}TreeLoadVerificationFormCommonTree";
         yield return $"{baseNamespace}.{normalizedName}.{normalizedName}TreeLoadVerificationForm";
+        //yield return $"{baseNamespace}.{normalizedName}.{normalizedName}TreeLoadVerificationFormCommonTree";
     }
 
     private static Type? FindType(string fullTypeName)

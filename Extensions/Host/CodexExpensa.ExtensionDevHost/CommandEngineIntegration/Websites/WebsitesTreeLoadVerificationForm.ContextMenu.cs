@@ -55,7 +55,7 @@ public sealed partial class WebsitesTreeLoadVerificationForm
 
         if (!IsWebsiteTreeNode(clickedNode))
         {
-            statusLabel.Text = "Context menu is available only for website nodes.";
+            SetStatus("Context menu is available only for website nodes.");
             return;
         }
 

@@ -3,7 +3,7 @@ namespace CodexExpensa.ExtensionDevHost.CommandEngineIntegration.Websites;
 public sealed class HostWebsiteDatabasePathService
 {
     private const string AddinId = "WebsitesAddin";
-    private const string DefaultDatabaseFileName = "websitesaddin.db";
+    private const string DefaultDatabaseFileName = "websites.current.db";
     private const string SandboxDatabaseFileName = "websitesaddin.sandbox.db";
     private const string DevDatabaseFileName = "websites.dev.db";
 

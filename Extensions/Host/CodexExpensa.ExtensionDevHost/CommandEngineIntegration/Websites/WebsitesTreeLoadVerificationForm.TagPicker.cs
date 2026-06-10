@@ -41,7 +41,7 @@ public sealed partial class WebsitesTreeLoadVerificationForm
 
         if (selectedNode is null || !IsWebsiteTreeNode(selectedNode))
         {
-            statusLabel.Text = "Select an individual website node before assigning a tag.";
+            SetStatus("Select an individual website node before assigning a tag.");
             return;
         }
 
@@ -132,7 +132,7 @@ public sealed partial class WebsitesTreeLoadVerificationForm
 
         if (selectedNode is null)
         {
-            statusLabel.Text = "Select a website before assigning a tag.";
+            SetStatus("Select a website before assigning a tag.");
             return;
         }
 
@@ -140,7 +140,7 @@ public sealed partial class WebsitesTreeLoadVerificationForm
 
         if (string.IsNullOrWhiteSpace(websiteId))
         {
-            statusLabel.Text = "Select an individual website node before assigning a tag.";
+            SetStatus("Select an individual website node before assigning a tag.");
             return;
         }
 
@@ -151,7 +151,7 @@ public sealed partial class WebsitesTreeLoadVerificationForm
 
         if (string.IsNullOrWhiteSpace(databasePath))
         {
-            statusLabel.Text = "No active Websites runtime database is selected.";
+            SetStatus("No active Websites runtime database is selected.");
             return;
         }
 
@@ -160,9 +160,9 @@ public sealed partial class WebsitesTreeLoadVerificationForm
             HostWebsiteTagAssignmentResult result =
                 _tagAssignmentService.AddOrAssignTagToWebsite(databasePath, websiteId, tagName);
 
-            statusLabel.Text = result.AssignmentCreated
+            SetStatus(result.AssignmentCreated
                 ? $"Assigned tag '{result.TagName}' to selected website."
-                : $"Selected website already has tag '{result.TagName}'.";
+                : $"Selected website already has tag '{result.TagName}'.");
 
             CloseTagPickerPopup();
 
@@ -172,7 +172,7 @@ public sealed partial class WebsitesTreeLoadVerificationForm
         }
         catch (Exception exception)
         {
-            statusLabel.Text = "Tag assignment failed.";
+            SetStatus("Tag assignment failed.");
 
             MessageBox.Show(
                 this,
@@ -232,7 +232,7 @@ public sealed partial class WebsitesTreeLoadVerificationForm
 
         if (matchingNode is null)
         {
-            statusLabel.Text = $"Tag not found: {tagName}";
+            SetStatus($"Tag not found: {tagName}");
             return;
         }
 
