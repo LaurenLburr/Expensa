@@ -20,6 +20,7 @@ partial class ExtensionRuntimeDashboardForm
     private ToolStripMenuItem showDuplicateManifestRowsMenuItem;
     private ToolStripMenuItem enableSelectedManifestMenuItem;
     private ToolStripMenuItem disableSelectedManifestMenuItem;
+    private ToolStripMenuItem setManifestDisplaySortMenuItem;
     private ToolStripMenuItem openSelectedManifestMenuItem;
     private ToolStripMenuItem openManifestFolderMenuItem;
     private ToolStripMenuItem copyManifestPathMenuItem;
@@ -118,6 +119,7 @@ partial class ExtensionRuntimeDashboardForm
         showDuplicateManifestRowsMenuItem = new ToolStripMenuItem();
         enableSelectedManifestMenuItem = new ToolStripMenuItem();
         disableSelectedManifestMenuItem = new ToolStripMenuItem();
+        setManifestDisplaySortMenuItem = new ToolStripMenuItem();
         openSelectedManifestMenuItem = new ToolStripMenuItem();
         openManifestFolderMenuItem = new ToolStripMenuItem();
         copyManifestPathMenuItem = new ToolStripMenuItem();
@@ -257,6 +259,7 @@ partial class ExtensionRuntimeDashboardForm
             new ToolStripSeparator(),
             enableSelectedManifestMenuItem,
             disableSelectedManifestMenuItem,
+            setManifestDisplaySortMenuItem,
             new ToolStripSeparator(),
             openSelectedManifestMenuItem,
             openManifestFolderMenuItem,
@@ -273,6 +276,8 @@ partial class ExtensionRuntimeDashboardForm
         enableSelectedManifestMenuItem.Click += EnableSelectedManifest;
         disableSelectedManifestMenuItem.Text = "&Disable Selected Manifest";
         disableSelectedManifestMenuItem.Click += DisableSelectedManifest;
+        setManifestDisplaySortMenuItem.Text = "Set Display &Sort...";
+        setManifestDisplaySortMenuItem.Click += SetSelectedManifestDisplaySort;
         openSelectedManifestMenuItem.Text = "&Open Selected Manifest";
         openSelectedManifestMenuItem.Click += OpenSelectedManifest;
         openManifestFolderMenuItem.Text = "Open Manifest &Folder";

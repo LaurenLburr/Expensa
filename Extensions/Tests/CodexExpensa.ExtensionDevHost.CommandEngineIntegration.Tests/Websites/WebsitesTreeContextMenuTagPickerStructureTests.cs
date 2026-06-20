@@ -5,7 +5,7 @@ namespace CodexExpensa.ExtensionDevHost.CommandEngineIntegration.Tests.Websites;
 public sealed class WebsitesTreeContextMenuTagPickerStructureTests
 {
     [Fact]
-    public void ContextMenu_AddsUnderscoreTagPickerMenuItem()
+    public void ContextMenu_AddsTagAssignmentMenuItems()
     {
         string text =
             ReadFile(
@@ -15,9 +15,13 @@ public sealed class WebsitesTreeContextMenuTagPickerStructureTests
                 "Websites",
                 "WebsitesTreeLoadVerificationForm.TagPicker.cs");
 
-        Assert.Contains("new ToolStripMenuItem(\"________\")", text);
+        Assert.Contains("new ToolStripMenuItem(\"Assign Tag...\")", text);
+        Assert.Contains("new ToolStripMenuItem(\"Remove Tag Association\")", text);
+        Assert.Contains("new ToolStripMenuItem(\"Delete Node\")", text);
         Assert.Contains("AddTagPickerMenuItem", text);
         Assert.Contains("ShowTagPickerPopup", text);
+        Assert.Contains("RemoveTagAssociationFromSelectedWebsiteAsync", text);
+        Assert.Contains("DeleteSelectedWebsiteNodeAsync", text);
         Assert.Contains("WebsitesTreeTagPickerPanel", text);
         Assert.Contains("_tagPickerPopupForm.Show(this)", text);
         Assert.DoesNotContain("ToolStripControlHost", text);

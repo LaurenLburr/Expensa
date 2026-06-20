@@ -1,0 +1,222 @@
+<UserControl
+    x:Class="CodexExpensa.ExtensionDevHost.CommandEngineIntegration.Websites.WebsiteDetailsWpfControl"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <UserControl.Resources>
+        <Style TargetType="TextBlock">
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Margin" Value="0,0,8,6" />
+        </Style>
+        <Style TargetType="TextBox">
+            <Setter Property="Margin" Value="0,0,0,6" />
+            <Setter Property="MinHeight" Value="24" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+    </UserControl.Resources>
+
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <CheckBox
+            x:Name="EditableCheckBox"
+            Grid.Row="0"
+            Margin="0,0,0,10"
+            HorizontalAlignment="Left"
+            VerticalAlignment="Center"
+            Checked="EditableCheckBox_CheckedChanged"
+            Content="Editable"
+            Unchecked="EditableCheckBox_CheckedChanged" />
+        <Button
+            x:Name="RefreshCredentialsButton"
+            Grid.Row="0"
+            Width="72"
+            Margin="80,0,0,10"
+            HorizontalAlignment="Left"
+            Click="RefreshCredentialsButton_Click"
+            Content="Refresh" />
+
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="100" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <TextBlock Grid.Row="0" Grid.Column="0" Text="Name" />
+            <TextBox
+                x:Name="NameTextBox"
+                Grid.Row="0"
+                Grid.Column="1"
+                IsReadOnly="True" />
+
+            <TextBlock Grid.Row="1" Grid.Column="0" Text="Key" />
+            <TextBox
+                x:Name="CredentialKeyTextBox"
+                Grid.Row="1"
+                Grid.Column="1"
+                IsReadOnly="True" />
+
+            <TextBlock Grid.Row="2" Grid.Column="0">
+                <Hyperlink Click="CopyUrlHyperlink_Click">Url</Hyperlink>
+            </TextBlock>
+            <TextBox
+                x:Name="UrlTextBox"
+                Grid.Row="2"
+                Grid.Column="1"
+                IsReadOnly="True" />
+
+            <TextBlock Grid.Row="3" Grid.Column="0">
+                <Hyperlink Click="CopyUsernameHyperlink_Click">Username</Hyperlink>
+            </TextBlock>
+            <TextBox
+                x:Name="UsernameTextBox"
+                Grid.Row="3"
+                Grid.Column="1"
+                IsReadOnly="True" />
+
+            <TextBlock Grid.Row="4" Grid.Column="0">
+                <Hyperlink Click="CopyPasswordHyperlink_Click">Password</Hyperlink>
+            </TextBlock>
+            <Grid Grid.Row="4" Grid.Column="1">
+                <PasswordBox
+                    x:Name="PasswordMaskedBox"
+                    MinHeight="24"
+                    Margin="0,0,0,6"
+                    PasswordChanged="PasswordMaskedBox_PasswordChanged" />
+                <TextBox
+                    x:Name="PasswordTextBox"
+                    Margin="0,0,0,6"
+                    IsReadOnly="True"
+                    TextChanged="PasswordTextBox_TextChanged"
+                    Visibility="Collapsed" />
+            </Grid>
+
+            <Border
+                Grid.Row="5"
+                Grid.Column="0"
+                Grid.ColumnSpan="2"
+                Margin="0,8,0,0"
+                Padding="8"
+                BorderBrush="#D1D5DB"
+                BorderThickness="1">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="64" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="64" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="64" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="64" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="64" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="64" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="lowercase" />
+                    <TextBox
+                        x:Name="LowercaseCountTextBox"
+                        Grid.Row="0"
+                        Grid.Column="1"
+                        Text="8" />
+                    <TextBlock Grid.Row="0" Grid.Column="2" Text="uppercase" />
+                    <TextBox
+                        x:Name="UppercaseCountTextBox"
+                        Grid.Row="0"
+                        Grid.Column="3"
+                        Text="4" />
+                    <TextBlock Grid.Row="0" Grid.Column="4" Text="digits" />
+                    <TextBox
+                        x:Name="DigitCountTextBox"
+                        Grid.Row="0"
+                        Grid.Column="5"
+                        Text="4" />
+                    <TextBlock Grid.Row="0" Grid.Column="6" Text="min" />
+                    <TextBox
+                        x:Name="MinimumLengthTextBox"
+                        Grid.Row="0"
+                        Grid.Column="7"
+                        Text="18" />
+                    <TextBlock Grid.Row="0" Grid.Column="8" Text="max" />
+                    <TextBox
+                        x:Name="MaximumLengthTextBox"
+                        Grid.Row="0"
+                        Grid.Column="9"
+                        Text="24" />
+                    <Button
+                        x:Name="GeneratePasswordButton"
+                        Grid.Row="0"
+                        Grid.Column="10"
+                        MinWidth="80"
+                        Margin="8,0,8,6"
+                        Click="GeneratePasswordButton_Click"
+                        Content="Generate" />
+                    <Label
+                        x:Name="GeneratedPasswordLabel"
+                        Grid.Row="0"
+                        Grid.Column="11"
+                        Grid.ColumnSpan="5"
+                        MinHeight="26"
+                        Padding="0,4,8,0" />
+
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="specials" />
+                    <TextBox
+                        x:Name="SpecialCharactersTextBox"
+                        Grid.Row="1"
+                        Grid.Column="1"
+                        Grid.ColumnSpan="5"
+                        Text="!@#$%^&amp;*" />
+                    <TextBlock Grid.Row="1" Grid.Column="6" Text="# special" />
+                    <TextBox
+                        x:Name="SpecialCountTextBox"
+                        Grid.Row="1"
+                        Grid.Column="7"
+                        Text="2" />
+                    <TextBlock
+                        Grid.Row="1"
+                        Grid.Column="8"
+                        Grid.ColumnSpan="8"
+                        VerticalAlignment="Center">
+                        <Hyperlink Click="ImportHyperlink_Click">import</Hyperlink>
+                        <Run Text="  " />
+                        <Hyperlink Click="SaveHyperlink_Click">save</Hyperlink>
+                        <Run Text="  " />
+                        <Hyperlink Click="ApplyToWebHyperlink_Click">apply to web</Hyperlink>
+                    </TextBlock>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <TextBox
+            x:Name="DetailsTextBox"
+            Grid.Row="2"
+            Margin="0,10,0,0"
+            AcceptsReturn="True"
+            AcceptsTab="True"
+            HorizontalScrollBarVisibility="Auto"
+            IsReadOnly="True"
+            TextWrapping="NoWrap"
+            VerticalScrollBarVisibility="Auto" />
+    </Grid>
+</UserControl>

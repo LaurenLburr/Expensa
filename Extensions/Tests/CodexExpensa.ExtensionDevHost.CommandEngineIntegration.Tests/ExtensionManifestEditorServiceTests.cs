@@ -55,6 +55,41 @@ public sealed class ExtensionManifestEditorServiceTests
     }
 
     [Fact]
+    public void SetDisplaySort_WhenManifestExists_UpdatesDisplaySort()
+    {
+        string folder =
+            Path.Combine(
+                Path.GetTempPath(),
+                "ManifestEditorTests",
+                Guid.NewGuid().ToString("N"));
+
+        Directory.CreateDirectory(folder);
+
+        string manifestPath =
+            Path.Combine(folder, "extension.json");
+
+        ExtensionManifestWriter.Write(
+            manifestPath,
+            ExtensionManifestTemplate.CreateForWebsitesAddin());
+
+        ExtensionManifestEditorService editor = new();
+
+        ExtensionManifestUpdateResult result =
+            editor.SetDisplaySort(manifestPath, displaySort: 250);
+
+        Assert.True(result.Success);
+        Assert.NotNull(result.Manifest);
+        Assert.Equal(250, result.Manifest.DisplaySort);
+
+        ExtensionManifestLoadResult loadResult =
+            new ExtensionManifestLoader().Load(manifestPath);
+
+        Assert.True(loadResult.Success);
+        Assert.NotNull(loadResult.Manifest);
+        Assert.Equal(250, loadResult.Manifest.DisplaySort);
+    }
+
+    [Fact]
     public void RegistryService_IncludesManifestPath()
     {
         string folder =

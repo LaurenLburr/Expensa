@@ -6,6 +6,10 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="Krypton.Toolkit.Suite.Extended.Outlook.Grid" Version="105.26.4.110" />
+    <PackageReference Include="Krypton.Toolkit.Suite.Extended.TreeGridView" Version="105.26.4.110" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\..\Core\CodexExpensa.Navigation.Hosting\CodexExpensa.Navigation.Hosting.csproj" />
   </ItemGroup>
 </Project>

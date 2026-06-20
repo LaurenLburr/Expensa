@@ -10,6 +10,7 @@ using CodexExpensa.ExtensionDevHost.Services;
 using CodexExpensa.ExtensionDevHost.UI;
 using System.Diagnostics;
 using System.IO;
+using System.Reflection;
 using System.Text.Json;
 using System.Windows.Forms;
 
@@ -88,8 +89,13 @@ public MainForm()
         ToolStripMenuItem disableMenuItem = new("Disable Add-in");
         disableMenuItem.Click += (_, _) => SetContextAddinEnabled(isEnabled: false);
 
+        ToolStripMenuItem setDisplaySortMenuItem = new("Set Display Sort...");
+        setDisplaySortMenuItem.Click += (_, _) => SetContextAddinDisplaySort();
+
         _addinProjectContextMenu.Items.Add(enableMenuItem);
         _addinProjectContextMenu.Items.Add(disableMenuItem);
+        _addinProjectContextMenu.Items.Add(new ToolStripSeparator());
+        _addinProjectContextMenu.Items.Add(setDisplaySortMenuItem);
     }
 
     private void SetContextAddinEnabled(bool isEnabled)
@@ -102,6 +108,107 @@ public MainForm()
         SetAddinProjectEnabled(_contextMenuProjectName, isEnabled);
         BuildNavigationTree();
         RebuildMenu();
+    }
+
+    private void SetContextAddinDisplaySort()
+    {
+        if (string.IsNullOrWhiteSpace(_contextMenuProjectName))
+        {
+            return;
+        }
+
+        ExtensionProjectRegistration? registration =
+            _registrationStore.GetAll()
+                .FirstOrDefault(candidate =>
+                    string.Equals(candidate.ProjectName, _contextMenuProjectName, StringComparison.OrdinalIgnoreCase));
+
+        if (registration is null)
+        {
+            MessageBox.Show(
+                this,
+                $"Could not find registered add-in: {_contextMenuProjectName}",
+                "Set Display Sort",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Warning);
+
+            return;
+        }
+
+        if (!TryPromptForAddinDisplaySort(registration.ProjectName, registration.DisplaySort, out int displaySort))
+        {
+            return;
+        }
+
+        registration.DisplaySort = displaySort;
+        _registrationStore.Upsert(registration);
+        BuildNavigationTree();
+        RebuildMenu();
+    }
+
+    private bool TryPromptForAddinDisplaySort(string projectName, int currentValue, out int displaySort)
+    {
+        using Form dialog = new()
+        {
+            Text = $"Display Sort - {projectName}",
+            Width = 320,
+            Height = 150,
+            FormBorderStyle = FormBorderStyle.FixedDialog,
+            StartPosition = FormStartPosition.CenterParent,
+            MinimizeBox = false,
+            MaximizeBox = false
+        };
+
+        Label label = new()
+        {
+            Text = "Display sort:",
+            AutoSize = true,
+            Left = 16,
+            Top = 20
+        };
+
+        NumericUpDown input = new()
+        {
+            Left = 120,
+            Top = 16,
+            Width = 150,
+            Minimum = 0,
+            Maximum = 100000,
+            Value = Math.Clamp(currentValue, 0, 100000)
+        };
+
+        Button okButton = new()
+        {
+            Text = "OK",
+            DialogResult = DialogResult.OK,
+            Left = 116,
+            Top = 64,
+            Width = 75
+        };
+
+        Button cancelButton = new()
+        {
+            Text = "Cancel",
+            DialogResult = DialogResult.Cancel,
+            Left = 198,
+            Top = 64,
+            Width = 75
+        };
+
+        dialog.Controls.Add(label);
+        dialog.Controls.Add(input);
+        dialog.Controls.Add(okButton);
+        dialog.Controls.Add(cancelButton);
+        dialog.AcceptButton = okButton;
+        dialog.CancelButton = cancelButton;
+
+        if (dialog.ShowDialog(this) != DialogResult.OK)
+        {
+            displaySort = currentValue;
+            return false;
+        }
+
+        displaySort = decimal.ToInt32(input.Value);
+        return true;
     }
 
     private void RegisterCommands()
@@ -1241,6 +1348,8 @@ Describe how this add-in should be deployed or updated into Expensa.
                         $"{result.ProjectName}{Environment.NewLine}" +
                         $"Source: {result.SourceFolder}{Environment.NewLine}" +
                         $"Destination: {result.DestinationFolder}{Environment.NewLine}" +
+                        $"Version: {result.Version}{Environment.NewLine}" +
+                        $"Deployed: {result.DeployedUtc.ToLocalTime():yyyy-MM-dd HH:mm:ss}{Environment.NewLine}" +
                         $"Files copied: {result.FileCount}"));
 
         string failureText =
@@ -1306,6 +1415,8 @@ Describe how this add-in should be deployed or updated into Expensa.
                 $"{registration.ProjectName} deployed successfully.{Environment.NewLine}{Environment.NewLine}" +
                 $"Source:{Environment.NewLine}{result.SourceFolder}{Environment.NewLine}{Environment.NewLine}" +
                 $"Destination:{Environment.NewLine}{result.DestinationFolder}{Environment.NewLine}{Environment.NewLine}" +
+                $"Version: {result.Version}{Environment.NewLine}" +
+                $"Deployed: {result.DeployedUtc.ToLocalTime():yyyy-MM-dd HH:mm:ss}{Environment.NewLine}" +
                 $"Files copied: {result.FileCount}",
                 $"Deploy {registration.ProjectName} to Expensa",
                 MessageBoxButtons.OK,
@@ -1329,6 +1440,9 @@ Describe how this add-in should be deployed or updated into Expensa.
         string repositoryRoot = FindRepositoryRoot();
         string projectFolder = ResolveProjectFolder(registration);
         string projectFile = FindGenericAddinProjectFile(projectFolder, registration.ProjectName);
+
+        BuildProject(projectFile);
+
         string sourceFolder = FindGenericAddinOutputFolder(projectFile, registration.ProjectName);
         string destinationFolder = GetGenericExpensaAddinDestinationFolder(repositoryRoot, registration.ProjectName);
 
@@ -1345,11 +1459,20 @@ Describe how this add-in should be deployed or updated into Expensa.
                 deployedDll);
         }
 
+        AddinDeploymentManifest manifest =
+            WriteDeploymentManifest(
+                registration.ProjectName,
+                deployedDll,
+                Path.Combine(sourceFolder, $"{registration.ProjectName}.dll"),
+                destinationFolder);
+
         return new GenericAddinDeploymentResult(
             registration.ProjectName,
             sourceFolder,
             destinationFolder,
-            copiedCount);
+            copiedCount,
+            manifest.Version,
+            manifest.DeployedUtc);
     }
 
     private static string FindGenericAddinProjectFile(string projectFolder, string projectName)
@@ -1416,11 +1539,7 @@ Describe how this add-in should be deployed or updated into Expensa.
         return Path.Combine(
             repositoryRoot,
             "Expensa",
-            "CodexExpensa.App.WinForms",
-            "bin",
-            "Debug",
-            "net8.0-windows",
-            "Modules",
+            "Extensions",
             projectName);
     }
 
@@ -1435,6 +1554,8 @@ Describe how this add-in should be deployed or updated into Expensa.
                 $"WebsitesAddin deployed successfully.{Environment.NewLine}{Environment.NewLine}" +
                 $"Source:{Environment.NewLine}{result.SourceFolder}{Environment.NewLine}{Environment.NewLine}" +
                 $"Destination:{Environment.NewLine}{result.DestinationFolder}{Environment.NewLine}{Environment.NewLine}" +
+                $"Version: {result.Version}{Environment.NewLine}" +
+                $"Deployed: {result.DeployedUtc.ToLocalTime():yyyy-MM-dd HH:mm:ss}{Environment.NewLine}" +
                 $"Files copied: {result.FileCount}",
                 "Deploy Websites Add-in to Expensa",
                 MessageBoxButtons.OK,
@@ -1473,10 +1594,19 @@ Describe how this add-in should be deployed or updated into Expensa.
                 deployedDll);
         }
 
+        AddinDeploymentManifest manifest =
+            WriteDeploymentManifest(
+                "WebsitesAddin",
+                deployedDll,
+                Path.Combine(sourceFolder, "WebsitesAddin.dll"),
+                destinationFolder);
+
         return new WebsitesAddinDeploymentResult(
             sourceFolder,
             destinationFolder,
-            copiedCount);
+            copiedCount,
+            manifest.Version,
+            manifest.DeployedUtc);
     }
 
     private static string FindRepositoryRoot()
@@ -1629,12 +1759,76 @@ Describe how this add-in should be deployed or updated into Expensa.
         return Path.Combine(
             repositoryRoot,
             "Expensa",
-            "CodexExpensa.App.WinForms",
-            "bin",
-            "Debug",
-            "net8.0-windows",
-            "Modules",
+            "Extensions",
             "WebsitesAddin");
+    }
+
+    private static AddinDeploymentManifest WriteDeploymentManifest(
+        string projectName,
+        string deployedAssemblyPath,
+        string sourceAssemblyPath,
+        string destinationFolder)
+    {
+        string version = GetAssemblyVersion(deployedAssemblyPath);
+        DateTime deployedUtc = DateTime.UtcNow;
+
+        AddinDeploymentManifest manifest =
+            new(
+                projectName,
+                version,
+                deployedUtc,
+                sourceAssemblyPath,
+                deployedAssemblyPath);
+
+        string manifestPath =
+            Path.Combine(
+                destinationFolder,
+                "deployment.json");
+
+        string json =
+            JsonSerializer.Serialize(
+                manifest,
+                new JsonSerializerOptions
+                {
+                    WriteIndented = true
+                });
+
+        File.WriteAllText(
+            manifestPath,
+            json);
+
+        return manifest;
+    }
+
+    private static string GetAssemblyVersion(
+        string assemblyPath)
+    {
+        try
+        {
+            AssemblyName assemblyName =
+                AssemblyName.GetAssemblyName(assemblyPath);
+
+            string? informationalVersion =
+                FileVersionInfo.GetVersionInfo(assemblyPath)
+                    .ProductVersion;
+
+            if (!string.IsNullOrWhiteSpace(informationalVersion))
+            {
+                int metadataSeparator =
+                    informationalVersion.IndexOf('+');
+
+                return metadataSeparator >= 0
+                    ? informationalVersion[..metadataSeparator]
+                    : informationalVersion;
+            }
+
+            return assemblyName.Version?.ToString()
+                ?? "Unknown";
+        }
+        catch
+        {
+            return "Unknown";
+        }
     }
 
     private static int CopyDirectoryContents(
@@ -1692,12 +1886,23 @@ Describe how this add-in should be deployed or updated into Expensa.
         string ProjectName,
         string SourceFolder,
         string DestinationFolder,
-        int FileCount);
+        int FileCount,
+        string Version,
+        DateTime DeployedUtc);
+
+    private sealed record AddinDeploymentManifest(
+        string AddIn,
+        string Version,
+        DateTime DeployedUtc,
+        string SourceAssembly,
+        string DeployedAssembly);
 
     private sealed record WebsitesAddinDeploymentResult(
         string SourceFolder,
         string DestinationFolder,
-        int FileCount);
+        int FileCount,
+        string Version,
+        DateTime DeployedUtc);
 
 
     private void RestoreMainSplitterDistance()

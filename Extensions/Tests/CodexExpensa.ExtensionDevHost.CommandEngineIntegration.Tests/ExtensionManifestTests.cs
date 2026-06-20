@@ -66,8 +66,14 @@ public sealed class ExtensionManifestTests
         Assert.True(result.Success);
         Assert.NotNull(result.Manifest);
         Assert.Equal("WebsitesAddin", result.Manifest.ExtensionId);
+        Assert.Equal(100, result.Manifest.DisplaySort);
         Assert.Equal("WebsitesAddin.dll", result.Manifest.AssemblyFile);
         Assert.Equal("WebsitesAddin.WebsitesAddinCommandProvider", result.Manifest.ProviderType);
+
+        string json =
+            File.ReadAllText(manifestPath);
+
+        Assert.Contains("\"displaySort\"", json, StringComparison.Ordinal);
     }
 
     [Fact]

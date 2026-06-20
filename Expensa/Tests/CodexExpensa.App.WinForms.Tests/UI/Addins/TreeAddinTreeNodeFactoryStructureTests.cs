@@ -7,33 +7,97 @@ public sealed class TreeAddinTreeNodeFactoryStructureTests
     [Fact]
     public void TreeNodeFactory_UsesExistingWebsiteParserAndRenderer()
     {
-        string text = TestRepositoryPath.ReadExpensaFile("UI", "Addins", "TreeAddinTreeNodeFactory.cs");
+        string text = TestRepositoryPath.ReadExpensaFile(
+            "UI",
+            "Addins",
+            "TreeAddinTreeNodeFactory.cs");
 
-        Assert.Contains("WebsiteLoadResultParser.Parse", text);
-        Assert.Contains("WebsiteTreeViewRenderer.Render", text);
-        Assert.Contains("CloneNode", text);
-        Assert.Contains("root.Text = \"Websites\"", text);
+        Assert.Contains(
+            "WebsiteLoadResultParser.Parse",
+            text,
+            StringComparison.Ordinal);
+
+        Assert.Contains(
+            "WebsiteTreeViewRenderer.Render",
+            text,
+            StringComparison.Ordinal);
+
+        Assert.Contains(
+            "CloneNode",
+            text,
+            StringComparison.Ordinal);
+
+        Assert.Contains(
+            "root.Text = \"Websites\"",
+            text,
+            StringComparison.Ordinal);
     }
 
     [Fact]
-    public void TreeNodeFactory_ConvertsBudgetMonthsToExistingExpensaBudgetTags()
+    public void TreeNodeFactory_ConvertsBudgetNodesToTypedPayloads()
     {
-        string text = TestRepositoryPath.ReadExpensaFile("UI", "Addins", "TreeAddinTreeNodeFactory.cs");
+        string text = TestRepositoryPath.ReadExpensaFile(
+            "UI",
+            "Addins",
+            "TreeAddinTreeNodeFactory.cs");
 
-        Assert.Contains("CreateBudgetsRootNode", text);
-        Assert.Contains("Budget.Root", text);
-        Assert.Contains("Budget.Month.", text);
-        Assert.Contains("budgetYear", text);
-        Assert.Contains("budgetMonth", text);
+        Assert.Contains(
+            "CreateBudgetsRootNode",
+            text,
+            StringComparison.Ordinal);
+
+        Assert.Contains(
+            "new BudgetTreeNodePayload(",
+            text,
+            StringComparison.Ordinal);
+
+        Assert.Contains(
+            "GetString(element, \"nodeId\")",
+            text,
+            StringComparison.Ordinal);
+
+        Assert.Contains(
+            "GetString(element, \"nodeType\")",
+            text,
+            StringComparison.Ordinal);
+
+        Assert.Contains(
+            "budgetYear",
+            text,
+            StringComparison.Ordinal);
+
+        Assert.Contains(
+            "budgetMonth",
+            text,
+            StringComparison.Ordinal);
+
+        Assert.DoesNotContain(
+            "Budget.Month.",
+            text,
+            StringComparison.Ordinal);
     }
 
     [Fact]
-    public void TreeNodeFactory_CreatesFailureNodesForFailedAddins()
+    public void TreeNodeFactory_CreatesDetailedFailureNodesForFailedAddins()
     {
-        string text = TestRepositoryPath.ReadExpensaFile("UI", "Addins", "TreeAddinTreeNodeFactory.cs");
+        string text = TestRepositoryPath.ReadExpensaFile(
+            "UI",
+            "Addins",
+            "TreeAddinTreeNodeFactory.cs");
 
-        Assert.Contains("CreateFailureNode", text);
-        Assert.Contains("failed", text);
-        Assert.Contains("ToolTipText = exception.Message", text);
+        Assert.Contains(
+            "CreateFailureNode",
+            text,
+            StringComparison.Ordinal);
+
+        Assert.Contains(
+            "failed",
+            text,
+            StringComparison.OrdinalIgnoreCase);
+
+        Assert.Contains(
+            "ToolTipText = exception.ToString()",
+            text,
+            StringComparison.Ordinal);
     }
 }

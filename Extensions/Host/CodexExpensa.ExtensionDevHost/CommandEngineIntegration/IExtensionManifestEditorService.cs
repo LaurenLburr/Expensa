@@ -5,4 +5,8 @@ public interface IExtensionManifestEditorService
     ExtensionManifestUpdateResult SetEnabled(
         string manifestPath,
         bool enabled);
+
+    ExtensionManifestUpdateResult SetDisplaySort(
+        string manifestPath,
+        int displaySort);
 }

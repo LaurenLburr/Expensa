@@ -40,6 +40,7 @@ public sealed class ExtensionManifestEditorService : IExtensionManifestEditorSer
             {
                 ExtensionId = loadResult.Manifest.ExtensionId,
                 DisplayName = loadResult.Manifest.DisplayName,
+                DisplaySort = loadResult.Manifest.DisplaySort,
                 Version = loadResult.Manifest.Version,
                 AssemblyFile = loadResult.Manifest.AssemblyFile,
                 ProviderType = loadResult.Manifest.ProviderType,
@@ -58,6 +59,50 @@ public sealed class ExtensionManifestEditorService : IExtensionManifestEditorSer
             Message = enabled
                 ? "Manifest enabled."
                 : "Manifest disabled.",
+            Manifest = updatedManifest
+        };
+    }
+
+    public ExtensionManifestUpdateResult SetDisplaySort(
+        string manifestPath,
+        int displaySort)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(manifestPath);
+
+        ExtensionManifestLoadResult loadResult =
+            _loader.Load(manifestPath);
+
+        if (!loadResult.Success || loadResult.Manifest is null)
+        {
+            return new ExtensionManifestUpdateResult
+            {
+                Success = false,
+                Message = string.Join(Environment.NewLine, loadResult.Errors)
+            };
+        }
+
+        ExtensionManifest updatedManifest =
+            new()
+            {
+                ExtensionId = loadResult.Manifest.ExtensionId,
+                DisplayName = loadResult.Manifest.DisplayName,
+                DisplaySort = displaySort,
+                Version = loadResult.Manifest.Version,
+                AssemblyFile = loadResult.Manifest.AssemblyFile,
+                ProviderType = loadResult.Manifest.ProviderType,
+                MinimumHostVersion = loadResult.Manifest.MinimumHostVersion,
+                Enabled = loadResult.Manifest.Enabled,
+                Description = loadResult.Manifest.Description
+            };
+
+        ExtensionManifestWriter.Write(
+            manifestPath,
+            updatedManifest);
+
+        return new ExtensionManifestUpdateResult
+        {
+            Success = true,
+            Message = "Manifest display sort updated.",
             Manifest = updatedManifest
         };
     }

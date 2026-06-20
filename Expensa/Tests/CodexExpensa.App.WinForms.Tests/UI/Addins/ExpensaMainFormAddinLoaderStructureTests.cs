@@ -5,37 +5,88 @@ namespace CodexExpensa.App.WinForms.Tests.UI.Addins;
 public sealed class ExpensaMainFormAddinLoaderStructureTests
 {
     [Fact]
-    public void MainForm_UsesAggregateTreeAddinLoaderInsteadOfWebsiteOnlyLoader()
+    public void MainForm_UsesTreeAddinLoaderForRefresh()
     {
-        string text = TestRepositoryPath.ReadExpensaFile("UI", "MainForm.cs");
+        string text = TestRepositoryPath.ReadExpensaFile(
+            "UI",
+            "MainForm.cs");
 
-        Assert.Contains("TreeAddinTreeViewLoader", text);
-        Assert.Contains("_treeAddinLoader", text);
-        Assert.Contains("LoadTreeAddinsAsync", text);
-        Assert.Contains("LoadAllIntoTreeViewAsync", text);
+        Assert.Contains(
+            "TreeAddinTreeViewLoader",
+            text,
+            StringComparison.Ordinal);
 
-        Assert.DoesNotContain("private readonly WebsiteAddinTreeLoader _websiteTreeLoader", text);
-        Assert.DoesNotContain("LoadWebsiteAddinTreeAsync", text);
+        Assert.Contains(
+            "_treeAddinLoader.LoadAllIntoTreeViewAsync(",
+            text,
+            StringComparison.Ordinal);
+
+        Assert.Contains(
+            "TreeAddinTreeNodeFactory.CreateRootNode",
+            TestRepositoryPath.ReadExpensaFile(
+                "UI",
+                "Addins",
+                "TreeAddinTreeViewLoader.cs"),
+            StringComparison.Ordinal);
     }
 
     [Fact]
-    public void MainForm_LoadAndRefreshUseTreeAddins()
+    public void MainForm_BudgetNodesOpenExtensionProvidedScreens()
     {
-        string text = TestRepositoryPath.ReadExpensaFile("UI", "MainForm.cs");
+        string text = TestRepositoryPath.ReadExpensaFile(
+            "UI",
+            "MainForm.cs");
 
-        Assert.Contains("await LoadTreeAddinsAsync();", text);
-        Assert.Contains("SetStatus(\"Tree add-ins refreshed.\")", text);
-        Assert.Contains("SetStatus(\"Loading tree add-ins...\")", text);
-        Assert.Contains("Tree add-ins loaded:", text);
-    }
+        int branchStart =
+            text.IndexOf(
+                "if (e.Node.Tag is BudgetTreeNodePayload budgetPayload)",
+                StringComparison.Ordinal);
 
-    [Fact]
-    public void MainForm_BudgetRootTagOpensBudgetsLanding()
-    {
-        string text = TestRepositoryPath.ReadExpensaFile("UI", "MainForm.cs");
+        Assert.True(
+            branchStart >= 0,
+            "The typed Budget add-in selection branch was not found.");
 
-        Assert.Contains("Budget.Root", text);
-        Assert.Contains("ShowBudgetsLanding();", text);
-        Assert.Contains("BudgetNav.TryParseMonth", text);
+        int branchEnd =
+            text.IndexOf(
+                "if (e.Node.Tag is PayeeTreeNodePayload payeePayload)",
+                branchStart,
+                StringComparison.Ordinal);
+
+        Assert.True(
+            branchEnd > branchStart,
+            "The end of the typed Budget add-in selection branch was not found.");
+
+        string budgetBranch =
+            text[branchStart..branchEnd];
+
+        Assert.Contains(
+            "ShowAddinScreenAsync(",
+            budgetBranch,
+            StringComparison.Ordinal);
+
+        Assert.Contains(
+            "TreeAddinKind.Budgets",
+            budgetBranch,
+            StringComparison.Ordinal);
+
+        Assert.Contains(
+            "Year = budgetPayload.Year",
+            budgetBranch,
+            StringComparison.Ordinal);
+
+        Assert.Contains(
+            "Month = budgetPayload.Month",
+            budgetBranch,
+            StringComparison.Ordinal);
+
+        Assert.DoesNotContain(
+            "ShowBudgetsLanding();",
+            budgetBranch,
+            StringComparison.Ordinal);
+
+        Assert.DoesNotContain(
+            "ShowBudgetMonth(",
+            budgetBranch,
+            StringComparison.Ordinal);
     }
 }

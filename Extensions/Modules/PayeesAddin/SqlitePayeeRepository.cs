@@ -20,7 +20,7 @@ public sealed class SqlitePayeeRepository
             return CreateEmptyResult($"Database not found: {request.DatabasePath}");
         }
 
-        using SqliteConnection connection = new($"Data Source={request.DatabasePath};Mode=ReadOnly");
+        using SqliteConnection connection = new($"Data Source={request.DatabasePath};Mode=ReadOnly;Pooling=False");
         connection.Open();
 
         string? tableName = FindPayeeTableName(connection);
@@ -30,7 +30,9 @@ public sealed class SqlitePayeeRepository
             return CreateEmptyResult("No Payee or Payees table was found.");
         }
 
-        DataTable rows = LoadPayeeRows(connection, tableName, request);
+        bool hasTagTables = TableExists(connection, "Tag") && TableExists(connection, "TagAssignment");
+
+        DataTable rows = LoadPayeeRows(connection, tableName, request, hasTagTables);
         IReadOnlyList<PayeeTreeNode> nodes = BuildPayeeTree(rows);
 
         int totalCount = nodes
@@ -89,24 +91,40 @@ public sealed class SqlitePayeeRepository
         return Convert.ToString(command.ExecuteScalar(), CultureInfo.InvariantCulture);
     }
 
-    private static DataTable LoadPayeeRows(SqliteConnection connection, string tableName, PayeeLoadRequest request)
+    private static DataTable LoadPayeeRows(SqliteConnection connection, string tableName, PayeeLoadRequest request, bool hasTagTables)
     {
         HashSet<string> columns = GetColumns(connection, tableName);
 
         string idColumn = PickColumn(columns, "PayeeId", "Id", tableName + "Id");
         string nameColumn = PickColumn(columns, "PayeeName", "Name", "DisplayName");
-        string activeExpression = columns.Contains("IsActive") ? "[IsActive]" : "1";
+        string activeExpression = columns.Contains("IsActive") ? "p.[IsActive]" : "1";
+        string tagSelect = hasTagTables
+            ? "COALESCE(t.[TagName], 'Uncategorized') AS [TagName], COALESCE(t.[SortIndex], 999999) AS [TagSortIndex], COALESCE(ta.[SortIndex], 0) AS [AssignmentSortIndex]"
+            : "'Uncategorized' AS [TagName], 999999 AS [TagSortIndex], 0 AS [AssignmentSortIndex]";
+        string tagJoin = hasTagTables
+            ? $"""
+            LEFT JOIN [TagAssignment] ta
+                ON ta.[EntityType] = 'Payee'
+                AND ta.[EntityId] = p.[{idColumn}]
+                AND ta.[IsActive] = 1
+            LEFT JOIN [Tag] t
+                ON t.[TagId] = ta.[TagId]
+                AND t.[IsActive] = 1
+            """
+            : string.Empty;
 
         string whereClause =
             string.IsNullOrWhiteSpace(request.SearchText)
                 ? string.Empty
-                : $"WHERE [{nameColumn}] LIKE @SearchText";
+                : hasTagTables
+                    ? $"WHERE (p.[{nameColumn}] LIKE @SearchText OR t.[TagName] LIKE @SearchText)"
+                    : $"WHERE p.[{nameColumn}] LIKE @SearchText";
 
         if (!request.IncludeInactive && columns.Contains("IsActive"))
         {
             whereClause = string.IsNullOrWhiteSpace(whereClause)
-                ? "WHERE [IsActive] <> 0"
-                : whereClause + " AND [IsActive] <> 0";
+                ? "WHERE p.[IsActive] <> 0"
+                : whereClause + " AND p.[IsActive] <> 0";
         }
 
         using SqliteCommand command = connection.CreateCommand();
@@ -114,12 +132,18 @@ public sealed class SqlitePayeeRepository
         command.CommandText =
             $"""
             SELECT
-                [{idColumn}] AS [PayeeId],
-                [{nameColumn}] AS [PayeeName],
-                {activeExpression} AS [IsActive]
-            FROM [{tableName}]
+                p.[{idColumn}] AS [PayeeId],
+                p.[{nameColumn}] AS [PayeeName],
+                {activeExpression} AS [IsActive],
+                {tagSelect}
+            FROM [{tableName}] p
+            {tagJoin}
             {whereClause}
-            ORDER BY [{nameColumn}]
+            ORDER BY
+                [TagSortIndex],
+                [TagName],
+                [AssignmentSortIndex],
+                p.[{nameColumn}]
             LIMIT @MaximumRows;
             """;
 
@@ -140,12 +164,19 @@ public sealed class SqlitePayeeRepository
 
     private static IReadOnlyList<PayeeTreeNode> BuildPayeeTree(DataTable rows)
     {
-        List<PayeeTreeNode> payeeNodes = [];
+        Dictionary<string, List<PayeeTreeNode>> childrenByTag =
+            new(StringComparer.OrdinalIgnoreCase);
 
         foreach (DataRow row in rows.Rows)
         {
             string payeeId = Convert.ToString(row["PayeeId"], CultureInfo.InvariantCulture) ?? string.Empty;
             string payeeName = Convert.ToString(row["PayeeName"], CultureInfo.InvariantCulture) ?? string.Empty;
+            string tagName = Convert.ToString(row["TagName"], CultureInfo.InvariantCulture) ?? string.Empty;
+
+            if (string.IsNullOrWhiteSpace(tagName))
+            {
+                tagName = "Uncategorized";
+            }
 
             bool isActive =
                 row["IsActive"] is not DBNull &&
@@ -156,8 +187,8 @@ public sealed class SqlitePayeeRepository
                 payeeName = payeeId;
             }
 
-            payeeNodes.Add(
-                new PayeeTreeNode
+            PayeeTreeNode payeeNode =
+                new()
                 {
                     NodeId = "payee:" + payeeId,
                     DisplayText = payeeName,
@@ -166,8 +197,27 @@ public sealed class SqlitePayeeRepository
                     PayeeName = payeeName,
                     IsActive = isActive,
                     Children = []
-                });
+                };
+
+            if (!childrenByTag.TryGetValue(tagName, out List<PayeeTreeNode>? children))
+            {
+                children = [];
+                childrenByTag[tagName] = children;
+            }
+
+            children.Add(payeeNode);
         }
+
+        IReadOnlyList<PayeeTreeNode> tagNodes = childrenByTag
+            .OrderBy(static pair => pair.Key, StringComparer.OrdinalIgnoreCase)
+            .Select(static pair => new PayeeTreeNode
+            {
+                NodeId = $"payees.tag:{pair.Key}",
+                DisplayText = pair.Key,
+                NodeType = PayeeTreeNodeTypes.Group,
+                Children = pair.Value
+            })
+            .ToList();
 
         return
         [
@@ -176,16 +226,7 @@ public sealed class SqlitePayeeRepository
                 NodeId = "payees",
                 DisplayText = "Payees",
                 NodeType = PayeeTreeNodeTypes.Root,
-                Children =
-                [
-                    new PayeeTreeNode
-                    {
-                        NodeId = "payees.by-name",
-                        DisplayText = "By Name",
-                        NodeType = PayeeTreeNodeTypes.Group,
-                        Children = payeeNodes
-                    }
-                ]
+                Children = tagNodes
             }
         ];
     }
@@ -200,12 +241,39 @@ public sealed class SqlitePayeeRepository
 
         using SqliteDataReader reader = command.ExecuteReader();
 
-        while (reader.Read())
+        DataTable table = new();
+        table.Load(reader);
+
+        foreach (DataRow row in table.Rows)
         {
-            columns.Add(reader.GetString(0));
+            string columnName = Convert.ToString(row["name"], CultureInfo.InvariantCulture) ?? string.Empty;
+
+            if (!string.IsNullOrWhiteSpace(columnName))
+            {
+                columns.Add(columnName);
+            }
         }
 
         return columns;
+    }
+
+    private static bool TableExists(SqliteConnection connection, string tableName)
+    {
+        using SqliteCommand command = connection.CreateCommand();
+
+        command.CommandText =
+            """
+            SELECT 1
+            FROM [sqlite_master]
+            WHERE [type] = 'table'
+              AND [name] = @TableName
+            LIMIT 1;
+            """;
+
+        command.Parameters.AddWithValue("@TableName", tableName);
+
+        object? result = command.ExecuteScalar();
+        return result is not null && result is not DBNull;
     }
 
     private static string PickColumn(HashSet<string> columns, params string[] candidates)

@@ -7,4 +7,9 @@ public sealed class ExtensionProjectRegistration
     public string AssemblyName { get; set; } = string.Empty;
     public bool IsEnabled { get; set; }
     public int SortOrder { get; set; }
+    public int DisplaySort
+    {
+        get => SortOrder;
+        set => SortOrder = value;
+    }
 }

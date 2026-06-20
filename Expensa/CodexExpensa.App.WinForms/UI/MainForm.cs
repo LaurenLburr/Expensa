@@ -7,6 +7,7 @@ using CodexExpensa.App.WinForms.UI.Accounts;
 using CodexExpensa.App.WinForms.UI.Addins;
 using CodexExpensa.App.WinForms.UI.Banks;
 using CodexExpensa.App.WinForms.UI.Budgets;
+using CodexExpensa.App.WinForms.UI.Payees;
 using CodexExpensa.App.WinForms.UI.Websites;
 using CodexExpensa.Core.Abstractions;
 using CodexExpensa.Core.Domain.Accounts;
@@ -32,12 +33,16 @@ public partial class MainForm : Form
 
     private Form? _activeChildForm;
     private readonly TreeAddinTreeViewLoader _treeAddinLoader = new();
+    private readonly AddinScreenRuntimeInvoker _addinScreenInvoker = new();
+    private readonly WebsiteTagAssignmentService _websiteTagAssignmentService = new();
 
     private readonly ContextMenuStrip _ctxBanksRoot;
     private readonly ContextMenuStrip _ctxAccountsRoot;
     private readonly ContextMenuStrip _ctxBudgetsRoot;
     private readonly ContextMenuStrip _ctxBankNode;
     private readonly ContextMenuStrip _ctxAccountNode;
+    private readonly ContextMenuStrip _ctxWebsiteNode;
+    private ToolStripDropDown? _websiteTagPickerDropDown;
 
     private enum NavTag
     {
@@ -137,9 +142,11 @@ public partial class MainForm : Form
         _ctxBudgetsRoot = BuildBudgetsRootMenu();
         _ctxBankNode = BuildBankNodeMenu();
         _ctxAccountNode = BuildAccountNodeMenu();
+        _ctxWebsiteNode = BuildWebsiteNodeMenu();
 
         Load += MainForm_Load;
 
+        treeNav.ShowNodeToolTips = true;
         treeNav.AfterSelect += TreeNav_AfterSelect;
         treeNav.NodeMouseClick += TreeNav_NodeMouseClick;
 
@@ -305,7 +312,7 @@ public partial class MainForm : Form
         treeNav.SelectedNode = treeNav.Nodes[0];
     }
 
-    private void TreeNav_AfterSelect(object? sender, TreeViewEventArgs e)
+    private async void TreeNav_AfterSelect(object? sender, TreeViewEventArgs e)
     {
         if (e.Node is null)
             return;
@@ -313,8 +320,56 @@ public partial class MainForm : Form
         if (WebsiteTreeNodeTagReader.TryReadPayload(e.Node, out var websitePayload) &&
             websitePayload is not null)
         {
-            ShowWebsiteNode(websitePayload);
+            await ShowAddinScreenAsync(
+                TreeAddinKind.Websites,
+                new AddinScreenSelection
+                {
+                    NodeId = websitePayload.NodeId,
+                    NodeType = websitePayload.NodeType.ToString(),
+                    EntityId = websitePayload.WebsiteId,
+                    DisplayText = websitePayload.DisplayText,
+                    Url = websitePayload.Url,
+                    Category = websitePayload.TagName,
+                    IsActive = websitePayload.IsActive
+                });
+
             SetStatus($"Websites: {websitePayload.DisplayText}");
+            return;
+        }
+
+        if (e.Node.Tag is BudgetTreeNodePayload budgetPayload)
+        {
+            await ShowAddinScreenAsync(
+                TreeAddinKind.Budgets,
+                new AddinScreenSelection
+                {
+                    NodeId = budgetPayload.NodeId,
+                    NodeType = budgetPayload.NodeType,
+                    DisplayText = budgetPayload.DisplayText,
+                    Year = budgetPayload.Year,
+                    Month = budgetPayload.Month
+                });
+
+            SetStatus($"Budgets: {budgetPayload.DisplayText}");
+            return;
+        }
+
+        if (e.Node.Tag is PayeeTreeNodePayload payeePayload)
+        {
+            await ShowAddinScreenAsync(
+                TreeAddinKind.Payees,
+                new AddinScreenSelection
+                {
+                    NodeId = e.Node.Name,
+                    NodeType = payeePayload.NodeType,
+                    EntityId = payeePayload.PayeeId,
+                    DisplayText = payeePayload.DisplayText
+                });
+
+            SetStatus(
+                string.IsNullOrWhiteSpace(payeePayload.DisplayText)
+                    ? "Payees"
+                    : $"Payees: {payeePayload.DisplayText}");
             return;
         }
 
@@ -336,38 +391,6 @@ public partial class MainForm : Form
                     SetStatus("Budgets");
                     ShowBudgetsLanding();
                     return;
-            }
-        }
-
-        // Budgets
-        if (e.Node.Tag is string budgetTag)
-        {
-            if (string.Equals(budgetTag, "Budget.Root", StringComparison.OrdinalIgnoreCase))
-            {
-                ShowBudgetsLanding();
-                SetStatus("Budgets");
-                return;
-            }
-
-            if (string.Equals(budgetTag, BudgetNav.Template, StringComparison.OrdinalIgnoreCase))
-            {
-                ShowBudgetTemplate();
-                SetStatus("Budgets: Template");
-                return;
-            }
-
-            if (BudgetNav.TryParseCurrent(budgetTag, out var cy, out var cm))
-            {
-                ShowBudgetMonth(cy, cm);
-                SetStatus($"Budgets: Current ({new DateTime(cy, cm, 1):MMM/yyyy})");
-                return;
-            }
-
-            if (BudgetNav.TryParseMonth(budgetTag, out var year, out var month))
-            {
-                ShowBudgetMonth(year, month);
-                SetStatus($"Budgets: {year}-{month:D2}");
-                return;
             }
         }
 
@@ -410,6 +433,12 @@ public partial class MainForm : Form
             return;
 
         treeNav.SelectedNode = e.Node;
+
+        if (IsWebsiteNavigationNode(e.Node))
+        {
+            _ctxWebsiteNode.Show(treeNav, e.Location);
+            return;
+        }
 
         if (e.Node.Tag is NavTag rootTag)
         {
@@ -455,6 +484,208 @@ public partial class MainForm : Form
             _ctxAccountNode.Show(treeNav, e.Location);
         }
     }
+
+    private ContextMenuStrip BuildWebsiteNodeMenu()
+    {
+        var menu = new ContextMenuStrip();
+
+        var assignTag = new ToolStripMenuItem("Assign Tag...");
+        assignTag.Click += (_, _) => ShowWebsiteTagPicker();
+
+        var removeTag = new ToolStripMenuItem("Remove Tag Association");
+        removeTag.Click += async (_, _) => await RemoveSelectedWebsiteTagAssociationsAsync();
+
+        menu.Opening += (_, e) =>
+        {
+            bool isWebsiteNode =
+                TryGetSelectedWebsiteForTagging(out WebsiteTagTarget? target) &&
+                target is not null;
+
+            assignTag.Enabled = isWebsiteNode;
+            removeTag.Enabled =
+                isWebsiteNode &&
+                target is not null &&
+                !string.IsNullOrWhiteSpace(target.TagName) &&
+                !string.Equals(target.TagName, "Uncategorized", StringComparison.OrdinalIgnoreCase);
+
+            e.Cancel = treeNav.SelectedNode is null ||
+                !IsWebsiteNavigationNode(treeNav.SelectedNode);
+        };
+
+        menu.Items.Add(assignTag);
+        menu.Items.Add(removeTag);
+
+        return menu;
+    }
+
+    private void ShowWebsiteTagPicker()
+    {
+        if (!TryGetSelectedWebsiteForTagging(out WebsiteTagTarget? target) ||
+            target is null)
+        {
+            return;
+        }
+
+        CloseWebsiteTagPicker();
+
+        WebsiteTagPickerPanel picker = new();
+        picker.SetTags(GetUnassignedWebsiteTagNames(target.WebsiteId));
+        picker.TypedTagAccepted += WebsiteTagPicker_TagAccepted;
+        picker.ListedTagAccepted += WebsiteTagPicker_TagAccepted;
+
+        ToolStripControlHost host = new(picker)
+        {
+            AutoSize = false,
+            Size = picker.Size,
+            Margin = Padding.Empty,
+            Padding = Padding.Empty
+        };
+
+        _websiteTagPickerDropDown = new ToolStripDropDown
+        {
+            Padding = Padding.Empty
+        };
+        _websiteTagPickerDropDown.Items.Add(host);
+        _websiteTagPickerDropDown.Closed += (_, _) => _websiteTagPickerDropDown = null;
+
+        Rectangle nodeBounds = treeNav.SelectedNode?.Bounds ?? Rectangle.Empty;
+        Point location = new(nodeBounds.Left, nodeBounds.Bottom);
+        _websiteTagPickerDropDown.Show(treeNav, location);
+        picker.FocusTextBox();
+    }
+
+    private IReadOnlyList<string> GetUnassignedWebsiteTagNames(string websiteId)
+    {
+        HashSet<string> assignedTags =
+            new(_websiteTagAssignmentService.GetAssignedTagNames(websiteId), StringComparer.CurrentCultureIgnoreCase);
+
+        return _websiteTagAssignmentService.GetActiveTagNames()
+            .Where(tagName => !assignedTags.Contains(tagName))
+            .ToList();
+    }
+
+    private async void WebsiteTagPicker_TagAccepted(object? sender, string tagName)
+    {
+        await AssignTagToSelectedWebsiteAsync(tagName);
+    }
+
+    private async Task AssignTagToSelectedWebsiteAsync(string tagName)
+    {
+        if (!TryGetSelectedWebsiteForTagging(out WebsiteTagTarget? target) ||
+            target is null)
+        {
+            return;
+        }
+
+        try
+        {
+            string assignedTag =
+                _websiteTagAssignmentService.AssignTagToWebsite(target.WebsiteId, tagName);
+
+            CloseWebsiteTagPicker();
+            await LoadTreeAddinsAsync();
+            SetStatus($"Assigned tag '{assignedTag}' to {target.DisplayText}.");
+        }
+        catch (Exception ex)
+        {
+            ShowError("Assign website tag failed", ex);
+        }
+    }
+
+    private async Task RemoveSelectedWebsiteTagAssociationsAsync()
+    {
+        if (!TryGetSelectedWebsiteForTagging(out WebsiteTagTarget? target) ||
+            target is null)
+        {
+            return;
+        }
+
+        try
+        {
+            int removedCount =
+                _websiteTagAssignmentService.RemoveWebsiteTagAssociations(target.WebsiteId);
+
+            await LoadTreeAddinsAsync();
+            SetStatus(removedCount == 0
+                ? $"{target.DisplayText} had no tag association to remove."
+                : $"Removed tag association from {target.DisplayText}.");
+        }
+        catch (Exception ex)
+        {
+            ShowError("Remove website tag association failed", ex);
+        }
+    }
+
+    private void CloseWebsiteTagPicker()
+    {
+        if (_websiteTagPickerDropDown is null)
+        {
+            return;
+        }
+
+        ToolStripDropDown dropDown = _websiteTagPickerDropDown;
+        _websiteTagPickerDropDown = null;
+        dropDown.Close();
+        dropDown.Dispose();
+    }
+
+    private bool TryGetSelectedWebsiteForTagging(out WebsiteTagTarget? target)
+    {
+        target = null;
+
+        TreeNode? selectedNode = treeNav.SelectedNode;
+
+        if (selectedNode is null ||
+            !IsWebsiteNavigationNode(selectedNode))
+        {
+            return false;
+        }
+
+        if (WebsiteTreeNodeTagReader.TryReadPayload(selectedNode, out IHostWebsiteTreeNodePayload? payload) &&
+            payload is not null &&
+            payload.NodeType == HostWebsiteTreeNodeType.Website &&
+            !string.IsNullOrWhiteSpace(payload.WebsiteId))
+        {
+            target = new WebsiteTagTarget(
+                payload.WebsiteId,
+                payload.DisplayText,
+                payload.TagName);
+
+            return true;
+        }
+
+        if (selectedNode.Nodes.Count == 0 &&
+            !string.IsNullOrWhiteSpace(selectedNode.Name))
+        {
+            target = new WebsiteTagTarget(
+                selectedNode.Name,
+                selectedNode.Text,
+                selectedNode.Parent?.Text ?? string.Empty);
+
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool IsWebsiteNavigationNode(TreeNode node)
+    {
+        for (TreeNode? current = node; current is not null; current = current.Parent)
+        {
+            if (string.Equals(current.Name, "addin.websites", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(current.Text, "Websites", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private sealed record WebsiteTagTarget(
+        string WebsiteId,
+        string DisplayText,
+        string TagName);
 
     private ContextMenuStrip BuildBanksRootMenu()
     {
@@ -612,6 +843,57 @@ public partial class MainForm : Form
         return menu;
     }
 
+    private async Task ShowAddinScreenAsync(
+        TreeAddinKind kind,
+        AddinScreenSelection selection)
+    {
+        TreeAddinDefinition definition =
+            TreeAddinDefinition.DefaultTreeAddins()
+                .Single(item => item.Kind == kind);
+
+        try
+        {
+            SetStatus($"Loading {selection.DisplayText}...");
+
+            AddinScreenRuntimeResult result =
+                await _addinScreenInvoker.ExecuteAsync(
+                    definition,
+                    selection);
+
+            if (!result.Succeeded)
+            {
+                throw new InvalidOperationException(
+                    string.IsNullOrWhiteSpace(result.Message)
+                        ? $"{definition.AddinName} screen provider failed."
+                        : result.Message);
+            }
+
+            ShowChildForm(
+                new AddinScreenForm(
+                    result.Screen,
+                    result.AssemblyPath,
+                    result.AssemblyLastWriteTimeUtc,
+                    assemblyVersion: result.AssemblyVersion,
+                    deployedUtc: result.DeployedUtc,
+                    accounts: _accounts,
+                    payees: _payees,
+                    transactions: _transactions,
+                    selection: selection,
+                    saveDatabase: _dbSession.Save,
+                    reloadAsync: () =>
+                        ShowAddinScreenAsync(
+                            kind,
+                            selection)));
+        }
+        catch (Exception exception)
+        {
+            ShowChildForm(
+                AddinScreenForm.CreateFailure(
+                    selection.DisplayText,
+                    exception));
+        }
+    }
+
     private void ShowWebsiteNode(IHostWebsiteTreeNodePayload payload)
     {
         ArgumentNullException.ThrowIfNull(payload);
@@ -647,6 +929,12 @@ public partial class MainForm : Form
     private void ShowBudgetsLanding()
     {
         var form = new BudgetsLandingForm();
+        ShowChildForm(form);
+    }
+
+    private void ShowPayees()
+    {
+        var form = new PayeesForm(_payees);
         ShowChildForm(form);
     }
 

@@ -1,5 +1,4 @@
 using System.Reflection;
-using System.Runtime.Loader;
 using CodexExpensa.App.WinForms.Composition;
 
 namespace CodexExpensa.App.WinForms.UI.Addins;
@@ -28,14 +27,11 @@ public sealed class TreeAddinRuntimeInvoker
         ArgumentNullException.ThrowIfNull(definition);
         ArgumentNullException.ThrowIfNull(options);
 
-        string assemblyPath =
-            assemblyLocator.FindAssemblyPath(definition);
-
-        TreeAddinDependencyLoadContext loadContext =
-            new(assemblyPath);
-
         Assembly assembly =
-            loadContext.LoadMainAssembly(assemblyPath);
+            assemblyLocator.FindAssembly(definition);
+
+        string assemblyPath =
+            assembly.Location;
 
         Type smokeRunnerType =
             assembly.GetType(definition.SmokeRunnerTypeName, throwOnError: true)!;
@@ -93,7 +89,10 @@ public sealed class TreeAddinRuntimeInvoker
             Definition = definition,
             Status = GetPropertyString(result, "Status"),
             Message = GetPropertyString(result, "Message"),
-            OutputJson = GetPropertyString(result, "OutputJson")
+            OutputJson = GetPropertyString(result, "OutputJson"),
+            AssemblyPath = assemblyPath,
+            AssemblyLastWriteTimeUtc =
+                File.GetLastWriteTimeUtc(assemblyPath)
         };
     }
 
@@ -121,40 +120,4 @@ public sealed class TreeAddinRuntimeInvoker
         return Convert.ToString(value) ?? string.Empty;
     }
 
-    private sealed class TreeAddinDependencyLoadContext : AssemblyLoadContext
-    {
-        private readonly AssemblyDependencyResolver resolver;
-
-        public TreeAddinDependencyLoadContext(string mainAssemblyPath)
-            : base(isCollectible: false)
-        {
-            resolver =
-                new AssemblyDependencyResolver(mainAssemblyPath);
-        }
-
-        public Assembly LoadMainAssembly(string assemblyPath)
-        {
-            return LoadFromAssemblyPath(assemblyPath);
-        }
-
-        protected override Assembly? Load(AssemblyName assemblyName)
-        {
-            string? assemblyPath =
-                resolver.ResolveAssemblyToPath(assemblyName);
-
-            return assemblyPath is null
-                ? null
-                : LoadFromAssemblyPath(assemblyPath);
-        }
-
-        protected override IntPtr LoadUnmanagedDll(string unmanagedDllName)
-        {
-            string? libraryPath =
-                resolver.ResolveUnmanagedDllToPath(unmanagedDllName);
-
-            return libraryPath is null
-                ? IntPtr.Zero
-                : LoadUnmanagedDllFromPath(libraryPath);
-        }
-    }
 }

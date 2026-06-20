@@ -24,6 +24,25 @@ public sealed class ExtensionRuntimeDashboardControllerManifestEditorTests
         Assert.False(editor.LastEnabled);
     }
 
+    [Fact]
+    public void SetManifestDisplaySort_CallsEditorService()
+    {
+        FakeManifestEditorService editor = new();
+
+        ExtensionRuntimeDashboardController controller =
+            new(
+                new ExtensionRuntimeManager(),
+                new FakeManifestRegistryService(),
+                editor);
+
+        ExtensionManifestUpdateResult result =
+            controller.SetManifestDisplaySort("C:\\Temp\\extension.json", displaySort: 250);
+
+        Assert.True(result.Success);
+        Assert.Equal("C:\\Temp\\extension.json", editor.LastManifestPath);
+        Assert.Equal(250, editor.LastDisplaySort);
+    }
+
     private sealed class FakeManifestRegistryService : IExtensionManifestRegistryService
     {
         public ExtensionManifestRegistrySnapshot Discover(
@@ -40,12 +59,28 @@ public sealed class ExtensionRuntimeDashboardControllerManifestEditorTests
 
         public bool LastEnabled { get; private set; }
 
+        public int LastDisplaySort { get; private set; }
+
         public ExtensionManifestUpdateResult SetEnabled(
             string manifestPath,
             bool enabled)
         {
             LastManifestPath = manifestPath;
             LastEnabled = enabled;
+
+            return new ExtensionManifestUpdateResult
+            {
+                Success = true,
+                Message = "Updated."
+            };
+        }
+
+        public ExtensionManifestUpdateResult SetDisplaySort(
+            string manifestPath,
+            int displaySort)
+        {
+            LastManifestPath = manifestPath;
+            LastDisplaySort = displaySort;
 
             return new ExtensionManifestUpdateResult
             {

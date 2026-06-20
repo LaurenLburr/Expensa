@@ -4,5 +4,6 @@ public enum TreeAddinKind
 {
     Unknown = 0,
     Websites = 1,
-    Budgets = 2
+    Budgets = 2,
+    Payees = 3
 }

@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace CodexExpensa.ExtensionDevHost.CommandEngineIntegration;
 
 public sealed class ExtensionManifest
@@ -5,6 +7,9 @@ public sealed class ExtensionManifest
     public string ExtensionId { get; init; } = string.Empty;
 
     public string DisplayName { get; init; } = string.Empty;
+
+    [JsonPropertyName("displaySort")]
+    public int DisplaySort { get; init; }
 
     public string Version { get; init; } = string.Empty;
 

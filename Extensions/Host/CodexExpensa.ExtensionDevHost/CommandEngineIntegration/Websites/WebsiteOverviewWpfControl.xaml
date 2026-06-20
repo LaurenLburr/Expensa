@@ -1,0 +1,34 @@
+<UserControl
+    x:Class="CodexExpensa.ExtensionDevHost.CommandEngineIntegration.Websites.WebsiteOverviewWpfControl"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:websites="clr-namespace:CodexExpensa.ExtensionDevHost.CommandEngineIntegration.Websites">
+    <Grid Margin="10">
+        <DataGrid
+            x:Name="WebsitesDataGrid"
+            AutoGenerateColumns="False"
+            CanUserAddRows="False"
+            IsReadOnly="True"
+            MouseDoubleClick="WebsitesDataGrid_MouseDoubleClick"
+            SelectionMode="Single">
+            <DataGrid.Columns>
+                <DataGridTextColumn
+                    Width="180"
+                    Binding="{Binding Name}"
+                    Header="Name" />
+                <DataGridTextColumn
+                    Width="220"
+                    Binding="{Binding Url}"
+                    Header="Url" />
+                <DataGridTextColumn
+                    Width="160"
+                    Binding="{Binding TagName}"
+                    Header="Tag" />
+                <DataGridTextColumn
+                    Width="220"
+                    Binding="{Binding WebsiteId}"
+                    Header="WebsiteId" />
+            </DataGrid.Columns>
+        </DataGrid>
+    </Grid>
+</UserControl>

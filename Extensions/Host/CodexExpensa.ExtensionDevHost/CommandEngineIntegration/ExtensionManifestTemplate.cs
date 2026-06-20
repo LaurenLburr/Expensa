@@ -8,6 +8,7 @@ public static class ExtensionManifestTemplate
         {
             ExtensionId = "WebsitesAddin",
             DisplayName = "Websites Add-in",
+            DisplaySort = 100,
             Version = "1.0.0",
             AssemblyFile = "WebsitesAddin.dll",
             ProviderType = "WebsitesAddin.WebsitesAddinCommandProvider",

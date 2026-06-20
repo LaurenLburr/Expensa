@@ -5,14 +5,14 @@ namespace CodexExpensa.App.WinForms.Tests.UI.Addins;
 public sealed class TreeAddinRuntimeInvokerStructureTests
 {
     [Fact]
-    public void RuntimeInvoker_UsesDependencyAwareAssemblyLoadContext()
+    public void RuntimeInvoker_UsesLocatedCompiledAddinAssembly()
     {
         string text = TestRepositoryPath.ReadExpensaFile("UI", "Addins", "TreeAddinRuntimeInvoker.cs");
 
-        Assert.Contains("AssemblyDependencyResolver", text);
-        Assert.Contains("AssemblyLoadContext", text);
-        Assert.Contains("LoadMainAssembly", text);
-        Assert.Contains("LoadUnmanagedDll", text);
+        Assert.Contains("assemblyLocator.FindAssembly(definition)", text);
+        Assert.Contains("assembly.Location", text);
+        Assert.DoesNotContain("AssemblyDependencyResolver", text);
+        Assert.DoesNotContain("AssemblyLoadContext", text);
     }
 
     [Fact]

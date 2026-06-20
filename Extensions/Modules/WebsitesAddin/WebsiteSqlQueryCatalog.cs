@@ -46,7 +46,7 @@ public sealed class WebsiteSqlQueryCatalog
 
     private SqliteConnection OpenConnection()
     {
-        SqliteConnection connection = new($"Data Source={_databasePath}");
+        SqliteConnection connection = new($"Data Source={_databasePath};Mode=ReadOnly;Pooling=False");
         connection.Open();
         return connection;
     }

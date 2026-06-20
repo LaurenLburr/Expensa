@@ -35,6 +35,61 @@ public sealed class AddinRuntimeDatabaseCopyService
             _pathService.GetDevCurrentDatabasePath(addinId));
     }
 
+    public AddinRuntimeDatabaseCopyResult CreateDevDatabaseFromRuntime(
+        string addinId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(addinId);
+
+        AddinRuntimeDatabaseLocation runtimeLocation =
+            _pathService.GetRuntimeDatabaseLocation(addinId);
+
+        string devDatabasePath =
+            _pathService.GetDevCurrentDatabasePath(addinId);
+
+        if (!File.Exists(runtimeLocation.DatabasePath))
+        {
+            throw new FileNotFoundException(
+                $"The current add-in runtime database was not found: {runtimeLocation.DatabasePath}",
+                runtimeLocation.DatabasePath);
+        }
+
+        string fullRuntimePath =
+            Path.GetFullPath(runtimeLocation.DatabasePath);
+
+        string fullDevPath =
+            Path.GetFullPath(devDatabasePath);
+
+        if (string.Equals(fullRuntimePath, fullDevPath, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                "The current add-in runtime database and Dev database resolve to the same file.");
+        }
+
+        Directory.CreateDirectory(
+            Path.GetDirectoryName(devDatabasePath)!);
+
+        if (File.Exists(devDatabasePath))
+        {
+            throw new IOException(
+                $"The Dev database already exists: {devDatabasePath}");
+        }
+
+        File.Copy(
+            runtimeLocation.DatabasePath,
+            devDatabasePath,
+            overwrite: false);
+
+        return new AddinRuntimeDatabaseCopyResult
+        {
+            AddinId = addinId,
+            SourceLabel = "Runtime",
+            SourceDatabasePath = runtimeLocation.DatabasePath,
+            RuntimeDatabasePath = devDatabasePath,
+            ActiveRuntimePathFile = _pathService.GetActiveRuntimePathFile(addinId),
+            ReplacedDatabaseArchivePath = null
+        };
+    }
+
     public AddinRuntimeDatabaseCopyResult ReplaceRuntimeDatabase(
         string addinId,
         string sourceLabel,

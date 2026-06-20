@@ -49,6 +49,8 @@ logs/
 .env.*
 appsettings.Development.json
 secrets.json
+Brave Passwords.csv
+*Passwords.csv
 
 # AI / generated uploads
 AI_Replies/

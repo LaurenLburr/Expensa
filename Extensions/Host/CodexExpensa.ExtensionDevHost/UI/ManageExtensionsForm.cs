@@ -13,6 +13,7 @@ public sealed class ManageExtensionsForm : Form
     private readonly BindingSource _bindingSource = new();
 
     private readonly Button _refreshButton = new();
+    private readonly Button _setDisplaySortButton = new();
     private readonly Button _openFolderButton = new();
     private readonly Button _unregisterButton = new();
     private readonly Button _deleteFilesButton = new();
@@ -103,9 +104,9 @@ public sealed class ManageExtensionsForm : Form
 
         _grid.Columns.Add(new DataGridViewTextBoxColumn
         {
-            HeaderText = "Sort",
-            DataPropertyName = nameof(ExtensionProjectRegistration.SortOrder),
-            Width = 70
+            HeaderText = "Display Sort",
+            DataPropertyName = nameof(ExtensionProjectRegistration.DisplaySort),
+            Width = 95
         });
 
         _grid.DataSource = _bindingSource;
@@ -123,6 +124,10 @@ public sealed class ManageExtensionsForm : Form
         _refreshButton.AutoSize = true;
         _refreshButton.Click += (_, _) => LoadRegistrations();
 
+        _setDisplaySortButton.Text = "Set Display Sort...";
+        _setDisplaySortButton.AutoSize = true;
+        _setDisplaySortButton.Click += (_, _) => SetSelectedDisplaySort();
+
         _openFolderButton.Text = "Open Folder";
         _openFolderButton.AutoSize = true;
         _openFolderButton.Click += (_, _) => OpenSelectedFolder();
@@ -136,6 +141,7 @@ public sealed class ManageExtensionsForm : Form
         _deleteFilesButton.Click += (_, _) => DeleteSelectedFilesAndUnregister();
 
         buttons.Controls.Add(_refreshButton);
+        buttons.Controls.Add(_setDisplaySortButton);
         buttons.Controls.Add(_openFolderButton);
         buttons.Controls.Add(_unregisterButton);
         buttons.Controls.Add(_deleteFilesButton);
@@ -231,6 +237,92 @@ public sealed class ManageExtensionsForm : Form
     private ExtensionProjectRegistration? GetSelectedRegistration()
     {
         return _bindingSource.Current as ExtensionProjectRegistration;
+    }
+
+    private void SetSelectedDisplaySort()
+    {
+        ExtensionProjectRegistration? registration = GetSelectedRegistration();
+        if (registration is null)
+        {
+            MessageBox.Show(this, "Select an extension first.", Text, MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        if (!TryPromptForDisplaySort(registration.ProjectName, registration.DisplaySort, out int displaySort))
+        {
+            return;
+        }
+
+        registration.DisplaySort = displaySort;
+        _store.Upsert(registration);
+        LoadRegistrations();
+        RegistrationsChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private bool TryPromptForDisplaySort(string projectName, int currentValue, out int displaySort)
+    {
+        using Form dialog = new()
+        {
+            Text = $"Display Sort - {projectName}",
+            Width = 320,
+            Height = 150,
+            FormBorderStyle = FormBorderStyle.FixedDialog,
+            StartPosition = FormStartPosition.CenterParent,
+            MinimizeBox = false,
+            MaximizeBox = false
+        };
+
+        Label label = new()
+        {
+            Text = "Display sort:",
+            AutoSize = true,
+            Left = 16,
+            Top = 20
+        };
+
+        NumericUpDown input = new()
+        {
+            Left = 120,
+            Top = 16,
+            Width = 150,
+            Minimum = 0,
+            Maximum = 100000,
+            Value = Math.Clamp(currentValue, 0, 100000)
+        };
+
+        Button okButton = new()
+        {
+            Text = "OK",
+            DialogResult = DialogResult.OK,
+            Left = 116,
+            Top = 64,
+            Width = 75
+        };
+
+        Button cancelButton = new()
+        {
+            Text = "Cancel",
+            DialogResult = DialogResult.Cancel,
+            Left = 198,
+            Top = 64,
+            Width = 75
+        };
+
+        dialog.Controls.Add(label);
+        dialog.Controls.Add(input);
+        dialog.Controls.Add(okButton);
+        dialog.Controls.Add(cancelButton);
+        dialog.AcceptButton = okButton;
+        dialog.CancelButton = cancelButton;
+
+        if (dialog.ShowDialog(this) != DialogResult.OK)
+        {
+            displaySort = currentValue;
+            return false;
+        }
+
+        displaySort = decimal.ToInt32(input.Value);
+        return true;
     }
 
     private void OpenSelectedFolder()

@@ -1,4 +1,5 @@
 using Microsoft.Data.Sqlite;
+using CodexExpensa.ExtensionDevHost.CommandEngineIntegration.ExtensionManager;
 
 namespace CodexExpensa.ExtensionDevHost.CommandEngineIntegration.Websites;
 
@@ -10,8 +11,8 @@ public sealed class HostWebsiteTagAssignmentService
         ArgumentException.ThrowIfNullOrWhiteSpace(websiteId);
         ArgumentException.ThrowIfNullOrWhiteSpace(tagName);
 
-        using SqliteConnection connection = new($"Data Source={databasePath}");
-        connection.Open();
+        using SqliteConnection connection =
+            SafeSqliteConnection.OpenFromFile(databasePath);
 
         using SqliteTransaction transaction = connection.BeginTransaction();
 
@@ -19,6 +20,10 @@ public sealed class HostWebsiteTagAssignmentService
         bool assignmentCreated = EnsureWebsiteTagAssignment(connection, transaction, websiteId, tagId);
 
         transaction.Commit();
+
+        SafeSqliteConnection.SaveToFile(
+            connection,
+            databasePath);
 
         return new HostWebsiteTagAssignmentResult
         {
@@ -39,8 +44,8 @@ public sealed class HostWebsiteTagAssignmentService
             return [];
         }
 
-        using SqliteConnection connection = new($"Data Source={databasePath}");
-        connection.Open();
+        using SqliteConnection connection =
+            SafeSqliteConnection.OpenFromFile(databasePath);
 
         using SqliteCommand command = connection.CreateCommand();
 
@@ -77,6 +82,83 @@ public sealed class HostWebsiteTagAssignmentService
         }
 
         return tags;
+    }
+
+    public int RemoveWebsiteTagAssignments(string databasePath, string websiteId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(databasePath);
+        ArgumentException.ThrowIfNullOrWhiteSpace(websiteId);
+
+        using SqliteConnection connection =
+            SafeSqliteConnection.OpenFromFile(databasePath);
+
+        using SqliteCommand command = connection.CreateCommand();
+
+        command.CommandText =
+            """
+            UPDATE [TagAssignment]
+            SET [IsActive] = 0
+            WHERE [EntityType] = 'Website'
+              AND [EntityId] = @WebsiteId
+              AND [IsActive] = 1;
+            """;
+
+        command.Parameters.AddWithValue("@WebsiteId", websiteId);
+
+        int removedCount = command.ExecuteNonQuery();
+
+        SafeSqliteConnection.SaveToFile(
+            connection,
+            databasePath);
+
+        return removedCount;
+    }
+
+    public int DeleteWebsiteNode(string databasePath, string websiteId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(databasePath);
+        ArgumentException.ThrowIfNullOrWhiteSpace(websiteId);
+
+        using SqliteConnection connection =
+            SafeSqliteConnection.OpenFromFile(databasePath);
+
+        using SqliteTransaction transaction = connection.BeginTransaction();
+
+        using SqliteCommand websiteCommand = connection.CreateCommand();
+        websiteCommand.Transaction = transaction;
+        websiteCommand.CommandText =
+            """
+            UPDATE [Website]
+            SET [IsEnabled] = 0
+            WHERE [WebsiteId] = @WebsiteId
+              AND [IsEnabled] = 1;
+            """;
+
+        websiteCommand.Parameters.AddWithValue("@WebsiteId", websiteId);
+
+        int deletedCount = websiteCommand.ExecuteNonQuery();
+
+        using SqliteCommand tagAssignmentCommand = connection.CreateCommand();
+        tagAssignmentCommand.Transaction = transaction;
+        tagAssignmentCommand.CommandText =
+            """
+            UPDATE [TagAssignment]
+            SET [IsActive] = 0
+            WHERE [EntityType] = 'Website'
+              AND [EntityId] = @WebsiteId
+              AND [IsActive] = 1;
+            """;
+
+        tagAssignmentCommand.Parameters.AddWithValue("@WebsiteId", websiteId);
+        tagAssignmentCommand.ExecuteNonQuery();
+
+        transaction.Commit();
+
+        SafeSqliteConnection.SaveToFile(
+            connection,
+            databasePath);
+
+        return deletedCount;
     }
 
     private static string GetOrCreateTagId(SqliteConnection connection, SqliteTransaction transaction, string tagName)

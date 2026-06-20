@@ -1,0 +1,75 @@
+{
+  "formatVersion": 1,
+  "name": "Deploy Expensa Extensions",
+  "targetRoot": ".",
+  "stopOnError": true,
+  "createBackup": true,
+  "steps": [
+    {
+      "action": "BuildProject",
+      "name": "Build BudgetsAddin",
+      "project": "Extensions\\Modules\\BudgetsAddin\\BudgetsAddin.csproj",
+      "configuration": "Debug",
+      "required": true
+    },
+    {
+      "action": "CopyFolder",
+      "name": "Deploy BudgetsAddin",
+      "source": "Extensions\\Modules\\BudgetsAddin\\bin\\Debug\\net8.0-windows",
+      "destination": "Expensa\\Extensions\\BudgetsAddin",
+      "cleanDestination": true,
+      "overwrite": true,
+      "required": true
+    },
+    {
+      "action": "VerifyFile",
+      "name": "Verify BudgetsAddin",
+      "path": "Expensa\\Extensions\\BudgetsAddin\\BudgetsAddin.dll",
+      "required": true
+    },
+    {
+      "action": "BuildProject",
+      "name": "Build PayeesAddin",
+      "project": "Extensions\\Modules\\PayeesAddin\\PayeesAddin.csproj",
+      "configuration": "Debug",
+      "required": true
+    },
+    {
+      "action": "CopyFolder",
+      "name": "Deploy PayeesAddin",
+      "source": "Extensions\\Modules\\PayeesAddin\\bin\\Debug\\net8.0-windows",
+      "destination": "Expensa\\Extensions\\PayeesAddin",
+      "cleanDestination": true,
+      "overwrite": true,
+      "required": true
+    },
+    {
+      "action": "VerifyFile",
+      "name": "Verify PayeesAddin",
+      "path": "Expensa\\Extensions\\PayeesAddin\\PayeesAddin.dll",
+      "required": true
+    },
+    {
+      "action": "BuildProject",
+      "name": "Build WebsitesAddin",
+      "project": "Extensions\\Modules\\WebsitesAddin\\WebsitesAddin.csproj",
+      "configuration": "Debug",
+      "required": true
+    },
+    {
+      "action": "CopyFolder",
+      "name": "Deploy WebsitesAddin",
+      "source": "Extensions\\Modules\\WebsitesAddin\\bin\\Debug\\net8.0-windows",
+      "destination": "Expensa\\Extensions\\WebsitesAddin",
+      "cleanDestination": true,
+      "overwrite": true,
+      "required": true
+    },
+    {
+      "action": "VerifyFile",
+      "name": "Verify WebsitesAddin",
+      "path": "Expensa\\Extensions\\WebsitesAddin\\WebsitesAddin.dll",
+      "required": true
+    }
+  ]
+}

@@ -1,7 +1,6 @@
 using CodexExpensa.ExtensionDevHost.CommandEngineIntegration.ExtensionManager;
 using Microsoft.Data.Sqlite;
 using System.Data;
-using System.Diagnostics;
 using System.Globalization;
 
 namespace CodexExpensa.ExtensionDevHost.CommandEngineIntegration.Websites;
@@ -12,6 +11,7 @@ public sealed partial class WebsitesDatabasePanelForm : DatabasePanelTemplate
 
     private readonly AddinRuntimeDatabasePathService _pathService = new();
     private readonly AddinRuntimeDatabaseCopyService _copyService = new();
+    private readonly AddinDevDatabaseUiCoordinator _devDatabaseUi = new();
 
     private string _currentDatabasePath = string.Empty;
     private string _lastCopyMessage = string.Empty;
@@ -22,34 +22,62 @@ public sealed partial class WebsitesDatabasePanelForm : DatabasePanelTemplate
         _currentDatabasePath =
             _pathService.GetRuntimeDatabaseLocation(AddinId).DatabasePath;
 
+        ConfigureDatabaseContextMenus(
+            () => ReloadAddinDatabaseIntoMemory(),
+            () => OpenProdDatabaseFolder(),
+            () => CreateOrReplaceDevDatabaseFromAddinDatabase(),
+            () => OpenDevDatabaseFolder());
+
         SafeDataGridViewBinding.Attach(gridDataView);
         ConfigureCurrentDatabasePanel();
         LoadDataSummary();
     }
 
-    protected override void OnDatabasePathLinkClicked()
+    protected override void ReloadAddinDatabaseIntoMemory()
     {
-        string folder =
-            Path.GetDirectoryName(_currentDatabasePath) ?? string.Empty;
+        _lastCopyMessage =
+            "Reloaded the existing add-in runtime database file into memory." +
+            Environment.NewLine +
+            "No database was copied from Prod or Dev.";
 
-        if (string.IsNullOrWhiteSpace(folder) || !Directory.Exists(folder))
+        ConfigureCurrentDatabasePanel();
+        LoadDataSummary();
+    }
+
+    protected override void OpenProdDatabaseFolder()
+    {
+        FolderLauncher.OpenContainingFolder(
+            _pathService.GetProdDatabasePath());
+    }
+
+    protected override void CreateOrReplaceDevDatabaseFromAddinDatabase()
+    {
+        AddinDevDatabaseCopyResult? result =
+            _devDatabaseUi.CreateOrReplaceDevDatabase(this, AddinId);
+
+        if (result is null)
         {
-            MessageBox.Show(
-                this,
-                $"Database folder was not found:{Environment.NewLine}{folder}",
-                "Websites Database",
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Warning);
-
             return;
         }
 
-        Process.Start(
-            new ProcessStartInfo
-            {
-                FileName = folder,
-                UseShellExecute = true
-            });
+        _lastCopyMessage =
+            $"Created Dev database from the add-in runtime database.{Environment.NewLine}" +
+            $"Source:{Environment.NewLine}{result.RuntimeDatabasePath}{Environment.NewLine}{Environment.NewLine}" +
+            $"Dev database:{Environment.NewLine}{result.DevDatabasePath}";
+
+        ConfigureCurrentDatabasePanel();
+        LoadDataSummary();
+    }
+
+    protected override void OpenDevDatabaseFolder()
+    {
+        FolderLauncher.OpenContainingFolder(
+            _pathService.GetDevCurrentDatabasePath(AddinId));
+    }
+
+    protected override void OnDatabasePathLinkClicked()
+    {
+        FolderLauncher.OpenContainingFolder(_currentDatabasePath);
     }
 
     protected override void OnUpdateFromProdClicked()
@@ -61,6 +89,11 @@ public sealed partial class WebsitesDatabasePanelForm : DatabasePanelTemplate
 
     protected override void OnUpdateFromDevClicked()
     {
+        if (!_devDatabaseUi.EnsureDevDatabaseExists(this, AddinId))
+        {
+            return;
+        }
+
         ReplaceRuntimeDatabaseFromSource(
             "Dev",
             () => _copyService.ReplaceRuntimeDatabaseFromDev(AddinId));

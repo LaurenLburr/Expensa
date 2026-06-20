@@ -10,6 +10,10 @@ public sealed class TreeAddinRuntimeResult
 
     public required string OutputJson { get; init; }
 
+    public string AssemblyPath { get; init; } = string.Empty;
+
+    public DateTime? AssemblyLastWriteTimeUtc { get; init; }
+
     public bool Succeeded =>
         string.Equals(Status, "Succeeded", StringComparison.OrdinalIgnoreCase) ||
         string.Equals(Status, "Success", StringComparison.OrdinalIgnoreCase) ||

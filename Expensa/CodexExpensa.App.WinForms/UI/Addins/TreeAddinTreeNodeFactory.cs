@@ -9,15 +9,24 @@ public static class TreeAddinTreeNodeFactory
     {
         ArgumentNullException.ThrowIfNull(result);
 
-        return result.Definition.Kind switch
-        {
-            TreeAddinKind.Websites => CreateWebsitesRootNode(result),
-            TreeAddinKind.Budgets => CreateBudgetsRootNode(result),
-            _ => new TreeNode(result.Definition.AddinName)
-        };
+        TreeNode root =
+            result.Definition.Kind switch
+            {
+                TreeAddinKind.Websites => CreateWebsitesRootNode(result),
+                TreeAddinKind.Budgets => CreateBudgetsRootNode(result),
+                TreeAddinKind.Payees => CreatePayeesRootNode(result),
+                _ => new TreeNode(result.Definition.AddinName)
+            };
+
+        root.ToolTipText =
+            CreateAssemblyToolTip(result);
+
+        return root;
     }
 
-    public static TreeNode CreateFailureNode(TreeAddinDefinition definition, Exception exception)
+    public static TreeNode CreateFailureNode(
+        TreeAddinDefinition definition,
+        Exception exception)
     {
         ArgumentNullException.ThrowIfNull(definition);
         ArgumentNullException.ThrowIfNull(exception);
@@ -25,17 +34,17 @@ public static class TreeAddinTreeNodeFactory
         return new TreeNode($"{GetDisplayName(definition)} failed")
         {
             Tag = null,
-            ToolTipText = exception.Message
+            ToolTipText = exception.ToString()
         };
     }
 
-    private static TreeNode CreateWebsitesRootNode(TreeAddinRuntimeResult result)
+    private static TreeNode CreateWebsitesRootNode(
+        TreeAddinRuntimeResult result)
     {
         WebsiteLoadResult websiteResult =
             WebsiteLoadResultParser.Parse(result.OutputJson);
 
-        using TreeView scratchTree =
-            new();
+        using TreeView scratchTree = new();
 
         WebsiteTreeViewRenderer.Render(
             scratchTree,
@@ -61,7 +70,8 @@ public static class TreeAddinTreeNodeFactory
         return root;
     }
 
-    private static TreeNode CreateBudgetsRootNode(TreeAddinRuntimeResult result)
+    private static TreeNode CreateBudgetsRootNode(
+        TreeAddinRuntimeResult result)
     {
         TreeNode root =
             new("Budgets")
@@ -78,56 +88,182 @@ public static class TreeAddinTreeNodeFactory
         using JsonDocument document =
             JsonDocument.Parse(result.OutputJson);
 
-        if (!document.RootElement.TryGetProperty("nodes", out JsonElement nodesElement) ||
+        if (!document.RootElement.TryGetProperty(
+                "nodes",
+                out JsonElement nodesElement)
+            ||
             nodesElement.ValueKind != JsonValueKind.Array)
         {
             return root;
         }
 
-        foreach (JsonElement yearNodeElement in nodesElement.EnumerateArray())
+        foreach (JsonElement nodeElement in
+                 nodesElement.EnumerateArray())
         {
-            TreeNode yearNode =
-                new(GetString(yearNodeElement, "displayText"))
-                {
-                    Name = GetString(yearNodeElement, "nodeId"),
-                    Tag = GetString(yearNodeElement, "nodeId")
-                };
-
-            if (yearNodeElement.TryGetProperty("children", out JsonElement childrenElement) &&
-                childrenElement.ValueKind == JsonValueKind.Array)
-            {
-                foreach (JsonElement monthNodeElement in childrenElement.EnumerateArray())
-                {
-                    int? year =
-                        GetNullableInt(monthNodeElement, "budgetYear");
-
-                    int? month =
-                        GetNullableInt(monthNodeElement, "budgetMonth");
-
-                    if (year is null || month is null)
-                    {
-                        continue;
-                    }
-
-                    string tag =
-                        $"Budget.Month.{year.Value:D4}.{month.Value:D2}";
-
-                    yearNode.Nodes.Add(
-                        new TreeNode(GetString(monthNodeElement, "displayText"))
-                        {
-                            Name = GetString(monthNodeElement, "nodeId"),
-                            Tag = tag
-                        });
-                }
-            }
-
-            root.Nodes.Add(yearNode);
+            root.Nodes.Add(
+                CreateBudgetNode(nodeElement));
         }
 
         return root;
     }
 
-    private static TreeNode CloneNode(TreeNode source)
+    private static TreeNode CreateBudgetNode(
+        JsonElement element)
+    {
+        string nodeType =
+            GetString(element, "nodeType");
+
+        int? year =
+            GetNullableInt(element, "budgetYear");
+
+        int? month =
+            GetNullableInt(element, "budgetMonth");
+
+        TreeNode node =
+            new(GetString(element, "displayText"))
+            {
+                Name = GetString(element, "nodeId"),
+                Tag = new BudgetTreeNodePayload(
+                    GetString(element, "nodeId"),
+                    nodeType,
+                    GetString(element, "displayText"),
+                    year,
+                    month)
+            };
+
+        if (element.TryGetProperty(
+                "children",
+                out JsonElement childrenElement)
+            &&
+            childrenElement.ValueKind ==
+            JsonValueKind.Array)
+        {
+            foreach (JsonElement childElement in
+                     childrenElement.EnumerateArray())
+            {
+                node.Nodes.Add(
+                    CreateBudgetNode(childElement));
+            }
+        }
+
+        return node;
+    }
+
+    private static TreeNode CreatePayeesRootNode(
+        TreeAddinRuntimeResult result)
+    {
+        TreeNode fallback =
+            new("Payees")
+            {
+                Name = "addin.payees",
+                Tag = new PayeeTreeNodePayload(
+                    "PayeeRoot",
+                    string.Empty,
+                    "Payees")
+            };
+
+        if (string.IsNullOrWhiteSpace(result.OutputJson))
+        {
+            return fallback;
+        }
+
+        using JsonDocument document =
+            JsonDocument.Parse(result.OutputJson);
+
+        if (!document.RootElement.TryGetProperty(
+                "nodes",
+                out JsonElement nodesElement)
+            ||
+            nodesElement.ValueKind != JsonValueKind.Array)
+        {
+            return fallback;
+        }
+
+        JsonElement.ArrayEnumerator enumerator =
+            nodesElement.EnumerateArray();
+
+        if (!enumerator.MoveNext())
+        {
+            return fallback;
+        }
+
+        TreeNode root =
+            CreatePayeeNode(enumerator.Current);
+
+        root.Text = "Payees";
+        root.Name = "addin.payees";
+
+        return root;
+    }
+
+    private static TreeNode CreatePayeeNode(
+        JsonElement element)
+    {
+        string nodeType =
+            GetString(element, "nodeType");
+
+        string displayText =
+            GetString(element, "displayText");
+
+        string payeeId =
+            GetString(element, "payeeId");
+
+        TreeNode node =
+            new(displayText)
+            {
+                Name = GetString(element, "nodeId"),
+                Tag = new PayeeTreeNodePayload(
+                    nodeType,
+                    payeeId,
+                    displayText)
+            };
+
+        if (element.TryGetProperty(
+                "children",
+                out JsonElement childrenElement)
+            &&
+            childrenElement.ValueKind ==
+            JsonValueKind.Array)
+        {
+            foreach (JsonElement childElement in
+                     childrenElement.EnumerateArray())
+            {
+                node.Nodes.Add(
+                    CreatePayeeNode(childElement));
+            }
+        }
+
+        return node;
+    }
+
+    private static string CreateAssemblyToolTip(
+        TreeAddinRuntimeResult result)
+    {
+        if (string.IsNullOrWhiteSpace(
+                result.AssemblyPath))
+        {
+            return result.Message;
+        }
+
+        string timestamp =
+            result.AssemblyLastWriteTimeUtc is null
+                ? "(unknown)"
+                : result.AssemblyLastWriteTimeUtc.Value
+                    .ToLocalTime()
+                    .ToString("yyyy-MM-dd HH:mm:ss");
+
+        return
+            $"{result.Definition.AddinName}"
+            + Environment.NewLine
+            + $"Loaded from: {result.AssemblyPath}"
+            + Environment.NewLine
+            + $"DLL modified: {timestamp}"
+            + Environment.NewLine
+            + result.Message;
+    }
+
+    private static TreeNode CloneNode(
+        TreeNode source)
     {
         TreeNode clone =
             new(source.Text)
@@ -151,33 +287,50 @@ public static class TreeAddinTreeNodeFactory
         return clone;
     }
 
-    private static string GetDisplayName(TreeAddinDefinition definition)
+    private static string GetDisplayName(
+        TreeAddinDefinition definition)
     {
         return definition.Kind switch
         {
             TreeAddinKind.Websites => "Websites",
             TreeAddinKind.Budgets => "Budgets",
+            TreeAddinKind.Payees => "Payees",
             _ => definition.AddinName
         };
     }
 
-    private static string GetString(JsonElement element, string propertyName)
+    private static string GetString(
+        JsonElement element,
+        string propertyName)
     {
-        return element.TryGetProperty(propertyName, out JsonElement property) &&
-            property.ValueKind == JsonValueKind.String
-                ? property.GetString() ?? string.Empty
-                : string.Empty;
+        return element.TryGetProperty(
+                   propertyName,
+                   out JsonElement property)
+               &&
+               property.ValueKind ==
+               JsonValueKind.String
+            ? property.GetString()
+              ?? string.Empty
+            : string.Empty;
     }
 
-    private static int? GetNullableInt(JsonElement element, string propertyName)
+    private static int? GetNullableInt(
+        JsonElement element,
+        string propertyName)
     {
-        if (!element.TryGetProperty(propertyName, out JsonElement property) ||
-            property.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
+        if (!element.TryGetProperty(
+                propertyName,
+                out JsonElement property)
+            ||
+            property.ValueKind is
+                JsonValueKind.Null
+                or JsonValueKind.Undefined)
         {
             return null;
         }
 
-        return property.TryGetInt32(out int value)
+        return property.TryGetInt32(
+            out int value)
             ? value
             : null;
     }

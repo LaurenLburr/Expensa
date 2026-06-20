@@ -32,4 +32,28 @@ public sealed class AddinRuntimeDatabasePathServiceTests
             location.DatabasePath,
             StringComparison.OrdinalIgnoreCase);
     }
+    [Fact]
+    public void GetDevCurrentDatabasePath_UsesLiteralCurrentDatabaseFileName()
+    {
+        AddinRuntimeDatabasePathService service = new();
+
+        string path =
+            service.GetDevCurrentDatabasePath("PayeesAddin");
+
+        Assert.EndsWith(
+            Path.Combine(
+                "Extensions",
+                "Modules",
+                "PayeesAddin",
+                "DevDatabase",
+                "current.db"),
+            path,
+            StringComparison.OrdinalIgnoreCase);
+
+        Assert.False(
+            path.EndsWith(
+                Path.Combine("DevDatabase", "payees.current.db"),
+                StringComparison.OrdinalIgnoreCase));
+    }
+
 }

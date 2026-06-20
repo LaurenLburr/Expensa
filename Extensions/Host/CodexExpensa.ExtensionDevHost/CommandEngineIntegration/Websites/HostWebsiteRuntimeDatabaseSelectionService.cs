@@ -30,7 +30,9 @@ public sealed class HostWebsiteRuntimeDatabaseSelectionService
         string runtimeDatabasePath =
             File.ReadAllText(settingsPath).Trim();
 
-        if (string.IsNullOrWhiteSpace(runtimeDatabasePath))
+        if (string.IsNullOrWhiteSpace(runtimeDatabasePath) ||
+            Directory.Exists(runtimeDatabasePath) ||
+            !File.Exists(runtimeDatabasePath))
         {
             return _pathService.GetRuntimeDatabaseLocation();
         }

@@ -50,7 +50,7 @@ public sealed class AddinRuntimeDatabasePathService
             "Modules",
             addinId,
             "DevDatabase",
-            GetCurrentDatabaseFileName(addinId));
+            "current.db");
     }
 
     public string GetProdDatabasePath()

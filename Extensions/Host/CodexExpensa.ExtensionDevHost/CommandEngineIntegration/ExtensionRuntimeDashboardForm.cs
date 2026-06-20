@@ -1,4 +1,5 @@
 using Codex.CommandEngine.Core;
+using CodexExpensa.ExtensionDevHost.CommandEngineIntegration.ExtensionManager;
 using System.Diagnostics;
 
 namespace CodexExpensa.ExtensionDevHost.CommandEngineIntegration;
@@ -54,6 +55,7 @@ public sealed partial class ExtensionRuntimeDashboardForm : Form
 
         InitializeComponent();
 
+        EnsureAddinFolderStructure();
         LoadDashboardSettings();
         RefreshFromSnapshot(_controller.GetSnapshot());
     }
@@ -243,6 +245,41 @@ public sealed partial class ExtensionRuntimeDashboardForm : Form
         EventArgs e)
     {
         SetSelectedManifestEnabled(false);
+    }
+
+    private void SetSelectedManifestDisplaySort(
+        object? sender,
+        EventArgs e)
+    {
+        ExtensionManifestRecord? record =
+            GetSelectedManifestRecord();
+
+        if (record is null)
+        {
+            return;
+        }
+
+        if (!TryPromptForDisplaySort(record, out int displaySort))
+        {
+            return;
+        }
+
+        ExtensionManifestUpdateResult result =
+            _controller.SetManifestDisplaySort(record.ManifestPath, displaySort);
+
+        if (!result.Success)
+        {
+            MessageBox.Show(
+                this,
+                result.Message,
+                "Manifest Registry",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
+
+            return;
+        }
+
+        DiscoverManifestRegistry(this, EventArgs.Empty);
     }
 
     private void OpenSelectedManifest(
@@ -997,6 +1034,7 @@ public sealed partial class ExtensionRuntimeDashboardForm : Form
         commandListView.Columns.Clear();
         commandListView.Columns.Add("Extension Id", 180);
         commandListView.Columns.Add("Display Name", 210);
+        commandListView.Columns.Add("Display Sort", 90);
         commandListView.Columns.Add("Version", 80);
         commandListView.Columns.Add("Enabled", 70);
         commandListView.Columns.Add("Duplicate", 80);
@@ -1012,6 +1050,7 @@ public sealed partial class ExtensionRuntimeDashboardForm : Form
             };
 
             item.SubItems.Add(record.DisplayName);
+            item.SubItems.Add(record.DisplaySort.ToString());
             item.SubItems.Add(record.Version);
             item.SubItems.Add(record.Enabled ? "Yes" : "No");
             item.SubItems.Add(record.IsDuplicate ? $"Yes ({record.DuplicateCount})" : "No");
@@ -1028,4 +1067,83 @@ public sealed partial class ExtensionRuntimeDashboardForm : Form
         diagnosticsTextBox.Text =
             ExtensionManifestRegistryTextFormatter.Format(viewModel);
     }
+
+    private bool TryPromptForDisplaySort(
+        ExtensionManifestRecord record,
+        out int displaySort)
+    {
+        using Form dialog =
+            new()
+            {
+                Text = "Set Display Sort",
+                FormBorderStyle = FormBorderStyle.FixedDialog,
+                StartPosition = FormStartPosition.CenterParent,
+                MinimizeBox = false,
+                MaximizeBox = false,
+                ClientSize = new Size(320, 120)
+            };
+
+        Label label =
+            new()
+            {
+                AutoSize = true,
+                Location = new Point(12, 14),
+                Text = $"{record.DisplayName} display sort:"
+            };
+
+        NumericUpDown input =
+            new()
+            {
+                Location = new Point(12, 42),
+                Width = 120,
+                Minimum = -100000,
+                Maximum = 100000,
+                Value = Math.Clamp(record.DisplaySort, -100000, 100000)
+            };
+
+        Button ok =
+            new()
+            {
+                Text = "OK",
+                DialogResult = DialogResult.OK,
+                Location = new Point(154, 78),
+                Width = 72
+            };
+
+        Button cancel =
+            new()
+            {
+                Text = "Cancel",
+                DialogResult = DialogResult.Cancel,
+                Location = new Point(234, 78),
+                Width = 72
+            };
+
+        dialog.Controls.Add(label);
+        dialog.Controls.Add(input);
+        dialog.Controls.Add(ok);
+        dialog.Controls.Add(cancel);
+        dialog.AcceptButton = ok;
+        dialog.CancelButton = cancel;
+
+        if (dialog.ShowDialog(this) != DialogResult.OK)
+        {
+            displaySort = 0;
+            return false;
+        }
+
+        displaySort = (int)input.Value;
+        return true;
+    }
+    private static void EnsureAddinFolderStructure()
+    {
+        ExtensionManagerAddinTestCatalog catalog = new();
+        AddinFolderStructureInitializer initializer = new();
+
+        initializer.EnsureCreated(
+            catalog
+                .GetAddins()
+                .Select(static addin => addin.AddinId));
+    }
+
 }

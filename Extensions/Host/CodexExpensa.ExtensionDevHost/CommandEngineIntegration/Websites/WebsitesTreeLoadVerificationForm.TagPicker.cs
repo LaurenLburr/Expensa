@@ -6,6 +6,8 @@ public sealed partial class WebsitesTreeLoadVerificationForm
     private readonly HostWebsiteRuntimeDatabaseSelectionService _runtimeDatabaseSelectionService = new();
 
     private ToolStripMenuItem? _tagPickerMenuItem;
+    private ToolStripMenuItem? _removeTagAssociationMenuItem;
+    private ToolStripMenuItem? _deleteNodeMenuItem;
     private Form? _tagPickerPopupForm;
     private WebsitesTreeTagPickerPanel? _tagPickerPanel;
     private Point _lastTreeContextMenuScreenLocation;
@@ -19,10 +21,18 @@ public sealed partial class WebsitesTreeLoadVerificationForm
             return;
         }
 
-        _tagPickerMenuItem = new ToolStripMenuItem("________");
+        _tagPickerMenuItem = new ToolStripMenuItem("Assign Tag...");
         _tagPickerMenuItem.Click += tagPickerMenuItem_Click;
 
+        _removeTagAssociationMenuItem = new ToolStripMenuItem("Remove Tag Association");
+        _removeTagAssociationMenuItem.Click += removeTagAssociationMenuItem_Click;
+
+        _deleteNodeMenuItem = new ToolStripMenuItem("Delete Node");
+        _deleteNodeMenuItem.Click += deleteNodeMenuItem_Click;
+
         menuStrip.Items.Add(_tagPickerMenuItem);
+        menuStrip.Items.Add(_removeTagAssociationMenuItem);
+        menuStrip.Items.Add(_deleteNodeMenuItem);
     }
 
     private void RememberTreeContextMenuLocation(Point clientLocation)
@@ -33,6 +43,16 @@ public sealed partial class WebsitesTreeLoadVerificationForm
     private void tagPickerMenuItem_Click(object? sender, EventArgs e)
     {
         ShowTagPickerPopup();
+    }
+
+    private async void removeTagAssociationMenuItem_Click(object? sender, EventArgs e)
+    {
+        await RemoveTagAssociationFromSelectedWebsiteAsync().ConfigureAwait(true);
+    }
+
+    private async void deleteNodeMenuItem_Click(object? sender, EventArgs e)
+    {
+        await DeleteSelectedWebsiteNodeAsync().ConfigureAwait(true);
     }
 
     private void ShowTagPickerPopup()
@@ -149,9 +169,11 @@ public sealed partial class WebsitesTreeLoadVerificationForm
 
         string databasePath = databaseLocation.DatabasePath;
 
-        if (string.IsNullOrWhiteSpace(databasePath))
+        if (string.IsNullOrWhiteSpace(databasePath) ||
+            Directory.Exists(databasePath) ||
+            !File.Exists(databasePath))
         {
-            SetStatus("No active Websites runtime database is selected.");
+            SetStatus("No writable Websites runtime database file is selected.");
             return;
         }
 
@@ -176,8 +198,140 @@ public sealed partial class WebsitesTreeLoadVerificationForm
 
             MessageBox.Show(
                 this,
-                exception.Message,
+                exception.Message + Environment.NewLine + Environment.NewLine +
+                "Database:" + Environment.NewLine +
+                databasePath,
                 "Assign Website Tag",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
+        }
+    }
+
+    private async Task RemoveTagAssociationFromSelectedWebsiteAsync()
+    {
+        TreeNode? selectedNode = websitesTreeView.SelectedNode;
+
+        if (selectedNode is null)
+        {
+            SetStatus("Select a website before removing a tag association.");
+            return;
+        }
+
+        string websiteId = HostWebsiteTreeNodeTagReader.GetWebsiteId(selectedNode);
+
+        if (string.IsNullOrWhiteSpace(websiteId))
+        {
+            SetStatus("Select an individual website node before removing a tag association.");
+            return;
+        }
+
+        HostWebsiteDatabaseLocation databaseLocation =
+            _runtimeDatabaseSelectionService.GetActiveRuntimeDatabaseLocation();
+
+        string databasePath = databaseLocation.DatabasePath;
+
+        if (string.IsNullOrWhiteSpace(databasePath) ||
+            Directory.Exists(databasePath) ||
+            !File.Exists(databasePath))
+        {
+            SetStatus("No writable Websites runtime database file is selected.");
+            return;
+        }
+
+        try
+        {
+            int removedCount =
+                _tagAssignmentService.RemoveWebsiteTagAssignments(databasePath, websiteId);
+
+            SetStatus(removedCount == 0
+                ? "Selected website had no active tag association."
+                : "Removed tag association from selected website.");
+
+            CloseTagPickerPopup();
+
+            await LoadWebsitesTreeAsync().ConfigureAwait(true);
+        }
+        catch (Exception exception)
+        {
+            SetStatus("Remove tag association failed.");
+
+            MessageBox.Show(
+                this,
+                exception.Message + Environment.NewLine + Environment.NewLine +
+                "Database:" + Environment.NewLine +
+                databasePath,
+                "Remove Website Tag Association",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
+        }
+    }
+
+    private async Task DeleteSelectedWebsiteNodeAsync()
+    {
+        TreeNode? selectedNode = websitesTreeView.SelectedNode;
+
+        if (selectedNode is null)
+        {
+            SetStatus("Select a website before deleting a node.");
+            return;
+        }
+
+        string websiteId = HostWebsiteTreeNodeTagReader.GetWebsiteId(selectedNode);
+
+        if (string.IsNullOrWhiteSpace(websiteId))
+        {
+            SetStatus("Select an individual website node before deleting a node.");
+            return;
+        }
+
+        DialogResult confirmResult = MessageBox.Show(
+            this,
+            $"Delete website node '{selectedNode.Text}'?",
+            "Delete Website Node",
+            MessageBoxButtons.YesNo,
+            MessageBoxIcon.Warning);
+
+        if (confirmResult != DialogResult.Yes)
+        {
+            return;
+        }
+
+        HostWebsiteDatabaseLocation databaseLocation =
+            _runtimeDatabaseSelectionService.GetActiveRuntimeDatabaseLocation();
+
+        string databasePath = databaseLocation.DatabasePath;
+
+        if (string.IsNullOrWhiteSpace(databasePath) ||
+            Directory.Exists(databasePath) ||
+            !File.Exists(databasePath))
+        {
+            SetStatus("No writable Websites runtime database file is selected.");
+            return;
+        }
+
+        try
+        {
+            int deletedCount =
+                _tagAssignmentService.DeleteWebsiteNode(databasePath, websiteId);
+
+            SetStatus(deletedCount == 0
+                ? "Selected website node was not active."
+                : "Deleted selected website node.");
+
+            CloseTagPickerPopup();
+
+            await LoadWebsitesTreeAsync().ConfigureAwait(true);
+        }
+        catch (Exception exception)
+        {
+            SetStatus("Delete website node failed.");
+
+            MessageBox.Show(
+                this,
+                exception.Message + Environment.NewLine + Environment.NewLine +
+                "Database:" + Environment.NewLine +
+                databasePath,
+                "Delete Website Node",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Error);
         }

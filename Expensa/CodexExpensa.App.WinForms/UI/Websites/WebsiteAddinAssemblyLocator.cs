@@ -22,28 +22,41 @@ public static class WebsiteAddinAssemblyLocator
                 GetCandidatePaths().Select(Path.GetFullPath));
 
         throw new FileNotFoundException(
-            $"Could not locate {AssemblyName}. Build or deploy the Websites add-in under a Modules\\WebsitesAddin folder.{Environment.NewLine}{Environment.NewLine}Searched:{Environment.NewLine}{candidates}");
+            $"Could not locate {AssemblyName}. Build or deploy the Websites add-in under Expensa\\Extensions\\WebsitesAddin.{Environment.NewLine}{Environment.NewLine}Searched:{Environment.NewLine}{candidates}");
     }
 
     private static IReadOnlyList<string> GetCandidatePaths()
     {
-        List<string> candidatePaths =
-        [
+        List<string> candidatePaths = [];
+
+        foreach (string root in EnumerateAncestorFolders(AppContext.BaseDirectory))
+        {
+            candidatePaths.Add(
+                Path.Combine(
+                    root,
+                    "Expensa",
+                    "Extensions",
+                    "WebsitesAddin",
+                    AssemblyName));
+        }
+
+        candidatePaths.Add(
             Path.Combine(
                 AppContext.BaseDirectory,
                 "Modules",
                 "WebsitesAddin",
-                AssemblyName),
+                AssemblyName));
 
+        candidatePaths.Add(
             Path.Combine(
                 Directory.GetCurrentDirectory(),
                 "Modules",
                 "WebsitesAddin",
-                AssemblyName)
-        ];
+                AssemblyName));
 
         foreach (string root in EnumerateAncestorFolders(AppContext.BaseDirectory))
         {
+
             candidatePaths.Add(
                 Path.Combine(
                     root,

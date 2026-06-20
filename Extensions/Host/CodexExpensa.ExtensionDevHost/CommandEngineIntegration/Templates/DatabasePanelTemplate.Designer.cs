@@ -28,26 +28,33 @@ namespace CodexExpensa.ExtensionDevHost.CommandEngineIntegration
         /// </summary>
         private void InitializeComponent()
         {
+            components = new System.ComponentModel.Container();
             panel1 = new Panel();
-        diagnosticsToolStrip = new ToolStrip();
             linkUpdate_from_Dev = new LinkLabel();
+            ctx_Dev = new ContextMenuStrip(components);
+            openFolderToolStripMenuItem1 = new ToolStripMenuItem();
             linkUpdate_from_Prod = new LinkLabel();
+            ctx_Prod = new ContextMenuStrip(components);
+            openFolderToolStripMenuItem = new ToolStripMenuItem();
             linkDb_filename = new LinkLabel();
             labelDatabase_file_Name = new Label();
             label1 = new Label();
             labelAdd_in_Name = new Label();
+            diagnosticsToolStrip = new ToolStrip();
             splitContainer1 = new SplitContainer();
             text_Data_ = new TextBox();
-            gridDataView = new DataGridView();
             statusStrip1 = new StatusStrip();
             labelNumRows = new ToolStripStatusLabel();
+            gridDataView = new DataGridView();
             panel1.SuspendLayout();
+            ctx_Dev.SuspendLayout();
+            ctx_Prod.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)splitContainer1).BeginInit();
             splitContainer1.Panel1.SuspendLayout();
             splitContainer1.Panel2.SuspendLayout();
             splitContainer1.SuspendLayout();
-            ((System.ComponentModel.ISupportInitialize)gridDataView).BeginInit();
             statusStrip1.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)gridDataView).BeginInit();
             SuspendLayout();
             // 
             // panel1
@@ -67,6 +74,7 @@ namespace CodexExpensa.ExtensionDevHost.CommandEngineIntegration
             // linkUpdate_from_Dev
             // 
             linkUpdate_from_Dev.AutoSize = true;
+            linkUpdate_from_Dev.ContextMenuStrip = ctx_Dev;
             linkUpdate_from_Dev.Location = new Point(264, 62);
             linkUpdate_from_Dev.Name = "linkUpdate_from_Dev";
             linkUpdate_from_Dev.Size = new Size(124, 15);
@@ -75,9 +83,23 @@ namespace CodexExpensa.ExtensionDevHost.CommandEngineIntegration
             linkUpdate_from_Dev.Text = "Update Data from Dev";
             linkUpdate_from_Dev.LinkClicked += linkUpdate_from_Dev_LinkClicked;
             // 
+            // ctx_Dev
+            // 
+            ctx_Dev.Items.AddRange(new ToolStripItem[] { openFolderToolStripMenuItem1 });
+            ctx_Dev.Name = "ctx_Dev";
+            ctx_Dev.Size = new Size(181, 48);
+            // 
+            // openFolderToolStripMenuItem1
+            // 
+            openFolderToolStripMenuItem1.Name = "openFolderToolStripMenuItem1";
+            openFolderToolStripMenuItem1.Size = new Size(180, 22);
+            openFolderToolStripMenuItem1.Text = "Open Folder";
+            openFolderToolStripMenuItem1.Click += openFolderToolStripMenuItem1_Click;
+            // 
             // linkUpdate_from_Prod
             // 
             linkUpdate_from_Prod.AutoSize = true;
+            linkUpdate_from_Prod.ContextMenuStrip = ctx_Prod;
             linkUpdate_from_Prod.Location = new Point(129, 62);
             linkUpdate_from_Prod.Name = "linkUpdate_from_Prod";
             linkUpdate_from_Prod.Size = new Size(129, 15);
@@ -85,6 +107,19 @@ namespace CodexExpensa.ExtensionDevHost.CommandEngineIntegration
             linkUpdate_from_Prod.TabStop = true;
             linkUpdate_from_Prod.Text = "Update Data from Prod";
             linkUpdate_from_Prod.LinkClicked += linkUpdate_from_Prod_LinkClicked;
+            // 
+            // ctx_Prod
+            // 
+            ctx_Prod.Items.AddRange(new ToolStripItem[] { openFolderToolStripMenuItem });
+            ctx_Prod.Name = "ctx_Prod";
+            ctx_Prod.Size = new Size(140, 26);
+            // 
+            // openFolderToolStripMenuItem
+            // 
+            openFolderToolStripMenuItem.Name = "openFolderToolStripMenuItem";
+            openFolderToolStripMenuItem.Size = new Size(180, 22);
+            openFolderToolStripMenuItem.Text = "Open Folder";
+            openFolderToolStripMenuItem.Click += openFolderToolStripMenuItem_Click;
             // 
             // linkDb_filename
             // 
@@ -127,17 +162,19 @@ namespace CodexExpensa.ExtensionDevHost.CommandEngineIntegration
             labelAdd_in_Name.TabIndex = 0;
             labelAdd_in_Name.Text = "Payees Database";
             // 
+            // diagnosticsToolStrip
+            // 
+            diagnosticsToolStrip.GripStyle = ToolStripGripStyle.Hidden;
+            diagnosticsToolStrip.Location = new Point(0, 0);
+            diagnosticsToolStrip.Name = "diagnosticsToolStrip";
+            diagnosticsToolStrip.Size = new Size(900, 25);
+            diagnosticsToolStrip.TabIndex = 1;
+            diagnosticsToolStrip.Text = "Diagnostics";
+            // 
             // splitContainer1
             // 
-            diagnosticsToolStrip.Dock = DockStyle.Top;
-        diagnosticsToolStrip.GripStyle = ToolStripGripStyle.Hidden;
-        diagnosticsToolStrip.Name = "diagnosticsToolStrip";
-        diagnosticsToolStrip.Size = new Size(900, 25);
-        diagnosticsToolStrip.TabIndex = 1;
-        diagnosticsToolStrip.Text = "Diagnostics";
-
-        splitContainer1.Dock = DockStyle.Fill;
-            splitContainer1.Location = new Point(0, 112);
+            splitContainer1.Dock = DockStyle.Fill;
+            splitContainer1.Location = new Point(0, 87);
             splitContainer1.Name = "splitContainer1";
             splitContainer1.Orientation = Orientation.Horizontal;
             // 
@@ -163,19 +200,6 @@ namespace CodexExpensa.ExtensionDevHost.CommandEngineIntegration
             text_Data_.Size = new Size(800, 131);
             text_Data_.TabIndex = 0;
             // 
-            // gridDataView
-            // 
-            gridDataView.AllowUserToOrderColumns = true;
-            gridDataView.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
-            gridDataView.ReadOnly = true;
-            gridDataView.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
-            gridDataView.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
-            gridDataView.Dock = DockStyle.Fill;
-            gridDataView.Location = new Point(0, 0);
-            gridDataView.Name = "gridDataView";
-            gridDataView.Size = new Size(800, 228);
-            gridDataView.TabIndex = 0;
-            // 
             // statusStrip1
             // 
             statusStrip1.Items.AddRange(new ToolStripItem[] { labelNumRows });
@@ -191,6 +215,19 @@ namespace CodexExpensa.ExtensionDevHost.CommandEngineIntegration
             labelNumRows.Size = new Size(80, 17);
             labelNumRows.Text = "Loaded  rows ";
             // 
+            // gridDataView
+            // 
+            gridDataView.AllowUserToOrderColumns = true;
+            gridDataView.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+            gridDataView.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
+            gridDataView.Dock = DockStyle.Fill;
+            gridDataView.Location = new Point(0, 0);
+            gridDataView.Name = "gridDataView";
+            gridDataView.ReadOnly = true;
+            gridDataView.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+            gridDataView.Size = new Size(800, 228);
+            gridDataView.TabIndex = 0;
+            // 
             // DatabasePanelTemplate
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
@@ -202,15 +239,17 @@ namespace CodexExpensa.ExtensionDevHost.CommandEngineIntegration
             Text = "DatabasePanelTemplate";
             panel1.ResumeLayout(false);
             panel1.PerformLayout();
+            ctx_Dev.ResumeLayout(false);
+            ctx_Prod.ResumeLayout(false);
             splitContainer1.Panel1.ResumeLayout(false);
             splitContainer1.Panel1.PerformLayout();
             splitContainer1.Panel2.ResumeLayout(false);
             splitContainer1.Panel2.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)splitContainer1).EndInit();
             splitContainer1.ResumeLayout(false);
-            ((System.ComponentModel.ISupportInitialize)gridDataView).EndInit();
             statusStrip1.ResumeLayout(false);
             statusStrip1.PerformLayout();
+            ((System.ComponentModel.ISupportInitialize)gridDataView).EndInit();
             ResumeLayout(false);
         }
 
@@ -229,5 +268,9 @@ namespace CodexExpensa.ExtensionDevHost.CommandEngineIntegration
         protected DataGridView gridDataView;
         protected StatusStrip statusStrip1;
         protected ToolStripStatusLabel labelNumRows;
+        private ContextMenuStrip ctx_Dev;
+        private ContextMenuStrip ctx_Prod;
+        private ToolStripMenuItem openFolderToolStripMenuItem1;
+        private ToolStripMenuItem openFolderToolStripMenuItem;
     }
 }

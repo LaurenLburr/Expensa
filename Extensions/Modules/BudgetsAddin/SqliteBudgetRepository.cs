@@ -31,9 +31,7 @@ public sealed class SqliteBudgetRepository
         }
 
         using SqliteConnection connection =
-            new($"Data Source={request.DatabasePath};Mode=ReadOnly");
-
-        connection.Open();
+            LoadMemoryConnection(request.DatabasePath);
 
         DataTable budgetMonths =
             LoadBudgetMonthRows(connection, request);
@@ -49,18 +47,49 @@ public sealed class SqliteBudgetRepository
         };
     }
 
+
+    private static SqliteConnection LoadMemoryConnection(string databasePath)
+    {
+        SqliteConnection memoryConnection = new("Data Source=:memory:");
+
+        try
+        {
+            memoryConnection.Open();
+
+            using (SqliteConnection sourceConnection =
+                new($"Data Source={databasePath};Mode=ReadOnly;Pooling=False"))
+            {
+                sourceConnection.Open();
+                sourceConnection.BackupDatabase(memoryConnection);
+            }
+
+            SqliteConnection.ClearAllPools();
+
+            return memoryConnection;
+        }
+        catch
+        {
+            memoryConnection.Dispose();
+            SqliteConnection.ClearAllPools();
+            throw;
+        }
+    }
+
     private static DataTable LoadBudgetMonthRows(SqliteConnection connection, BudgetLoadRequest request)
     {
         using SqliteCommand command = connection.CreateCommand();
 
         command.CommandText =
             """
-            SELECT
+            SELECT DISTINCT
                 [BudgetMonthId] AS [MonthKey],
                 [Year] AS [BudgetYear],
                 [Month] AS [BudgetMonthNumber]
             FROM [BudgetMonth]
-            ORDER BY [Year] DESC, [Month] ASC
+            WHERE [BudgetMonthId] IS NOT NULL
+              AND [Year] IS NOT NULL
+              AND [Month] IS NOT NULL
+            ORDER BY [Year] DESC, [Month] ASC, [BudgetMonthId] ASC
             LIMIT @MaximumRows;
             """;
 

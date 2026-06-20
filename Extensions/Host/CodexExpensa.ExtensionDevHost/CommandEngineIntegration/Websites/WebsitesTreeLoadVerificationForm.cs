@@ -1,10 +1,12 @@
 using CodexExpensa.ExtensionDevHost.CommandEngineIntegration.Templates;
+using System.Text.Json;
 
 namespace CodexExpensa.ExtensionDevHost.CommandEngineIntegration.Websites;
 
 public sealed partial class WebsitesTreeLoadVerificationForm : TreeTestTemplate
 {
     private readonly HostWebsiteTreeContributionLoader _loader;
+    private readonly string _settingsPath;
     private bool _hasAutoLoaded;
 
     private TreeView websitesTreeView => TestTreeView;
@@ -23,6 +25,11 @@ public sealed partial class WebsitesTreeLoadVerificationForm : TreeTestTemplate
         ArgumentNullException.ThrowIfNull(loader);
 
         _loader = loader;
+        _settingsPath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "Expensa",
+            "Extensions",
+            "WebsitesTreeLoadVerificationSettings.json");
 
         InitializeComponent();
 
@@ -35,8 +42,11 @@ public sealed partial class WebsitesTreeLoadVerificationForm : TreeTestTemplate
 
         websitesTreeView.AfterSelect += websitesTreeView_AfterSelect;
         websitesTreeView.NodeMouseClick += websitesTreeView_NodeMouseClick;
+        splitContainer.SplitterMoved += splitContainer_SplitterMoved;
+        FormClosing += websitesTreeLoadVerificationForm_FormClosing;
 
         EnsureWebsiteDetailsPanel();
+        RestoreSplitterDistance();
     }
 
     protected override async void OnShown(EventArgs e)
@@ -111,5 +121,103 @@ public sealed partial class WebsitesTreeLoadVerificationForm : TreeTestTemplate
     private void websitesTreeView_AfterSelect(object? sender, TreeViewEventArgs e)
     {
         ShowSelectedTreeNodeDetails(e.Node);
+    }
+
+    private void splitContainer_SplitterMoved(object? sender, SplitterEventArgs e)
+    {
+        SaveSplitterDistance();
+    }
+
+    private void websitesTreeLoadVerificationForm_FormClosing(object? sender, FormClosingEventArgs e)
+    {
+        SaveSplitterDistance();
+    }
+
+    private void RestoreSplitterDistance()
+    {
+        WebsitesTreeLoadVerificationSettings settings =
+            LoadSettings();
+
+        if (settings.SplitterDistance <= 0)
+        {
+            return;
+        }
+
+        splitContainer.SplitterDistance =
+            GetSafeSplitterDistance(settings.SplitterDistance);
+    }
+
+    private void SaveSplitterDistance()
+    {
+        try
+        {
+            WebsitesTreeLoadVerificationSettings settings =
+                LoadSettings();
+
+            settings.SplitterDistance = splitContainer.SplitterDistance;
+            SaveSettings(settings);
+        }
+        catch
+        {
+        }
+    }
+
+    private int GetSafeSplitterDistance(int requestedDistance)
+    {
+        int maxDistance =
+            Math.Max(
+                splitContainer.Panel1MinSize,
+                splitContainer.Width - splitContainer.Panel2MinSize - splitContainer.SplitterWidth);
+
+        return Math.Clamp(
+            requestedDistance,
+            splitContainer.Panel1MinSize,
+            maxDistance);
+    }
+
+    private WebsitesTreeLoadVerificationSettings LoadSettings()
+    {
+        try
+        {
+            if (!File.Exists(_settingsPath))
+            {
+                return new WebsitesTreeLoadVerificationSettings();
+            }
+
+            string json = File.ReadAllText(_settingsPath);
+
+            return JsonSerializer.Deserialize<WebsitesTreeLoadVerificationSettings>(json)
+                ?? new WebsitesTreeLoadVerificationSettings();
+        }
+        catch
+        {
+            return new WebsitesTreeLoadVerificationSettings();
+        }
+    }
+
+    private void SaveSettings(WebsitesTreeLoadVerificationSettings settings)
+    {
+        string? folder =
+            Path.GetDirectoryName(_settingsPath);
+
+        if (!string.IsNullOrWhiteSpace(folder))
+        {
+            Directory.CreateDirectory(folder);
+        }
+
+        string json =
+            JsonSerializer.Serialize(
+                settings,
+                new JsonSerializerOptions
+                {
+                    WriteIndented = true
+                });
+
+        File.WriteAllText(_settingsPath, json);
+    }
+
+    private sealed class WebsitesTreeLoadVerificationSettings
+    {
+        public int SplitterDistance { get; set; }
     }
 }

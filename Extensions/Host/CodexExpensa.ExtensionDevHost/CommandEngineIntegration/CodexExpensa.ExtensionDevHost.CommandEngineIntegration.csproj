@@ -2,6 +2,7 @@
   <PropertyGroup>
     <TargetFramework>net8.0-windows</TargetFramework>
     <UseWindowsForms>true</UseWindowsForms>
+    <UseWPF>true</UseWPF>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
@@ -9,10 +10,13 @@
   <ItemGroup>
     <ProjectReference Include="..\..\..\..\Codex.CommandEngine\Core\Codex.CommandEngine.Abstractions\Codex.CommandEngine.Abstractions.csproj" />
     <ProjectReference Include="..\..\..\..\Codex.CommandEngine\Core\Codex.CommandEngine.Core\Codex.CommandEngine.Core.csproj" />
+    <ProjectReference Include="..\..\..\..\Expensa\CodexExpensa.Core\CodexExpensa.Core.csproj" />
+    <ProjectReference Include="..\..\..\..\Expensa\CodexExpensa.Security.Windows\CodexExpensa.Security.Windows.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.5" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.9" />
+    <PackageReference Include="Krypton.Toolkit.Suite.Extended.TreeGridView" Version="105.26.4.110" />
   </ItemGroup>
 
   <ItemGroup>

@@ -6,4 +6,8 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\CodexExpensa.Core\CodexExpensa.Core.csproj" />
+  </ItemGroup>
+
 </Project>

@@ -1,4 +1,5 @@
 using Microsoft.Data.Sqlite;
+using CodexExpensa.ExtensionDevHost.CommandEngineIntegration.ExtensionManager;
 
 namespace CodexExpensa.ExtensionDevHost.CommandEngineIntegration.Websites;
 
@@ -172,9 +173,7 @@ public sealed class HostWebsiteExpensaProdDatabaseCopyService
         ValidateRequiredSourceTables(prodDatabasePath);
 
         using SqliteConnection connection =
-            new($"Data Source={targetDatabasePath}");
-
-        connection.Open();
+            SafeSqliteConnection.CreateEmptyMemory();
 
         using SqliteCommand command =
             connection.CreateCommand();
@@ -183,6 +182,10 @@ public sealed class HostWebsiteExpensaProdDatabaseCopyService
             BuildCopySql(prodDatabasePath);
 
         command.ExecuteNonQuery();
+
+        SafeSqliteConnection.SaveToFile(
+            connection,
+            targetDatabasePath);
     }
 
     private static void ValidateRequiredSourceTables(
@@ -196,9 +199,7 @@ public sealed class HostWebsiteExpensaProdDatabaseCopyService
         ];
 
         using SqliteConnection connection =
-            new($"Data Source={prodDatabasePath};Mode=ReadOnly");
-
-        connection.Open();
+            SafeSqliteConnection.OpenFromFile(prodDatabasePath);
 
         foreach (string tableName in requiredTables)
         {

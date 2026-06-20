@@ -21,6 +21,7 @@ public sealed class ExtensionManifestRegistryServiceTests
 
         Assert.Single(snapshot.Records);
         Assert.Equal("WebsitesAddin", snapshot.Records[0].ExtensionId);
+        Assert.Equal(100, snapshot.Records[0].DisplaySort);
         Assert.Equal(1, snapshot.EnabledCount);
         Assert.Equal(0, snapshot.DisabledCount);
         Assert.Empty(snapshot.Errors);
@@ -34,19 +35,21 @@ public sealed class ExtensionManifestRegistryServiceTests
             Records =
             [
                 new ExtensionManifestRecord { ExtensionId = "z", DisplayName = "Zed", Enabled = true },
-                new ExtensionManifestRecord { ExtensionId = "a", DisplayName = "Alpha", Enabled = false }
+                new ExtensionManifestRecord { ExtensionId = "a", DisplayName = "Alpha", DisplaySort = 20, Enabled = false },
+                new ExtensionManifestRecord { ExtensionId = "b", DisplayName = "Beta", DisplaySort = 10, Enabled = true }
             ],
             Errors = ["bad manifest"]
         };
 
         ExtensionManifestRegistryViewModel viewModel = ExtensionManifestRegistryViewModelFactory.Create(snapshot);
 
-        Assert.Equal(2, viewModel.TotalCount);
-        Assert.Equal(1, viewModel.EnabledCount);
+        Assert.Equal(3, viewModel.TotalCount);
+        Assert.Equal(2, viewModel.EnabledCount);
         Assert.Equal(1, viewModel.DisabledCount);
         Assert.Equal(1, viewModel.ErrorCount);
-        Assert.Equal("a", viewModel.Records[0].ExtensionId);
-        Assert.Contains("2 manifest", viewModel.Summary);
+        Assert.Equal("z", viewModel.Records[0].ExtensionId);
+        Assert.Equal("b", viewModel.Records[1].ExtensionId);
+        Assert.Contains("3 manifest", viewModel.Summary);
     }
 
     [Fact]
@@ -74,5 +77,27 @@ public sealed class ExtensionManifestRegistryServiceTests
         Assert.Contains("Extension Manifest Registry", text);
         Assert.Contains("WebsitesAddin", text);
         Assert.Contains("WebsitesAddin.dll", text);
+    }
+
+    [Fact]
+    public void DashboardForm_ProvidesDisplaySortEditor()
+    {
+        string formText =
+            TestPathHelper.ReadHostFile(
+                "CodexExpensa.ExtensionDevHost",
+                "CommandEngineIntegration",
+                "ExtensionRuntimeDashboardForm.cs");
+
+        string designerText =
+            TestPathHelper.ReadHostFile(
+                "CodexExpensa.ExtensionDevHost",
+                "CommandEngineIntegration",
+                "ExtensionRuntimeDashboardForm.Designer.cs");
+
+        Assert.Contains("SetSelectedManifestDisplaySort", formText);
+        Assert.Contains("NumericUpDown", formText);
+        Assert.Contains("Display Sort", formText);
+        Assert.Contains("setManifestDisplaySortMenuItem", designerText);
+        Assert.Contains("Set Display &Sort", designerText);
     }
 }

@@ -72,6 +72,7 @@ public sealed class ExtensionManifestRegistryService : IExtensionManifestRegistr
                 {
                     ExtensionId = record.ExtensionId,
                     DisplayName = record.DisplayName,
+                    DisplaySort = record.DisplaySort,
                     Version = record.Version,
                     AssemblyFile = record.AssemblyFile,
                     ProviderType = record.ProviderType,
@@ -93,6 +94,7 @@ public sealed class ExtensionManifestRegistryService : IExtensionManifestRegistr
         {
             ExtensionId = manifest.ExtensionId,
             DisplayName = manifest.DisplayName,
+            DisplaySort = manifest.DisplaySort,
             Version = manifest.Version,
             AssemblyFile = manifest.AssemblyFile,
             ProviderType = manifest.ProviderType,

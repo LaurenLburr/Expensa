@@ -32,7 +32,7 @@ namespace CodexExpensa.ExtensionDevHost.CommandEngineIntegration.Templates
             splitContainer1 = new SplitContainer();
             splitContainer2 = new SplitContainer();
             tree = new TreeView();
-            gridData = new DataGridView();
+            gridData = new Krypton.Toolkit.Suite.Extended.TreeGridView.KryptonTreeGridView();
             panelLabel = new Panel();
             labelAdd_in_Name = new Label();
             textNotes = new TextBox();
@@ -158,7 +158,7 @@ namespace CodexExpensa.ExtensionDevHost.CommandEngineIntegration.Templates
         protected SplitContainer splitContainer1;
         protected SplitContainer splitContainer2;
         protected TreeView tree;
-        protected DataGridView gridData;
+        protected Krypton.Toolkit.Suite.Extended.TreeGridView.KryptonTreeGridView gridData;
         protected TextBox textNotes;
         private Panel panelLabel;
         protected Label labelAdd_in_Name;

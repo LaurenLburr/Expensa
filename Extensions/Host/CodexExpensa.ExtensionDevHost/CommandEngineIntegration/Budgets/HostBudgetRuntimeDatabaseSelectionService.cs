@@ -32,11 +32,55 @@ public sealed class HostBudgetRuntimeDatabaseSelectionService
             return pathService.GetRuntimeDatabaseLocation();
         }
 
+        string resolvedDatabasePath =
+            ResolveCanonicalDatabasePath(runtimeDatabasePath);
+
+        if (!string.Equals(
+                runtimeDatabasePath,
+                resolvedDatabasePath,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            File.WriteAllText(settingsPath, resolvedDatabasePath);
+        }
+
         return new HostBudgetDatabaseLocation
         {
-            DatabaseName = Path.GetFileName(runtimeDatabasePath),
-            DatabasePath = runtimeDatabasePath
+            DatabaseName = Path.GetFileName(resolvedDatabasePath),
+            DatabasePath = resolvedDatabasePath
         };
+    }
+
+    public static string ResolveCanonicalDatabasePath(string databasePath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(databasePath);
+
+        string folder =
+            Path.GetDirectoryName(databasePath) ?? string.Empty;
+
+        if (string.IsNullOrWhiteSpace(folder))
+        {
+            return databasePath;
+        }
+
+        string canonicalPath =
+            Path.Combine(folder, "budgets.current.db");
+
+        string fileName =
+            Path.GetFileName(databasePath);
+
+        bool isLegacyGenericName =
+            string.Equals(
+                fileName,
+                "current.db",
+                StringComparison.OrdinalIgnoreCase);
+
+        if ((isLegacyGenericName || !File.Exists(databasePath)) &&
+            File.Exists(canonicalPath))
+        {
+            return canonicalPath;
+        }
+
+        return databasePath;
     }
 
     public HostBudgetDatabaseLocation SetActiveRuntimeDatabase(string databasePath)

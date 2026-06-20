@@ -1,0 +1,75 @@
+Deploy Expensa Extensions
+=========================
+
+Succeeded: True
+Started UTC: 2026-06-15T13:44:36.8605222Z
+Completed UTC: 2026-06-15T13:44:42.4194314Z
+Instruction file: D:\Git\CodexExpensa\Extensions\Deployment\ExpensaDeployment.json
+Backup folder: D:\Git\CodexExpensa\Extensions\Deployment\Backups\20260615_134436
+
+1. [SUCCEEDED] Build BudgetsAddin (BuildProject)
+Built project: D:\Git\CodexExpensa\Extensions\Modules\BudgetsAddin\BudgetsAddin.csproj
+  Determining projects to restore...
+  All projects are up-to-date for restore.
+  Codex.CommandEngine.Abstractions -> D:\Git\CodexExpensa\Codex.CommandEngine\Core\Codex.CommandEngine.Abstractions\bin\Release\net8.0-windows\Codex.CommandEngine.Abstractions.dll
+  Codex.CommandEngine.Core -> D:\Git\CodexExpensa\Codex.CommandEngine\Core\Codex.CommandEngine.Core\bin\Release\net8.0-windows\Codex.CommandEngine.Core.dll
+  CodexExpensa.Navigation.Abstractions -> D:\Git\CodexExpensa\Extensions\Core\CodexExpensa.Navigation.Abstractions\bin\Release\net8.0\CodexExpensa.Navigation.Abstractions.dll
+  BudgetsAddin -> D:\Git\CodexExpensa\Extensions\Modules\BudgetsAddin\bin\Release\net8.0-windows\BudgetsAddin.dll
+
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:01.35
+
+
+2. [SUCCEEDED] Deploy BudgetsAddin (CopyFolder)
+Copied 35 files: D:\Git\CodexExpensa\Extensions\Modules\BudgetsAddin\bin\Release\net8.0-windows -> D:\Git\CodexExpensa\Expensa\Extensions\BudgetsAddin
+
+3. [SUCCEEDED] Verify BudgetsAddin (VerifyFile)
+Verified file: D:\Git\CodexExpensa\Expensa\Extensions\BudgetsAddin\BudgetsAddin.dll
+
+4. [SUCCEEDED] Build PayeesAddin (BuildProject)
+Built project: D:\Git\CodexExpensa\Extensions\Modules\PayeesAddin\PayeesAddin.csproj
+  Determining projects to restore...
+  All projects are up-to-date for restore.
+  Codex.CommandEngine.Abstractions -> D:\Git\CodexExpensa\Codex.CommandEngine\Core\Codex.CommandEngine.Abstractions\bin\Release\net8.0-windows\Codex.CommandEngine.Abstractions.dll
+  Codex.CommandEngine.Core -> D:\Git\CodexExpensa\Codex.CommandEngine\Core\Codex.CommandEngine.Core\bin\Release\net8.0-windows\Codex.CommandEngine.Core.dll
+  CodexExpensa.Navigation.Abstractions -> D:\Git\CodexExpensa\Extensions\Core\CodexExpensa.Navigation.Abstractions\bin\Release\net8.0\CodexExpensa.Navigation.Abstractions.dll
+  PayeesAddin -> D:\Git\CodexExpensa\Extensions\Modules\PayeesAddin\bin\Release\net8.0-windows\PayeesAddin.dll
+
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:01.37
+
+
+5. [SUCCEEDED] Deploy PayeesAddin (CopyFolder)
+Copied 34 files: D:\Git\CodexExpensa\Extensions\Modules\PayeesAddin\bin\Release\net8.0-windows -> D:\Git\CodexExpensa\Expensa\Extensions\PayeesAddin
+
+6. [SUCCEEDED] Verify PayeesAddin (VerifyFile)
+Verified file: D:\Git\CodexExpensa\Expensa\Extensions\PayeesAddin\PayeesAddin.dll
+
+7. [SUCCEEDED] Build WebsitesAddin (BuildProject)
+Built project: D:\Git\CodexExpensa\Extensions\Modules\WebsitesAddin\WebsitesAddin.csproj
+  Determining projects to restore...
+  All projects are up-to-date for restore.
+  Codex.CommandEngine.Abstractions -> D:\Git\CodexExpensa\Codex.CommandEngine\Core\Codex.CommandEngine.Abstractions\bin\Release\net8.0-windows\Codex.CommandEngine.Abstractions.dll
+  Codex.CommandEngine.Core -> D:\Git\CodexExpensa\Codex.CommandEngine\Core\Codex.CommandEngine.Core\bin\Release\net8.0-windows\Codex.CommandEngine.Core.dll
+  CodexExpensa.Navigation.Abstractions -> D:\Git\CodexExpensa\Extensions\Core\CodexExpensa.Navigation.Abstractions\bin\Release\net8.0\CodexExpensa.Navigation.Abstractions.dll
+  WebsitesAddin -> D:\Git\CodexExpensa\Extensions\Modules\WebsitesAddin\bin\Release\net8.0-windows\WebsitesAddin.dll
+
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:01.44
+
+
+8. [SUCCEEDED] Deploy WebsitesAddin (CopyFolder)
+Copied 35 files: D:\Git\CodexExpensa\Extensions\Modules\WebsitesAddin\bin\Release\net8.0-windows -> D:\Git\CodexExpensa\Expensa\Extensions\WebsitesAddin
+
+9. [SUCCEEDED] Verify WebsitesAddin (VerifyFile)
+Verified file: D:\Git\CodexExpensa\Expensa\Extensions\WebsitesAddin\WebsitesAddin.dll
+

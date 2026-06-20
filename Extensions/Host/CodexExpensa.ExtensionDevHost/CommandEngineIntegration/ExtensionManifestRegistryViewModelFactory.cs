@@ -9,7 +9,8 @@ public static class ExtensionManifestRegistryViewModelFactory
 
         IReadOnlyList<ExtensionManifestRecord> records =
             snapshot.Records
-                .OrderBy(static record => record.DisplayName, StringComparer.OrdinalIgnoreCase)
+                .OrderBy(static record => record.DisplaySort)
+                .ThenBy(static record => record.DisplayName, StringComparer.OrdinalIgnoreCase)
                 .ThenBy(static record => record.ExtensionId, StringComparer.OrdinalIgnoreCase)
                 .ThenBy(static record => record.ManifestPath, StringComparer.OrdinalIgnoreCase)
                 .ToList();

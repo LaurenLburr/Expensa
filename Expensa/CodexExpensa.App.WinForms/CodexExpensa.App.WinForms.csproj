@@ -1,13 +1,19 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
 		<OutputType>WinExe</OutputType>
 		<TargetFramework>net8.0-windows</TargetFramework>
 		<UseWindowsForms>true</UseWindowsForms>
+		<UseWPF>true</UseWPF>
 		<Nullable>enable</Nullable>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<AssemblyTitle>CodexExpensa</AssemblyTitle>
 	</PropertyGroup>
+
+	<ItemGroup>
+	  <PackageReference Include="Krypton.Toolkit.Suite.Extended.TreeGridView" Version="105.26.4.110" />
+	  <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.9" />
+	</ItemGroup>
 
 	<ItemGroup>
 		<ProjectReference Include="..\CodexExpensa.Core\CodexExpensa.Core.csproj" />

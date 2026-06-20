@@ -85,7 +85,7 @@ public sealed class SqliteWebsiteRepository : IWebsiteRepository, IDisposable
         }
         else
         {
-            _ownedConnection ??= new SqliteConnection($"Data Source={_options.DatabasePath}");
+            _ownedConnection ??= new SqliteConnection($"Data Source={_options.DatabasePath};Mode=ReadOnly;Pooling=False");
             connection = _ownedConnection;
         }
 

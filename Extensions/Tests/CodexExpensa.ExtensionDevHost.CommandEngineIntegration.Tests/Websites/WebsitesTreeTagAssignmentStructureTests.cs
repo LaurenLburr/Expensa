@@ -40,6 +40,45 @@ public sealed class WebsitesTreeTagAssignmentStructureTests
         Assert.Contains("'Website'", text);
         Assert.Contains("GetOrCreateTagId", text);
         Assert.Contains("EnsureWebsiteTagAssignment", text);
+        Assert.Contains("SafeSqliteConnection.OpenFromFile", text);
+        Assert.Contains("SafeSqliteConnection.SaveToFile", text);
+    }
+
+    [Fact]
+    public void TagAssignmentService_RemovesWebsiteTagAssignment()
+    {
+        string text =
+            ReadFile(
+                "Host",
+                "CodexExpensa.ExtensionDevHost",
+                "CommandEngineIntegration",
+                "Websites",
+                "HostWebsiteTagAssignmentService.cs");
+
+        Assert.Contains("RemoveWebsiteTagAssignments", text);
+        Assert.Contains("UPDATE [TagAssignment]", text);
+        Assert.Contains("SET [IsActive] = 0", text);
+        Assert.Contains("SafeSqliteConnection.OpenFromFile", text);
+        Assert.Contains("SafeSqliteConnection.SaveToFile", text);
+    }
+
+    [Fact]
+    public void TagAssignmentService_DeletesWebsiteNode()
+    {
+        string text =
+            ReadFile(
+                "Host",
+                "CodexExpensa.ExtensionDevHost",
+                "CommandEngineIntegration",
+                "Websites",
+                "HostWebsiteTagAssignmentService.cs");
+
+        Assert.Contains("DeleteWebsiteNode", text);
+        Assert.Contains("UPDATE [Website]", text);
+        Assert.Contains("SET [IsEnabled] = 0", text);
+        Assert.Contains("UPDATE [TagAssignment]", text);
+        Assert.Contains("SafeSqliteConnection.OpenFromFile", text);
+        Assert.Contains("SafeSqliteConnection.SaveToFile", text);
     }
 
     [Fact]
@@ -58,6 +97,43 @@ public sealed class WebsitesTreeTagAssignmentStructureTests
         Assert.Contains("AssignTagToSelectedWebsiteAsync", text);
         Assert.Contains("HostWebsiteTreeNodeTagReader.GetWebsiteId", text);
         Assert.Contains("AddOrAssignTagToWebsite", text);
+        Assert.Contains("LoadWebsitesTreeAsync", text);
+    }
+
+    [Fact]
+    public void Form_RemovesTagAssociationFromSelectedWebsite()
+    {
+        string text =
+            ReadFile(
+                "Host",
+                "CodexExpensa.ExtensionDevHost",
+                "CommandEngineIntegration",
+                "Websites",
+                "WebsitesTreeLoadVerificationForm.TagPicker.cs");
+
+        Assert.Contains("removeTagAssociationMenuItem_Click", text);
+        Assert.Contains("RemoveTagAssociationFromSelectedWebsiteAsync", text);
+        Assert.Contains("RemoveWebsiteTagAssignments", text);
+        Assert.Contains("Remove Website Tag Association", text);
+        Assert.Contains("LoadWebsitesTreeAsync", text);
+    }
+
+    [Fact]
+    public void Form_DeletesSelectedWebsiteNode()
+    {
+        string text =
+            ReadFile(
+                "Host",
+                "CodexExpensa.ExtensionDevHost",
+                "CommandEngineIntegration",
+                "Websites",
+                "WebsitesTreeLoadVerificationForm.TagPicker.cs");
+
+        Assert.Contains("deleteNodeMenuItem_Click", text);
+        Assert.Contains("DeleteSelectedWebsiteNodeAsync", text);
+        Assert.Contains("DeleteWebsiteNode", text);
+        Assert.Contains("MessageBoxButtons.YesNo", text);
+        Assert.Contains("Delete Website Node", text);
         Assert.Contains("LoadWebsitesTreeAsync", text);
     }
 

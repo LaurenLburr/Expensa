@@ -6,6 +6,8 @@ public sealed class ExtensionManifestRecord
 
     public string DisplayName { get; init; } = string.Empty;
 
+    public int DisplaySort { get; init; }
+
     public string Version { get; init; } = string.Empty;
 
     public string AssemblyFile { get; init; } = string.Empty;

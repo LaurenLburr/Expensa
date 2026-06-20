@@ -6,6 +6,10 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Krypton.Toolkit.Suite.Extended.Outlook.Grid" Version="105.26.4.110" />
+    <PackageReference Include="Krypton.Toolkit.Suite.Extended.TreeGridView" Version="105.26.4.110" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\CodexExpensa.ExtensionDevHost\CommandEngineIntegration\CodexExpensa.ExtensionDevHost.CommandEngineIntegration.csproj" />

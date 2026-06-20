@@ -116,6 +116,13 @@ public sealed partial class ExtensionRuntimeDashboardController
         return _manifestEditorService.SetEnabled(manifestPath, enabled);
     }
 
+    public ExtensionManifestUpdateResult SetManifestDisplaySort(string manifestPath, int displaySort)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(manifestPath);
+
+        return _manifestEditorService.SetDisplaySort(manifestPath, displaySort);
+    }
+
     public CommandMetadataRecord? FindCommandMetadata(string commandName)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(commandName);

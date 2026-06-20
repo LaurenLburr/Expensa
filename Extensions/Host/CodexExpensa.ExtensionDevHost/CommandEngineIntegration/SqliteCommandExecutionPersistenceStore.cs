@@ -1,4 +1,5 @@
 using Microsoft.Data.Sqlite;
+using CodexExpensa.ExtensionDevHost.CommandEngineIntegration.ExtensionManager;
 using System.Data;
 
 namespace CodexExpensa.ExtensionDevHost.CommandEngineIntegration;
@@ -6,7 +7,6 @@ namespace CodexExpensa.ExtensionDevHost.CommandEngineIntegration;
 public sealed class SqliteCommandExecutionPersistenceStore :
     ICommandExecutionPersistenceFileStore
 {
-    private readonly string _connectionString;
 
     public SqliteCommandExecutionPersistenceStore(CommandExecutionPersistenceOptions options)
     {
@@ -21,13 +21,6 @@ public sealed class SqliteCommandExecutionPersistenceStore :
         {
             Directory.CreateDirectory(folder);
         }
-
-        SqliteConnectionStringBuilder builder = new()
-        {
-            DataSource = DatabasePath
-        };
-
-        _connectionString = builder.ToString();
     }
 
     public string DatabasePath { get; }
@@ -38,6 +31,7 @@ public sealed class SqliteCommandExecutionPersistenceStore :
 
         ExecuteNonQuery(connection, CommandExecutionPersistenceSchema.CreateCommandExecutionTable);
         ExecuteNonQuery(connection, CommandExecutionPersistenceSchema.CreateCommandExecutionIndexes);
+        SafeSqliteConnection.SaveToFile(connection, DatabasePath);
     }
 
     public void UpsertQueueItem(CommandExecutionQueueItem item)
@@ -142,7 +136,9 @@ public sealed class SqliteCommandExecutionPersistenceStore :
             command.Parameters.AddWithValue(parameter.Key, parameter.Value);
         }
 
-        return command.ExecuteNonQuery();
+        int deleted = command.ExecuteNonQuery();
+        SafeSqliteConnection.SaveToFile(connection, DatabasePath);
+        return deleted;
     }
 
     public void DeleteCompletedQueueItems()
@@ -152,6 +148,7 @@ public sealed class SqliteCommandExecutionPersistenceStore :
         using SqliteConnection connection = OpenConnection();
 
         ExecuteNonQuery(connection, CommandExecutionPersistenceSchema.DeleteCompletedQueueItems);
+        SafeSqliteConnection.SaveToFile(connection, DatabasePath);
     }
 
     public void Vacuum()
@@ -161,6 +158,7 @@ public sealed class SqliteCommandExecutionPersistenceStore :
         using SqliteConnection connection = OpenConnection();
 
         ExecuteNonQuery(connection, "VACUUM;");
+        SafeSqliteConnection.SaveToFile(connection, DatabasePath);
     }
 
     private void Upsert(CommandExecutionPersistentRecord record)
@@ -185,13 +183,14 @@ public sealed class SqliteCommandExecutionPersistenceStore :
         command.Parameters.AddWithValue("@IsQueueItem", record.IsQueueItem);
 
         command.ExecuteNonQuery();
+        SafeSqliteConnection.SaveToFile(connection, DatabasePath);
     }
 
     private SqliteConnection OpenConnection()
     {
-        SqliteConnection connection = new(_connectionString);
-        connection.Open();
-        return connection;
+        return File.Exists(DatabasePath)
+            ? SafeSqliteConnection.OpenFromFile(DatabasePath)
+            : SafeSqliteConnection.CreateEmptyMemory();
     }
 
     private static void ExecuteNonQuery(SqliteConnection connection, string commandText)

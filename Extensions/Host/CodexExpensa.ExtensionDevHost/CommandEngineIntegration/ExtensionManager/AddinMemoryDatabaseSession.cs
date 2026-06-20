@@ -21,36 +21,37 @@ public sealed class AddinMemoryDatabaseSession : IDisposable
     public static AddinMemoryDatabaseSession LoadFromFile(
         string sourceDatabasePath)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(sourceDatabasePath);
+        SqliteConnection connection =
+            SafeSqliteConnection.OpenFromFile(sourceDatabasePath);
 
-        if (!File.Exists(sourceDatabasePath))
-        {
-            throw new FileNotFoundException(
-                $"Add-in database file was not found: {sourceDatabasePath}",
-                sourceDatabasePath);
-        }
+        return new AddinMemoryDatabaseSession(
+            sourceDatabasePath,
+            connection);
+    }
 
-        SqliteConnection memoryConnection = new("Data Source=:memory:");
+    public static AddinMemoryDatabaseSession CreateEmpty(
+        string targetDatabasePath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(targetDatabasePath);
 
-        try
-        {
-            memoryConnection.Open();
+        return new AddinMemoryDatabaseSession(
+            targetDatabasePath,
+            SafeSqliteConnection.CreateEmptyMemory());
+    }
 
-            using SqliteConnection sourceConnection =
-                new($"Data Source={sourceDatabasePath};Mode=ReadOnly");
+    public void Save()
+    {
+        SaveToFile(SourceDatabasePath);
+    }
 
-            sourceConnection.Open();
-            sourceConnection.BackupDatabase(memoryConnection);
+    public void SaveToFile(string databasePath)
+    {
+        ThrowIfDisposed();
+        ArgumentException.ThrowIfNullOrWhiteSpace(databasePath);
 
-            return new AddinMemoryDatabaseSession(
-                sourceDatabasePath,
-                memoryConnection);
-        }
-        catch
-        {
-            memoryConnection.Dispose();
-            throw;
-        }
+        SafeSqliteConnection.SaveToFile(
+            Connection,
+            databasePath);
     }
 
     public void Dispose()
@@ -60,7 +61,16 @@ public sealed class AddinMemoryDatabaseSession : IDisposable
             return;
         }
 
+        Connection.Close();
         Connection.Dispose();
+        SqliteConnection.ClearAllPools();
         _disposed = true;
+    }
+
+    private void ThrowIfDisposed()
+    {
+        ObjectDisposedException.ThrowIf(
+            _disposed,
+            this);
     }
 }

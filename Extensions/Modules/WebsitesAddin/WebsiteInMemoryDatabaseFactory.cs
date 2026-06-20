@@ -16,7 +16,7 @@ public static class WebsiteInMemoryDatabaseFactory
         }
 
         using SqliteConnection sourceConnection =
-            new($"Data Source={sourceDatabasePath};Mode=ReadOnly");
+            new($"Data Source={sourceDatabasePath};Mode=ReadOnly;Pooling=False");
 
         SqliteConnection memoryConnection =
             new("Data Source=:memory:");

@@ -4,6 +4,7 @@ public sealed partial class ExtensionManagerAddinTestSurfaceForm : Form
 {
     private readonly IExtensionManagerAddinTestCatalog _catalog;
     private readonly AddinProjectUiSurfaceResolver _surfaceResolver = new();
+    private readonly AddinFolderStructureInitializer _folderStructureInitializer = new();
 
     public ExtensionManagerAddinTestSurfaceForm()
         : this(new ExtensionManagerAddinTestCatalog())
@@ -27,6 +28,9 @@ public sealed partial class ExtensionManagerAddinTestSurfaceForm : Form
             _catalog.GetAddins()
                 .OrderBy(static item => item.SortOrder)
                 .ToList();
+
+        _folderStructureInitializer.EnsureCreated(
+            addins.Select(static addin => addin.AddinId));
 
         ExtensionManagerAddinTestTreeBuilder.Populate(addinTreeView, addins);
 
